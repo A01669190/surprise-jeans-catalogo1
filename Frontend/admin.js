@@ -18,7 +18,7 @@ function verificarAcceso() {
 }
 
 // 2. CONFIGURACIÓN DE LA API
-const API_URL = 'https://surprise-jeans-api.onrender.com';
+const API_URL = 'https://surprise-jeans-api-denz.onrender.com';
 
 document.addEventListener('DOMContentLoaded', () => {
     cargarCategoriasEnSelect();

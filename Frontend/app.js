@@ -1,4 +1,4 @@
-const API_URL = 'https://surprise-jeans-api.onrender.com';
+const API_URL = 'https://surprise-jeans-api-denz.onrender.com';
 
 document.addEventListener('DOMContentLoaded', () => {
     cargarCategorias();
