@@ -35,6 +35,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://surprise-jeans-catalogo1.vercel.app", 
+        "https://www.surprisejeans.com",  # <--- Agregas tu nuevo dominio con www
+        "https://surprisejeans.com",      # <--- Agregas tu nuevo dominio sin www
         "http://localhost:5500", "http://127.0.0.1:5500"
     ],
     allow_credentials=True,
