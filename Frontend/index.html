@@ -3,74 +3,265 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Surprise Jeans | Catálogo Exclusivo</title>
+    <title>Surprise Jeans | Mayoreo y Menudeo</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        nude: '#fdfbfb',
-                        blush: '#fcf3f2',
-                    }
-                }
-            }
-        }
-    </script>
 </head>
-<body class="bg-nude text-gray-800 font-sans selection:bg-rose-200">
-
-    <header class="bg-white sticky top-0 z-50 border-b border-gray-100/50 shadow-sm">
-        <div class="container mx-auto px-4 py-5 flex flex-col items-center">
-            <img src="logo.png" alt="Surprise Jeans Logo" class="h-16 md:h-20 object-contain mb-2">
-            <p class="text-stone-400 text-xs tracking-[0.25em] uppercase font-light">Mayoreo y Menudeo</p>
-        </div>
+<body class="bg-gray-50 text-gray-800 font-sans relative pb-20">
+    
+    <header class="text-center py-10 bg-white">
+        <h1 class="text-5xl font-black italic tracking-tighter">Surprise<span class="text-sm font-normal text-gray-400 block -mt-2">Jeans</span></h1>
+        <p class="text-[10px] text-gray-500 tracking-[0.3em] mt-3 uppercase font-bold">Mayoreo y Menudeo</p>
     </header>
 
-    <section class="bg-blush py-12 px-4 mb-8">
-        <div class="container mx-auto text-center max-w-2xl">
-            <h2 class="text-3xl md:text-4xl font-serif text-stone-800 mb-3 tracking-wide">Realza tu figura</h2>
-            <p class="text-stone-500 text-sm md:text-base font-light">Descubre nuestra nueva colección. El fit perfecto diseñado para ti, directo de fábrica.</p>
+    <section class="bg-rose-50 py-16 text-center px-4 border-y border-rose-100">
+        <h2 class="text-4xl font-serif mb-3 text-stone-800">Realza tu figura</h2>
+        <p class="text-stone-500 mb-8 max-w-lg mx-auto text-sm">Descubre nuestra nueva colección. El fit perfecto diseñado para ti, directo de fábrica.</p>
+        <div class="max-w-xl mx-auto relative shadow-lg rounded-full">
+            <input type="text" id="buscador" placeholder="¿Qué modelo buscas? (Ej. Skinny, Mom...)" class="w-full border-none p-4 rounded-full pl-14 focus:outline-none focus:ring-4 focus:ring-rose-200 transition-all text-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-5 top-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
         </div>
     </section>
 
-    <main class="container mx-auto px-4 py-4 mb-16">
-        
-        <div class="max-w-2xl mx-auto px-4 mb-6 mt-4">
-            <div class="relative">
-                <span class="absolute inset-y-0 left-0 pl-4 flex items-center text-gray-400">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
-                    </svg>
-                </span>
-                <input type="text" id="buscador-tienda" placeholder="¿Qué modelo buscas? (Ej. Skinny, Mom, Brillos...)" 
-                    class="w-full pl-12 pr-4 py-3 rounded-full border border-gray-200 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all shadow-sm text-gray-700 font-medium">
-            </div>
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div id="grid-pantalones" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+            <p class="text-center col-span-full text-stone-500 font-bold py-10 animate-pulse">Cargando colección...</p>
         </div>
-
-        <div class="mb-10 text-center">
-            <div id="contenedor-categorias" class="flex flex-wrap justify-center gap-3">
-            </div>
-        </div>
-
-        <div id="contenedor-pantalones" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-10">
-        </div>
-
-        <div class="text-center mt-12 mb-8">
-            <button id="btn-cargar-mas" class="hidden bg-stone-200 text-stone-700 hover:bg-stone-800 hover:text-white px-8 py-3 rounded-full text-sm font-bold tracking-widest transition-colors shadow-sm">
-                CARGAR MÁS MODELOS
-            </button>
-        </div>
-
     </main>
 
-    <footer class="bg-white border-t border-gray-100 py-10 mt-auto">
-        <div class="container mx-auto px-4 text-center">
-            <p class="text-stone-400 text-xs tracking-widest uppercase mb-2">Surprise Jeans © 2026</p>
-            <p class="text-stone-400 text-xs">Hecho con amor para el mejor fit.</p>
-        </div>
+    <footer class="text-center py-10 text-xs text-stone-400 uppercase tracking-widest bg-white mt-10">
+        <p>Surprise Jeans © 2026</p>
+        <p class="mt-1 lowercase tracking-normal">Hecho con amor para el mejor fit.</p>
     </footer>
 
-    <script src="app.js"></script>
+    <button onclick="abrirCarrito()" class="fixed bottom-6 right-6 bg-stone-900 text-white p-4 rounded-full shadow-2xl hover:bg-stone-800 transition-transform hover:scale-110 z-40">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+        <span id="cart-badge" class="absolute -top-2 -right-2 bg-rose-500 text-white text-xs font-black w-6 h-6 rounded-full flex items-center justify-center shadow-md">0</span>
+    </button>
+
+    <div id="modal-carrito" class="fixed inset-0 bg-stone-900 bg-opacity-75 z-50 hidden flex justify-end transition-opacity">
+        <div class="bg-white w-full max-w-md h-full shadow-2xl flex flex-col transform transition-transform translate-x-0">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <h3 class="text-xl font-black text-stone-800">Tu Pedido</h3>
+                <button onclick="cerrarCarrito()" class="text-stone-400 hover:text-rose-500 text-3xl font-bold leading-none">&times;</button>
+            </div>
+            
+            <div class="p-6 flex-1 overflow-y-auto">
+                <ul id="lista-carrito" class="space-y-6">
+                    <p class="text-center text-stone-400 text-sm mt-10">Aún no has agregado ningún modelo.</p>
+                </ul>
+            </div>
+            
+            <div class="p-6 border-t border-gray-100 bg-white shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)]">
+                <div class="flex justify-between items-center mb-6">
+                    <span class="font-bold text-stone-500 uppercase tracking-widest text-xs">Total Estimado</span>
+                    <span id="total-carrito" class="text-3xl font-black text-stone-900">$0.00</span>
+                </div>
+                <button onclick="enviarWhatsApp()" class="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-xl flex justify-center items-center gap-3 shadow-lg transition-colors text-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.898-4.45 9.898-9.892 0-2.64-1.024-5.119-2.894-6.985-1.869-1.868-4.348-2.897-6.983-2.897-5.448 0-9.896 4.451-9.896 9.893 0 2.124.6 3.744 1.585 5.4l-1.127 4.113 4.225-1.224zm7.561-5.163c-.303-.152-1.793-.886-2.07-.988-.277-.102-.479-.152-.681.152-.202.304-.781.988-.957 1.19-.176.202-.353.228-.656.076-.303-.152-1.279-.473-2.436-1.511-.902-.81-1.511-1.809-1.687-2.113-.176-.304-.019-.468.132-.619.136-.137.303-.355.455-.533.152-.178.202-.304.303-.507.102-.203.051-.38-.025-.533-.076-.152-.681-1.642-.932-2.248-.245-.591-.494-.51-.681-.519-.176-.008-.379-.009-.581-.009-.202 0-.53.076-.807.38-.277.304-1.06 1.039-1.06 2.535 0 1.495 1.085 2.941 1.237 3.143.152.203 2.143 3.271 5.187 4.582 2.378 1.018 3.197.876 3.967.822.846-.059 2.723-1.114 3.102-2.19.379-1.076.379-1.994.277-2.19-.102-.196-.379-.312-.681-.464z"/>
+                    </svg>
+                    Enviar Pedido
+                </button>
+                <p class="text-[10px] text-center text-stone-400 mt-3">Al hacer clic, se abrirá WhatsApp con el resumen de tu pedido.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 1. CONFIGURACIÓN PRINCIPAL
+        const API_URL = 'https://surprise-jeans-api-denz.onrender.com';
+        const NUMERO_WHATSAPP = '5215500000000'; // <-- CAMBIA ESTO POR EL NÚMERO REAL
+        
+        let catalogoCompleto = [];
+        let carrito = [];
+
+        // 2. DESCARGAR CATÁLOGO DEL SERVIDOR
+        async function cargarCatalogo() {
+            try {
+                const respuesta = await fetch(`${API_URL}/pantalones`);
+                catalogoCompleto = await respuesta.json();
+                renderizarCatalogo(catalogoCompleto);
+            } catch (error) {
+                console.error("Error al cargar:", error);
+                document.getElementById('grid-pantalones').innerHTML = '<p class="text-center text-rose-500 col-span-full">Error al cargar la colección. Recarga la página.</p>';
+            }
+        }
+
+        // 3. PINTAR PANTALONES EN LA PANTALLA
+        function renderizarCatalogo(listaPantalones) {
+            const grid = document.getElementById('grid-pantalones');
+            grid.innerHTML = '';
+
+            if (listaPantalones.length === 0) {
+                grid.innerHTML = '<p class="text-center col-span-full text-stone-500 py-10">No encontramos modelos con esa búsqueda.</p>';
+                return;
+            }
+
+            listaPantalones.forEach(p => {
+                // Si el stock es 0, no lo mostramos o lo mostramos agotado (aquí lo mostramos normal pero podrías ocultarlo)
+                const div = document.createElement('div');
+                div.className = 'bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 group';
+                
+                div.innerHTML = `
+                    <div class="relative overflow-hidden aspect-[3/4]">
+                        <img src="${p.imagen_url}" alt="${p.nombre}" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500">
+                        <div class="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-black text-indigo-600 shadow-sm">
+                            [${p.codigo || 'S/C'}]
+                        </div>
+                    </div>
+                    <div class="p-5">
+                        <h3 class="font-bold text-stone-800 text-lg uppercase leading-tight mb-2 truncate" title="${p.nombre}">${p.nombre}</h3>
+                        <div class="flex justify-between items-end mb-4">
+                            <p class="text-2xl font-black text-stone-900">$${p.precio}</p>
+                            <p class="text-xs text-stone-400 font-medium">Quedan ${p.stock}</p>
+                        </div>
+                        <button onclick="agregarAlCarrito(${p.id})" class="w-full bg-stone-100 hover:bg-stone-900 text-stone-900 hover:text-white font-bold py-3 rounded-xl transition-colors text-sm shadow-sm">
+                            Añadir a la bolsa
+                        </button>
+                    </div>
+                `;
+                grid.appendChild(div);
+            });
+        }
+
+        // 4. MOTOR DEL BUSCADOR EN TIEMPO REAL
+        document.getElementById('buscador').addEventListener('input', (e) => {
+            const texto = e.target.value.toLowerCase();
+            const filtrados = catalogoCompleto.filter(p => 
+                p.nombre.toLowerCase().includes(texto) || 
+                (p.codigo && p.codigo.toLowerCase().includes(texto))
+            );
+            renderizarCatalogo(filtrados);
+        });
+
+        // 5. LÓGICA DEL CARRITO
+        function agregarAlCarrito(id) {
+            const pantalon = catalogoCompleto.find(p => p.id === id);
+            if (!pantalon) return;
+
+            const itemExistente = carrito.find(item => item.id === id);
+            
+            // Verificamos que no pida más del stock que hay
+            if (itemExistente) {
+                if(itemExistente.cantidad < pantalon.stock) {
+                    itemExistente.cantidad++;
+                } else {
+                    alert(`Solo tenemos ${pantalon.stock} unidades en existencia de este modelo.`);
+                    return;
+                }
+            } else {
+                if(pantalon.stock > 0) {
+                    carrito.push({ ...pantalon, cantidad: 1 });
+                } else {
+                    alert('Este modelo está agotado.');
+                    return;
+                }
+            }
+            
+            actualizarUICarrito();
+            abrirCarrito(); // Despliega el carrito visualmente para que el cliente vea que se agregó
+        }
+
+        function actualizarUICarrito() {
+            const lista = document.getElementById('lista-carrito');
+            const badge = document.getElementById('cart-badge');
+            const totalEl = document.getElementById('total-carrito');
+            
+            let total = 0;
+            let cantidadTotal = 0;
+
+            if (carrito.length === 0) {
+                lista.innerHTML = '<p class="text-center text-stone-400 text-sm mt-10">Aún no has agregado ningún modelo.</p>';
+                badge.innerText = 0;
+                totalEl.innerText = '$0.00';
+                return;
+            }
+
+            lista.innerHTML = '';
+            carrito.forEach((item, index) => {
+                total += item.precio * item.cantidad;
+                cantidadTotal += item.cantidad;
+
+                const li = document.createElement('li');
+                li.className = 'flex items-center gap-4 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm';
+                li.innerHTML = `
+                    <img src="${item.imagen_url}" class="w-20 h-24 object-cover rounded-xl">
+                    <div class="flex-1">
+                        <p class="font-bold text-sm text-stone-800 uppercase leading-tight mb-1">${item.nombre}</p>
+                        <p class="text-[10px] text-indigo-500 font-black mb-2">[${item.codigo}]</p>
+                        <div class="flex justify-between items-center">
+                            <p class="font-black text-stone-900">$${item.precio}</p>
+                            <div class="flex items-center gap-3 bg-gray-50 rounded-lg p-1 border border-gray-200">
+                                <button onclick="cambiarCantidad(${index}, -1)" class="w-6 h-6 flex items-center justify-center bg-white rounded-md font-bold text-gray-500 hover:bg-rose-100 hover:text-rose-600 shadow-sm transition-colors">-</button>
+                                <span class="text-sm font-bold text-stone-700 w-4 text-center">${item.cantidad}</span>
+                                <button onclick="cambiarCantidad(${index}, 1)" class="w-6 h-6 flex items-center justify-center bg-white rounded-md font-bold text-gray-500 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm transition-colors">+</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                lista.appendChild(li);
+            });
+
+            badge.innerText = cantidadTotal;
+            totalEl.innerText = `$${total.toFixed(2)}`;
+        }
+
+        function cambiarCantidad(index, delta) {
+            const item = carrito[index];
+            
+            // Regla: no superar el stock
+            if (delta === 1 && item.cantidad >= item.stock) {
+                alert(`Solo hay ${item.stock} unidades en existencia.`);
+                return;
+            }
+
+            item.cantidad += delta;
+            
+            // Si baja de 1, se elimina del carrito
+            if (item.cantidad <= 0) {
+                carrito.splice(index, 1);
+            }
+            actualizarUICarrito();
+        }
+
+        // 6. CONTROL VISUAL DEL MODAL
+        function abrirCarrito() {
+            document.getElementById('modal-carrito').classList.remove('hidden');
+        }
+        function cerrarCarrito() {
+            document.getElementById('modal-carrito').classList.add('hidden');
+        }
+
+        // 7. COMPILADOR HACIA WHATSAPP
+        function enviarWhatsApp() {
+            if (carrito.length === 0) return;
+
+            let mensaje = "¡Hola! 👋 Me interesan estos modelos que armé en mi carrito:\\n\\n";
+            let totalPedido = 0;
+
+            carrito.forEach(item => {
+                const subtotal = item.precio * item.cantidad;
+                totalPedido += subtotal;
+                // Formato: ▫️ 2x [SJ-001] Skinny Azul - $300
+                mensaje += `▫️ *${item.cantidad}x* [${item.codigo}] ${item.nombre} - $${subtotal}\\n`;
+            });
+
+            mensaje += `\\n💰 *Total estimado: $${totalPedido.toFixed(2)}*\\n\\n¿Tienen estos modelos disponibles para coordinar el pago/entrega?`;
+
+            // Codificamos el texto para que la URL no se rompa con los espacios y saltos de línea
+            const url = `https://wa.me/${NUMERO_WHATSAPP}?text=${encodeURIComponent(mensaje)}`;
+            
+            // Abre WhatsApp en una pestaña nueva
+            window.open(url, '_blank');
+        }
+
+        // 8. AL INICIAR LA PÁGINA
+        document.addEventListener('DOMContentLoaded', cargarCatalogo);
+
+    </script>
 </body>
 </html>
