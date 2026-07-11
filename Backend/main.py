@@ -24,8 +24,7 @@ app.add_middleware(
 
 # 1. Crear carpeta para guardar fotos y hacerla pública
 os.makedirs("static/uploads", exist_ok=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
+app.mount("/static", StaticFiles(directory="Backend/static"), name="static")
 @app.get("/")
 def inicio():
     return {"mensaje": "¡El servidor de Surprise Jeans está vivo! 🚀"}

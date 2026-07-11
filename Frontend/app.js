@@ -37,9 +37,14 @@ async function cargarPantalones() {
             // Tarjeta sin bordes marcados, puro estilo boutique
             tarjeta.className = 'group flex flex-col cursor-pointer';
             
+            // CORRECCIÓN: Armamos la ruta absoluta hacia Render de forma segura
+            const imageUrlDefinitiva = pantalon.imagen_url.startsWith('http') 
+                ? pantalon.imagen_url 
+                : `${API_URL}${pantalon.imagen_url.startsWith('/') ? '' : '/'}${pantalon.imagen_url}`;
+            
             tarjeta.innerHTML = `
                 <div class="relative pt-[130%] bg-stone-50 rounded-xl overflow-hidden mb-4">
-                    <img src="${pantalon.imagen_url}" alt="${pantalon.nombre}" class="absolute top-0 left-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out">
+                    <img src="${imageUrlDefinitiva}" alt="${pantalon.nombre}" class="absolute top-0 left-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out">
                 </div>
                 <div class="flex flex-col flex-grow px-1">
                     <h3 class="font-serif text-stone-800 text-lg md:text-xl mb-1">${pantalon.nombre}</h3>
