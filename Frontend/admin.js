@@ -1,27 +1,57 @@
-// 1. FUNCIÓN DE SEGURIDAD (CANDADO)
-function verificarAcceso() {
-    const input = document.getElementById('input-password').value;
-    const passwordCorrecta = 'yessica2026'; 
+// 1. CONFIGURACIÓN DE LA API
+const API_URL = 'https://surprise-jeans-api-denz.onrender.com';
 
-    if (input === passwordCorrecta) {
-        const panel = document.getElementById('panel-login');
-        panel.style.opacity = '0';
-        setTimeout(() => { panel.style.display = 'none'; }, 500);
-    } else {
-        document.getElementById('error-password').classList.remove('hidden');
-        document.getElementById('input-password').value = ''; 
+// ==========================================
+// 2. SISTEMA DE LOGIN REAL CON BACKEND (JWT)
+// ==========================================
+async function verificarAcceso() {
+    const inputPassword = document.getElementById('input-password').value;
+    
+    // Armamos la petición de seguridad para el backend en Python
+    const formData = new URLSearchParams();
+    formData.append('username', 'admin');
+    formData.append('password', inputPassword);
+
+    try {
+        const respuesta = await fetch(`${API_URL}/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData
+        });
+
+        if (respuesta.ok) {
+            const data = await respuesta.json();
+            // Guardamos el token criptográfico en la memoria secreta del navegador
+            sessionStorage.setItem('token_vip', data.access_token); 
+            
+            // Ocultamos el panel de bloqueo
+            const panel = document.getElementById('panel-login');
+            panel.style.opacity = '0';
+            setTimeout(() => { panel.style.display = 'none'; }, 500);
+        } else {
+            // Contraseña incorrecta
+            document.getElementById('error-password').classList.remove('hidden');
+            document.getElementById('input-password').value = ''; 
+        }
+    } catch (error) {
+        console.error("Error al iniciar sesión:", error);
     }
 }
 
-// 2. CONFIGURACIÓN DE LA API
-const API_URL = 'https://surprise-jeans-api-denz.onrender.com';
+// FUNCIÓN CLAVE: Obtiene el token para enviarlo como "Gafete VIP" en cada petición protegida
+function obtenerTokenHeader() {
+    const token = sessionStorage.getItem('token_vip');
+    return { 'Authorization': `Bearer ${token}` };
+}
 
+// ==========================================
+// 3. INICIALIZACIÓN
+// ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     cargarCategoriasEnSelect();
     cargarInventarioAdmin(); // Carga la lista de inventario al entrar
 });
 
-// 3. FUNCIÓN PARA CARGAR CATEGORÍAS
 async function cargarCategoriasEnSelect() {
     try {
         const respuesta = await fetch(`${API_URL}/categorias`);
@@ -40,20 +70,26 @@ async function cargarCategoriasEnSelect() {
     }
 }
 
-// 4. FUNCIÓN PARA CREAR UNA NUEVA CATEGORÍA
+// ==========================================
+// 4. CREAR UNA NUEVA CATEGORÍA (Protegido)
+// ==========================================
 document.getElementById('formulario-categoria').addEventListener('submit', async (e) => {
     e.preventDefault();
     const formData = new FormData();
     formData.append('nombre', document.getElementById('nueva-categoria').value);
 
     try {
-        const respuesta = await fetch(`${API_URL}/categorias`, { method: 'POST', body: formData });
+        const respuesta = await fetch(`${API_URL}/categorias`, { 
+            method: 'POST', 
+            headers: obtenerTokenHeader(), // <-- Enviamos el Token de Seguridad
+            body: formData 
+        });
         if (respuesta.ok) {
             alert('¡Categoría creada con éxito!');
             document.getElementById('nueva-categoria').value = '';
             cargarCategoriasEnSelect(); 
         } else {
-            alert('Hubo un error al crear la categoría.');
+            alert('Error: No tienes autorización o tu sesión ha caducado. Recarga la página.');
         }
     } catch (error) { console.error("Error:", error); }
 });
@@ -63,7 +99,7 @@ document.getElementById('formulario-categoria').addEventListener('submit', async
 // ==========================================
 let pantalonesEnCola = [];
 
-// A. Añadir al carrito temporal
+// A. Añadir al carrito temporal (No requiere internet aún)
 document.getElementById('formulario-admin').addEventListener('submit', (e) => {
     e.preventDefault();
     
@@ -128,7 +164,7 @@ function eliminarDeCola(index) {
     actualizarUICola();
 }
 
-// D. Mandar todo de golpe al servidor
+// D. Mandar todo de golpe al servidor (Protegido con Token)
 async function subirTodos() {
     const btnSubir = document.getElementById('btn-subir-todos');
     btnSubir.innerText = 'Subiendo archivos, por favor espera...';
@@ -149,15 +185,21 @@ async function subirTodos() {
         try {
             const respuesta = await fetch(`${API_URL}/pantalones`, {
                 method: 'POST',
+                headers: obtenerTokenHeader(), // <-- Enviamos el Token de Seguridad
                 body: formData
             });
             if (respuesta.ok) subidosExito++;
+            else console.error("Error de autorización al subir", p.nombre);
         } catch (error) {
-            console.error("Error al subir:", p.nombre, error);
+            console.error("Error de red al subir:", p.nombre, error);
         }
     }
 
-    alert(`¡Inventario actualizado! Se subieron ${subidosExito} modelos con éxito al catálogo.`);
+    if(subidosExito > 0) {
+        alert(`¡Inventario actualizado! Se subieron ${subidosExito} modelos con éxito al catálogo.`);
+    } else {
+        alert(`Error: No se pudo subir nada. Verifica tu sesión o contraseña.`);
+    }
     
     pantalonesEnCola = [];
     actualizarUICola();
@@ -172,7 +214,7 @@ async function subirTodos() {
 // 6. GESTOR DE INVENTARIO ACTUAL
 // ==========================================
 
-// Cargar lo que ya existe en la base de datos
+// Cargar lo que ya existe en la base de datos (Público, no requiere token)
 async function cargarInventarioAdmin() {
     try {
         const respuesta = await fetch(`${API_URL}/pantalones`);
@@ -210,20 +252,21 @@ async function cargarInventarioAdmin() {
     }
 }
 
-// Función para borrar de la nube
+// Función para borrar de la nube (Protegido con Token)
 async function borrarPantalonDefinitivo(id) {
     if(!confirm("¿Estás seguro de que quieres borrar este pantalón para siempre? Esto no se puede deshacer.")) return;
 
     try {
         const respuesta = await fetch(`${API_URL}/pantalones/${id}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: obtenerTokenHeader() // <-- Enviamos el Token de Seguridad
         });
 
         if(respuesta.ok) {
             alert("Pantalón eliminado de la tienda.");
             cargarInventarioAdmin(); // Recarga la lista
         } else {
-            alert("Hubo un error al intentar borrarlo.");
+            alert("Error: No tienes autorización o tu sesión ha caducado. Recarga la página e inicia sesión de nuevo.");
         }
     } catch (error) {
         console.error("Error al borrar:", error);
