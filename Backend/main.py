@@ -5,7 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from typing import List
-
+import base64
+import requests
 import models, schemas
 from database import engine, get_db
 
@@ -51,41 +52,44 @@ def crear_categoria(nombre: str = Form(...), db: Session = Depends(get_db)):
 def obtener_pantalones(db: Session = Depends(get_db)):
     return db.query(models.Pantalon).all()
 
-@app.post("/pantalones", response_model=schemas.PantalonRespuesta)
-def crear_pantalon(
+@app.post("/pantalones")
+async def crear_pantalon(
     nombre: str = Form(...),
-    descripcion: str = Form(None),
     precio: float = Form(...),
     categoria_id: int = Form(...),
     foto: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    # Guardar la foto en la carpeta local
-    ruta_foto = f"static/uploads/{foto.filename}"
-    with open(ruta_foto, "wb") as buffer:
-        shutil.copyfileobj(foto.file, buffer)
-    
-    # CORRECCIÓN: Guardamos solo la ruta relativa, sin el "localhost"
-    url_publica = f"/{ruta_foto}"
-    
+    # 1. Leer imagen y convertir a Base64 para enviarla por red
+    contenido = await foto.read()
+    imagen_base64 = base64.b64encode(contenido).decode("utf-8")
+
+    # 2. Configurar la petición a la API de ImgBB
+    API_KEY = "967d4560b8e4d58a4f50db487013722f" # <--- ¡Pon tu llave de ImgBB aquí!
+    url_imgbb = "https://api.imgbb.com/1/upload"
+    payload = {
+        "key": API_KEY,
+        "image": imagen_base64
+    }
+
+    # 3. Enviar el HTTP POST
+    respuesta = requests.post(url_imgbb, data=payload)
+    datos = respuesta.json()
+
+    # Si todo salió bien, ImgBB nos regresa el link final de la foto en la nube
+    if respuesta.status_code == 200:
+        url_permanente = datos["data"]["url"]
+    else:
+        return {"error": "Fallo la subida de la imagen a la nube."}
+
+    # 4. Guardar los datos en PostgreSQL
     nuevo_pantalon = models.Pantalon(
         nombre=nombre,
-        descripcion=descripcion,
         precio=precio,
         categoria_id=categoria_id,
-        imagen_url=url_publica
+        imagen_url=url_permanente
     )
-    # --- RUTA SECRETA PARA LIMPIAR PRUEBAS ---
-@app.get("/limpiar-base-de-datos")
-def limpiar_bd(db: Session = Depends(get_db)):
-    # Borramos primero los pantalones (por la relación de llaves foráneas)
-    db.query(models.Pantalon).delete()
-    # Luego borramos las categorías
-    db.query(models.Categoria).delete()
-    db.commit()
-    return {"mensaje": "¡Borrón y cuenta nueva! Tu catálogo está totalmente en blanco y listo para vender."}
-
     db.add(nuevo_pantalon)
     db.commit()
-    db.refresh(nuevo_pantalon)
-    return nuevo_pantalon
+
+    return {"mensaje": "Pantalón subido con éxito", "url": url_permanente}
