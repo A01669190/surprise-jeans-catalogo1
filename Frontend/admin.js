@@ -268,7 +268,9 @@ async function subirTodos() {
     
     let exitos = 0;
     
-    for (let p of pantalonesEnCola) {
+    // Leemos la cola de atrás hacia adelante para no perder los datos si fallan
+    for (let i = pantalonesEnCola.length - 1; i >= 0; i--) {
+        let p = pantalonesEnCola[i];
         const fd = new FormData();
         fd.append('codigo', p.codigo); 
         fd.append('nombre', p.nombre); 
@@ -283,11 +285,18 @@ async function subirTodos() {
                 headers: obtenerTokenHeader(), 
                 body: fd 
             });
+            
             if (respuesta.ok) {
-                exitos++; 
+                exitos++;
+                // Solo si la carga fue un éxito, lo borramos de la lista de espera
+                pantalonesEnCola.splice(i, 1);
+            } else {
+                // Si el servidor lo rechaza, te lanza la alerta y NO lo borra de la lista
+                alert(`❌ El servidor rechazó el modelo: ${p.nombre}. (Verifica que formateaste la BD).`);
             }
         } catch(e) {
             console.error("Fallo al subir:", p.nombre, e);
+            alert(`⚠️ Error de red al intentar subir: ${p.nombre}. Revisa tu conexión.`);
         }
     }
     
@@ -295,7 +304,7 @@ async function subirTodos() {
         alert(`¡Se subieron ${exitos} modelos con éxito!`);
     }
     
-    pantalonesEnCola = []; 
+    // Actualizamos visualmente la interfaz sin perder los que hayan fallado
     actualizarUICola(); 
     cargarInventarioAdmin(); 
     
