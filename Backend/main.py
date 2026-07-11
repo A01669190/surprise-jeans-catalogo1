@@ -30,13 +30,13 @@ limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# 2. CORS ESTRICTO (Con método PUT habilitado)
+# 2. CORS ESTRICTO
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://surprise-jeans-catalogo1.vercel.app", 
-        "https://surprisejeanysk.com",      # <-- ¡Revisa que no le falte la 'y' ni la 'sk'!
-        "https://www.surprisejeanysk.com",
+        "https://surprisejeanysk.com",      
+        "https://www.surprisejeanysk.com",  
         "http://localhost:5500", "http://127.0.0.1:5500"
     ],
     allow_credentials=True,
@@ -124,7 +124,7 @@ def eliminar_categoria(
     if pantalones_asociados > 0:
         raise HTTPException(
             status_code=400, 
-            detail=f"No puedes borrar esta categoría porque tiene {pantalones_asociados} pantalón(es) asociados. Bórralos o edítalos primero."
+            detail=f"No puedes borrar esta categoría porque tiene {pantalones_asociados} pantalón(es) asociados."
         )
 
     db.delete(categoria)
@@ -134,7 +134,9 @@ def eliminar_categoria(
 @app.post("/pantalones")
 @limiter.limit("20/minute")
 async def crear_pantalon(
-    request: Request, nombre: str = Form(...), precio: float = Form(...),
+    request: Request, 
+    codigo: str = Form(...), # <-- NUEVO
+    nombre: str = Form(...), precio: float = Form(...),
     stock: int = Form(...), categoria_id: int = Form(...), foto: UploadFile = File(...),
     db: Session = Depends(get_db), token: str = Depends(verificar_token)
 ):
@@ -147,7 +149,7 @@ async def crear_pantalon(
     if respuesta.status_code == 200: url_permanente = respuesta.json()["data"]["url"]
     else: return {"error": "Fallo la subida a ImgBB"}
 
-    nuevo_pantalon = models.Pantalon(nombre=nombre, precio=precio, stock=stock, categoria_id=categoria_id, imagen_url=url_permanente)
+    nuevo_pantalon = models.Pantalon(codigo=codigo, nombre=nombre, precio=precio, stock=stock, categoria_id=categoria_id, imagen_url=url_permanente)
     db.add(nuevo_pantalon)
     db.commit()
     return {"mensaje": "Pantalón subido con éxito", "url": url_permanente}
@@ -156,6 +158,7 @@ async def crear_pantalon(
 @limiter.limit("20/minute")
 async def editar_pantalon(
     request: Request, pantalon_id: int, 
+    codigo: str = Form(...), # <-- NUEVO
     nombre: str = Form(...), precio: float = Form(...),
     stock: int = Form(...), categoria_id: int = Form(...),
     foto: Optional[UploadFile] = File(None), 
@@ -164,12 +167,12 @@ async def editar_pantalon(
     pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == pantalon_id).first()
     if not pantalon: return {"error": "Pantalón no encontrado"}
     
+    pantalon.codigo = codigo
     pantalon.nombre = nombre
     pantalon.precio = precio
     pantalon.stock = stock
     pantalon.categoria_id = categoria_id
     
-    # Procesamiento de foto opcional
     if foto and foto.filename:
         contenido = await foto.read()
         imagen_base64 = base64.b64encode(contenido).decode("utf-8")
@@ -200,34 +203,26 @@ async def subir_excel(
     request: Request, archivo: UploadFile = File(...), 
     db: Session = Depends(get_db), token: str = Depends(verificar_token)
 ):
-    # ¡AHORA ACEPTAMOS .CSV TAMBIÉN!
     if not archivo.filename.endswith(('.xlsx', '.xls', '.csv')):
         return {"error": "El archivo debe ser un Excel (.xlsx, .xls) o CSV (.csv)"}
 
     contenido = await archivo.read()
     
     try:
-        # Detectamos el formato exacto para que pandas lo lea bien
-        if archivo.filename.endswith('.csv'):
-            df = pd.read_csv(BytesIO(contenido))
-        else:
-            df = pd.read_excel(BytesIO(contenido))
+        if archivo.filename.endswith('.csv'): df = pd.read_csv(BytesIO(contenido))
+        else: df = pd.read_excel(BytesIO(contenido))
             
-        # Limpiamos los nombres de las columnas por si se coló un espacio en blanco
         df.columns = df.columns.str.strip()
         
-        columnas_esperadas = ["Nombre", "Precio", "Stock", "Categoria", "Foto_URL"]
+        # AHORA PEDIMOS LA COLUMNA CODIGO
+        columnas_esperadas = ["Codigo", "Nombre", "Precio", "Stock", "Categoria", "Foto_URL"]
         for col in columnas_esperadas:
-            if col not in df.columns:
-                return {"error": f"Falta la columna '{col}' en el archivo."}
+            if col not in df.columns: return {"error": f"Falta la columna '{col}' en el archivo."}
 
         pantalones_creados = 0
         for index, fila in df.iterrows():
             nombre_cat = str(fila.get('Categoria', '')).strip()
-            
-            # Si hay una fila vacía en el Excel, la saltamos
-            if not nombre_cat or nombre_cat == 'nan':
-                continue
+            if not nombre_cat or nombre_cat == 'nan': continue
             
             categoria = db.query(models.Categoria).filter(models.Categoria.nombre.ilike(nombre_cat)).first()
             if not categoria:
@@ -241,6 +236,7 @@ async def subir_excel(
                 foto_url = "https://dummyimage.com/400x500/e0e7ff/3730a3&text=FOTO+PENDIENTE"
 
             nuevo_pantalon = models.Pantalon(
+                codigo=str(fila['Codigo']).strip(), # <-- NUEVO
                 nombre=str(fila['Nombre']).strip(), precio=float(fila['Precio']),
                 stock=int(fila['Stock']), categoria_id=categoria.id, imagen_url=foto_url
             )
@@ -253,3 +249,9 @@ async def subir_excel(
     except Exception as e:
         print("Error leyendo archivo:", e)
         return {"error": "Hubo un problema al leer los datos. Verifica el formato del archivo."}
+
+@app.get("/reset-db-total")
+def reset_db_total():
+    models.Base.metadata.drop_all(bind=engine)
+    models.Base.metadata.create_all(bind=engine)
+    return {"mensaje": "Tablas formateadas exitosamente. Lista para el nuevo campo de código."}

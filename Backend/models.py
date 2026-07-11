@@ -12,6 +12,7 @@ class Categoria(Base):
 class Pantalon(Base):
     __tablename__ = "pantalones"
     id = Column(Integer, primary_key=True, index=True)
+    codigo = Column(String, index=True)
     nombre = Column(String, index=True)
     precio = Column(Float)
     imagen_url = Column(String)

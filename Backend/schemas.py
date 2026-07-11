@@ -13,6 +13,7 @@ class CategoriaRespuesta(CategoriaBase):
 # Esquema para leer pantalones
 class PantalonRespuesta(BaseModel):
     id: int
+    codigo: str  # <--- AQUÍ ESTÁ EL NUEVO CAMPO
     nombre: str
     descripcion: Optional[str] = None
     precio: float
