@@ -6,8 +6,22 @@
     <title>Panel Admin | Surprise Jeans</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-200 p-4 sm:p-8 font-sans">
+<body class="bg-gray-200 p-4 sm:p-8 font-sans relative">
     
+    <div id="panel-login" class="fixed inset-0 bg-gray-200 z-50 flex flex-col items-center justify-center p-4 transition-opacity duration-500">
+        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm text-center border border-gray-100">
+            <h2 class="text-2xl font-black text-gray-800 mb-2">Acceso Restringido</h2>
+            <p class="text-stone-500 text-sm mb-6">Administración de Surprise Jeans</p>
+            
+            <input type="password" id="input-password" class="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4 text-center tracking-widest" placeholder="••••••••" onkeypress="if(event.key === 'Enter') verificarAcceso()">
+            
+            <button onclick="verificarAcceso()" class="w-full bg-stone-900 hover:bg-rose-500 text-white p-3 rounded-lg font-bold transition-colors shadow-md">
+                ENTRAR
+            </button>
+            <p id="error-password" class="text-rose-500 text-xs mt-4 hidden font-semibold">Contraseña incorrecta. Intenta de nuevo.</p>
+        </div>
+    </div>
+
     <div class="max-w-md mx-auto space-y-6">
         
         <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
@@ -21,7 +35,7 @@
         </div>
 
         <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
-            <h2 class="text-xl font-black text-gray-800 mb-6">2. Subir Nuevo Modelo</h2>
+            <h2 class="text-xl font-black text-gray-800 mb-6">2. Agregar a la Lista</h2>
             
             <form id="formulario-admin" class="space-y-4">
                 <div>
@@ -36,36 +50,33 @@
                 
                 <div>
                     <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Categoría</label>
-                    <select id="categoria" class="w-full border border-gray-300 p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
-                        </select>
+                    <select id="categoria" class="w-full border border-gray-300 p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white" required>
+                    </select>
                 </div>
                 
                 <div>
                     <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Foto</label>
-                    <input type="file" id="foto" class="w-full border border-gray-300 p-2 rounded-lg text-sm" accept="image/*" required>
+                    <input type="file" id="foto" class="w-full border border-gray-300 p-2 rounded-lg text-sm bg-gray-50" accept="image/*" required>
                 </div>
                 
-                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-lg font-bold transition-colors mt-4">
-                    Guardar en el Catálogo
+                <button type="submit" class="w-full bg-stone-200 hover:bg-stone-300 text-stone-800 p-3 rounded-lg font-bold transition-colors mt-4">
+                    + Añadir a la lista de espera
                 </button>
             </form>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 mb-10">
+            <h2 class="text-xl font-black text-gray-800 mb-4">3. Listos para subir: <span id="contador-cola" class="text-indigo-600">0</span></h2>
+            
+            <ul id="lista-cola" class="divide-y divide-gray-200 mb-4"></ul>
+            
+            <button onclick="subirTodos()" id="btn-subir-todos" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-lg font-bold transition-colors hidden shadow-md">
+                🚀 SUBIR TODOS AL CATÁLOGO
+            </button>
         </div>
 
     </div>
 
     <script src="admin.js"></script>
 </body>
-<div id="panel-login" class="fixed inset-0 bg-gray-200 z-50 flex flex-col items-center justify-center p-4 transition-opacity duration-500">
-        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm text-center border border-gray-100">
-            <h2 class="text-2xl font-black text-gray-800 mb-2">Acceso Restringido</h2>
-            <p class="text-stone-500 text-sm mb-6">Administración de Surprise Jeans</p>
-            
-            <input type="password" id="input-password" class="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4 text-center tracking-widest" placeholder="••••••••" onkeypress="if(event.key === 'Enter') verificarAcceso()">
-            
-            <button onclick="verificarAcceso()" class="w-full bg-stone-900 hover:bg-rose-500 text-white p-3 rounded-lg font-bold transition-colors shadow-md">
-                ENTRAR
-            </button>
-            <p id="error-password" class="text-rose-500 text-xs mt-4 hidden font-semibold">Contraseña incorrecta. Intenta de nuevo.</p>
-        </div>
-    </div>
 </html>
