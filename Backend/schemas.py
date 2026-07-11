@@ -18,5 +18,6 @@ class PantalonRespuesta(BaseModel):
     precio: float
     imagen_url: str
     categoria_id: int
+    stock: int
     class Config:
         from_attributes = True
