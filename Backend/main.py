@@ -75,7 +75,16 @@ def crear_pantalon(
         categoria_id=categoria_id,
         imagen_url=url_publica
     )
-    
+    # --- RUTA SECRETA PARA LIMPIAR PRUEBAS ---
+@app.get("/limpiar-base-de-datos")
+def limpiar_bd(db: Session = Depends(get_db)):
+    # Borramos primero los pantalones (por la relación de llaves foráneas)
+    db.query(models.Pantalon).delete()
+    # Luego borramos las categorías
+    db.query(models.Categoria).delete()
+    db.commit()
+    return {"mensaje": "¡Borrón y cuenta nueva! Tu catálogo está totalmente en blanco y listo para vender."}
+
     db.add(nuevo_pantalon)
     db.commit()
     db.refresh(nuevo_pantalon)
