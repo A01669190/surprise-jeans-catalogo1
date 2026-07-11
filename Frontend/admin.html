@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Admin | Surprise Jeans</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-200 p-4 sm:p-8 font-sans">
+    
+    <div class="max-w-md mx-auto bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+        <h2 class="text-2xl font-black text-gray-800 mb-6 text-center">Subir Nuevo Modelo</h2>
+        
+        <form id="formulario-admin" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Nombre del Pantalón</label>
+                <input type="text" id="nombre" class="w-full border border-gray-300 p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Ej. Skinny con brillos" required>
+            </div>
+            
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Precio ($)</label>
+                <input type="number" id="precio" class="w-full border border-gray-300 p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="150" required>
+            </div>
+            
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Categoría</label>
+                <select id="categoria" class="w-full border border-gray-300 p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                    </select>
+            </div>
+            
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Foto</label>
+                <input type="file" id="foto" class="w-full border border-gray-300 p-2 rounded-lg text-sm" accept="image/*" required>
+            </div>
+            
+            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-lg font-bold transition-colors mt-4">
+                Guardar en el Catálogo
+            </button>
+        </form>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>
