@@ -171,3 +171,64 @@ def editar_pantalon(
     
     db.commit()
     return {"mensaje": "Pantalón actualizado correctamente"}
+
+@app.post("/pantalones/excel")
+@limiter.limit("5/minute") # Límite estricto porque procesar Excel consume mucha memoria
+async def subir_excel(
+    request: Request, 
+    archivo: UploadFile = File(...), 
+    db: Session = Depends(get_db), 
+    token: str = Depends(verificar_token) # <-- Candado VIP
+):
+    if not archivo.filename.endswith(('.xlsx', '.xls')):
+        return {"error": "El archivo debe ser un Excel (.xlsx o .xls)"}
+
+    contenido = await archivo.read()
+    
+    try:
+        # Leemos el Excel usando pandas
+        df = pd.read_excel(BytesIO(contenido))
+        
+        # Validamos que el Excel tenga las columnas correctas
+        columnas_esperadas = ["Nombre", "Precio", "Stock", "Categoria", "Foto_URL"]
+        for col in columnas_esperadas:
+            if col not in df.columns:
+                return {"error": f"Falta la columna '{col}' en el Excel. Revisa el formato."}
+
+        pantalones_creados = 0
+
+        # Iteramos fila por fila del Excel
+        for index, fila in df.iterrows():
+            nombre_cat = str(fila['Categoria']).strip()
+            
+            # 1. PROTECCIÓN DE CATEGORÍA: Si no existe, la creamos
+            categoria = db.query(models.Categoria).filter(models.Categoria.nombre.ilike(nombre_cat)).first()
+            if not categoria:
+                categoria = models.Categoria(nombre=nombre_cat)
+                db.add(categoria)
+                db.commit()
+                db.refresh(categoria)
+            
+            # 2. PROCESAMIENTO DE FOTO
+            foto_url = str(fila['Foto_URL'])
+            # Si la celda está vacía (pandas lo lee como 'nan'), ponemos una de relleno
+            if foto_url == 'nan' or not foto_url.startswith('http'):
+                foto_url = "https://via.placeholder.com/400x500?text=FOTO+PENDIENTE"
+
+            # 3. CREACIÓN DEL PANTALÓN
+            nuevo_pantalon = models.Pantalon(
+                nombre=str(fila['Nombre']).strip(),
+                precio=float(fila['Precio']),
+                stock=int(fila['Stock']),
+                categoria_id=categoria.id,
+                imagen_url=foto_url
+            )
+            db.add(nuevo_pantalon)
+            pantalones_creados += 1
+            
+        db.commit()
+        return {"mensaje": f"Carga masiva exitosa. Se crearon {pantalones_creados} modelos."}
+        
+    except Exception as e:
+        print("Error leyendo Excel:", e)
+        return {"error": "Hubo un problema al leer los datos del Excel. Verifica que no haya celdas rotas."}

@@ -35,7 +35,7 @@ function obtenerTokenHeader() {
 }
 
 // ==========================================
-// 3. INICIALIZACIÓN Y CATEGORÍAS
+// 3. INICIALIZACIÓN Y GESTIÓN DE CATEGORÍAS
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     cargarCategoriasEnSelect();
@@ -48,24 +48,32 @@ async function cargarCategoriasEnSelect() {
         const categorias = await respuesta.json();
         
         const select = document.getElementById('categoria');
-        const selectEdit = document.getElementById('edit-categoria'); // Select del Modal
+        const selectEdit = document.getElementById('edit-categoria'); 
+        const listaAdmin = document.getElementById('lista-categorias-admin'); // Nueva lista visual
         
-        select.innerHTML = ''; 
+        if(select) select.innerHTML = ''; 
         if(selectEdit) selectEdit.innerHTML = '';
+        if(listaAdmin) listaAdmin.innerHTML = ''; 
 
         categorias.forEach(cat => {
-            // Cargar en el formulario principal
-            const opcion = document.createElement('option');
-            opcion.value = cat.id; 
-            opcion.textContent = cat.nombre; 
-            select.appendChild(opcion);
-            
-            // Cargar en el formulario de edición
+            if(select) {
+                const opcion = document.createElement('option');
+                opcion.value = cat.id; opcion.textContent = cat.nombre; 
+                select.appendChild(opcion);
+            }
             if(selectEdit) {
                 const opEdit = document.createElement('option');
-                opEdit.value = cat.id;
-                opEdit.textContent = cat.nombre;
+                opEdit.value = cat.id; opEdit.textContent = cat.nombre;
                 selectEdit.appendChild(opEdit);
+            }
+            if(listaAdmin) {
+                const li = document.createElement('li');
+                li.className = 'bg-gray-50 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-2 border border-gray-200 shadow-sm';
+                li.innerHTML = `
+                    ${cat.nombre}
+                    <button type="button" onclick="borrarCategoria(${cat.id})" class="text-rose-500 hover:text-white hover:bg-rose-500 rounded-full w-4 h-4 flex items-center justify-center transition-colors" title="Eliminar categoría">×</button>
+                `;
+                listaAdmin.appendChild(li);
             }
         });
     } catch (error) { console.error("Error al cargar categorías:", error); }
@@ -88,8 +96,81 @@ document.getElementById('formulario-categoria').addEventListener('submit', async
     } catch (error) { console.error("Error:", error); }
 });
 
+async function borrarCategoria(id) {
+    if(!confirm("¿Estás seguro de que quieres borrar esta categoría?")) return;
+    try {
+        const respuesta = await fetch(`${API_URL}/categorias/${id}`, {
+            method: 'DELETE',
+            headers: obtenerTokenHeader()
+        });
+        if (respuesta.ok) {
+            cargarCategoriasEnSelect();
+        } else {
+            const errorData = await respuesta.json();
+            alert(`No se pudo borrar: ${errorData.detail || 'Error de conexión'}`);
+        }
+    } catch (error) { console.error("Error al borrar categoría:", error); }
+}
+
 // ==========================================
-// 4. SISTEMA DE CARGA MÚLTIPLE (COLA)
+// 4. CARGA MASIVA POR EXCEL
+// ==========================================
+const formExcel = document.getElementById('formulario-excel');
+if(formExcel) {
+    formExcel.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const archivoInput = document.getElementById('archivo-excel');
+        const archivo = archivoInput.files[0];
+        const btnSubir = document.getElementById('btn-subir-excel');
+
+        if (!archivo) return;
+
+        btnSubir.innerText = 'Procesando...';
+        btnSubir.disabled = true;
+
+        const formData = new FormData();
+        formData.append('archivo', archivo);
+
+        try {
+            const respuesta = await fetch(`${API_URL}/pantalones/excel`, {
+                method: 'POST',
+                headers: obtenerTokenHeader(),
+                body: formData
+            });
+            const data = await respuesta.json();
+            if (respuesta.ok) {
+                alert(`¡Éxito! ${data.mensaje}`);
+                archivoInput.value = '';
+                cargarCategoriasEnSelect(); 
+                cargarInventarioAdmin(); 
+            } else {
+                alert(`Error: ${data.error || 'Sesión caducada'}`);
+            }
+        } catch (error) {
+            console.error("Error al procesar Excel:", error);
+            alert("Ocurrió un error al intentar procesar el archivo.");
+        } finally {
+            btnSubir.innerText = 'PROCESAR';
+            btnSubir.disabled = false;
+        }
+    });
+}
+
+function descargarPlantilla() {
+    const contenido = "Nombre,Precio,Stock,Categoria,Foto_URL\nSkinny Azul,150,10,Skinny,https://ejemplo.com/foto1.jpg\nMom Jeans Rotos,180,5,Mom,\nCargo Negro,200,20,Cargo,";
+    const blob = new Blob([contenido], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", "Plantilla_SurpriseJeans.csv");
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// ==========================================
+// 5. SISTEMA DE CARGA MANUAL (COLA)
 // ==========================================
 let pantalonesEnCola = [];
 
@@ -125,7 +206,7 @@ function actualizarUICola() {
         li.className = 'py-3 flex justify-between items-center text-sm';
         li.innerHTML = `
             <div><span class="font-bold">${pantalon.nombre}</span> <span class="text-gray-500">($${pantalon.precio}) - Stock: ${pantalon.stock}</span></div>
-            <button onclick="eliminarDeCola(${index})" class="text-rose-500 hover:bg-rose-100 rounded-full w-6 h-6 font-bold pb-1">×</button>
+            <button type="button" onclick="eliminarDeCola(${index})" class="text-rose-500 hover:bg-rose-100 rounded-full w-6 h-6 font-bold pb-1">×</button>
         `;
         lista.appendChild(li);
     });
@@ -167,7 +248,7 @@ async function subirTodos() {
 }
 
 // ==========================================
-// 5. GESTOR DE INVENTARIO ACTUAL
+// 6. GESTOR DE INVENTARIO ACTUAL Y EDICIÓN
 // ==========================================
 async function cargarInventarioAdmin() {
     try {
@@ -185,7 +266,6 @@ async function cargarInventarioAdmin() {
             const div = document.createElement('div');
             div.className = 'flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-200';
             
-            // Reemplazamos las comillas simples del nombre para que no rompa el código al enviarlo al modal
             const nombreSeguro = p.nombre.replace(/'/g, "\\'"); 
             
             div.innerHTML = `
@@ -197,12 +277,12 @@ async function cargarInventarioAdmin() {
                     </div>
                 </div>
                 <div class="flex gap-1">
-                    <button onclick="abrirModal(${p.id}, '${nombreSeguro}', ${p.precio}, ${p.stock}, ${p.categoria_id})" class="text-indigo-500 hover:text-indigo-700 hover:bg-indigo-100 p-2 rounded-lg transition-colors" title="Editar modelo">
+                    <button type="button" onclick="abrirModal(${p.id}, '${nombreSeguro}', ${p.precio}, ${p.stock}, ${p.categoria_id})" class="text-indigo-500 hover:text-indigo-700 hover:bg-indigo-100 p-2 rounded-lg transition-colors" title="Editar modelo">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                         </svg>
                     </button>
-                    <button onclick="borrarPantalonDefinitivo(${p.id})" class="text-rose-500 hover:text-rose-700 hover:bg-rose-100 p-2 rounded-lg transition-colors" title="Eliminar de la base de datos">
+                    <button type="button" onclick="borrarPantalonDefinitivo(${p.id})" class="text-rose-500 hover:text-rose-700 hover:bg-rose-100 p-2 rounded-lg transition-colors" title="Eliminar de la base de datos">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
@@ -216,29 +296,24 @@ async function cargarInventarioAdmin() {
 
 async function borrarPantalonDefinitivo(id) {
     if(!confirm("¿Estás seguro de que quieres borrar este pantalón para siempre?")) return;
-
     try {
         const respuesta = await fetch(`${API_URL}/pantalones/${id}`, {
             method: 'DELETE', headers: obtenerTokenHeader()
         });
-
         if(respuesta.ok) { alert("Pantalón eliminado."); cargarInventarioAdmin(); } 
         else { alert("Error: Sesión caducada."); }
     } catch (error) { console.error("Error al borrar:", error); }
 }
 
 // ==========================================
-// 6. VENTANA FLOTANTE (EDICIÓN)
+// 7. VENTANA FLOTANTE (EDICIÓN)
 // ==========================================
 function abrirModal(id, nombre, precio, stock, categoria_id) {
-    // Llenamos las cajitas invisibles con la información actual
     document.getElementById('edit-id').value = id;
     document.getElementById('edit-nombre').value = nombre;
     document.getElementById('edit-precio').value = precio;
     document.getElementById('edit-stock').value = stock;
     document.getElementById('edit-categoria').value = categoria_id;
-    
-    // Mostramos la ventana
     document.getElementById('modal-editar').classList.remove('hidden');
 }
 
@@ -259,18 +334,16 @@ document.getElementById('formulario-editar').addEventListener('submit', async (e
     try {
         const respuesta = await fetch(`${API_URL}/pantalones/${id}`, {
             method: 'PUT',
-            headers: obtenerTokenHeader(), // <-- Enviamos el Token
+            headers: obtenerTokenHeader(),
             body: formData
         });
 
         if(respuesta.ok) {
             alert('¡Pantalón actualizado con éxito!');
             cerrarModal();
-            cargarInventarioAdmin(); // Recarga la lista para mostrar los nuevos datos al instante
+            cargarInventarioAdmin();
         } else {
             alert('Error al actualizar. Verifica tu sesión.');
         }
-    } catch (error) {
-        console.error("Error al editar:", error);
-    }
+    } catch (error) { console.error("Error al editar:", error); }
 });

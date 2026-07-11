@@ -25,17 +25,39 @@
     <div class="max-w-md mx-auto space-y-6">
         
         <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
-            <h2 class="text-xl font-black text-gray-800 mb-4">1. Crear Categoría</h2>
-            <form id="formulario-categoria" class="flex gap-3">
+            <h2 class="text-xl font-black text-gray-800 mb-4">1. Administrar Categorías</h2>
+            
+            <form id="formulario-categoria" class="flex gap-3 mb-5">
                 <input type="text" id="nueva-categoria" class="flex-1 border border-gray-300 p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" placeholder="Ej. Mom Jeans, Recto..." required>
                 <button type="submit" class="bg-stone-800 hover:bg-stone-900 text-white px-4 py-2 rounded-lg font-bold transition-colors text-sm">
                     AGREGAR
                 </button>
             </form>
+
+            <div class="border-t border-gray-100 pt-4">
+                <p class="text-xs text-stone-500 mb-3 font-bold uppercase tracking-wide">Categorías Actuales:</p>
+                <ul id="lista-categorias-admin" class="flex flex-wrap gap-2">
+                    </ul>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-r from-indigo-50 to-purple-50 p-6 rounded-2xl shadow-lg border border-indigo-100 mb-6">
+            <div class="flex justify-between items-center mb-2">
+                <h2 class="text-xl font-black text-indigo-900">⚡ Carga Masiva (Excel)</h2>
+                <a href="#" onclick="descargarPlantilla()" class="text-xs text-indigo-600 font-bold hover:underline">Descargar Plantilla</a>
+            </div>
+            <p class="text-xs text-indigo-700 mb-4 font-medium">Sube decenas de modelos de un golpe. Si la categoría no existe, el sistema la creará sola.</p>
+            
+            <form id="formulario-excel" class="flex gap-3 items-center">
+                <input type="file" id="archivo-excel" accept=".xlsx, .xls" class="flex-1 border border-indigo-200 p-2 rounded-lg text-sm bg-white" required>
+                <button type="submit" id="btn-subir-excel" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg font-bold transition-colors text-sm shadow-md">
+                    PROCESAR
+                </button>
+            </form>
         </div>
 
         <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
-            <h2 class="text-xl font-black text-gray-800 mb-6">2. Agregar a la Lista</h2>
+            <h2 class="text-xl font-black text-gray-800 mb-6">2. Agregar a la Lista Manual</h2>
             
             <form id="formulario-admin" class="space-y-4">
                 <div>
@@ -85,17 +107,19 @@
             <p class="text-xs text-stone-500 mb-4">Aquí puedes ver todo lo que está en la base de datos y eliminar modelos.</p>
             
             <div id="lista-inventario" class="space-y-3 max-h-96 overflow-y-auto pr-2">
-                </div>
+            </div>
         </div>
 
     </div>
+
     <div id="modal-editar" class="fixed inset-0 bg-stone-900 bg-opacity-75 z-50 hidden flex items-center justify-center p-4 transition-opacity duration-300">
         <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md relative">
             <button onclick="cerrarModal()" class="absolute top-4 right-4 text-gray-400 hover:text-rose-500 font-bold text-2xl leading-none">&times;</button>
             <h2 class="text-xl font-black text-gray-800 mb-4">Editar Modelo</h2>
             
             <form id="formulario-editar" class="space-y-4">
-                <input type="hidden" id="edit-id"> <div>
+                <input type="hidden" id="edit-id"> 
+                <div>
                     <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Nombre</label>
                     <input type="text" id="edit-nombre" class="w-full border border-gray-300 p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
                 </div>
