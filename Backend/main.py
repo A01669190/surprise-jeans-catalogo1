@@ -1,6 +1,6 @@
 import os
 import shutil
-from fastapi import FastAPI, Depends, File, UploadFile, Form
+from fastapi import FastAPI, Depends, File, UploadFile, Form, Request # <-- Agregamos Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
@@ -10,16 +10,32 @@ import models, schemas
 from typing import List, Optional
 from database import engine, get_db
 
+# --- NUEVAS LIBRERÍAS DE SEGURIDAD (WAF) ---
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
 # Crea las tablas si no existen
 models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="API Surprise Jeans")
+app = FastAPI(title="API Surprise Jeans - Secure")
 
+# 1. CONFIGURACIÓN DE MITIGACIÓN DE TRÁFICO (Anti-DDoS)
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# 2. LISTA DE CONTROL DE ACCESO (CORS Estricto)
+# Ya no aceptamos "*". Solo tu página oficial y tu Mac pueden hablar con la base de datos.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://surprise-jeans-catalogo1.vercel.app", 
+        "http://localhost:5500",
+        "http://127.0.0.1:5500"
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "DELETE"], # Bloqueamos métodos no autorizados
     allow_headers=["*"],
 )
 
@@ -28,24 +44,18 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
 def inicio():
-    return {"mensaje": "¡El servidor de Surprise Jeans está vivo! 🚀"}
+    return {"mensaje": "Servidor Seguro de Surprise Jeans Operativo 🔒"}
 
-# --- RUTAS DE CATEGORÍAS ---
+# --- RUTAS PÚBLICAS (Límites generosos) ---
 @app.get("/categorias", response_model=List[schemas.CategoriaRespuesta])
-def obtener_categorias(db: Session = Depends(get_db)):
+@limiter.limit("60/minute") # Máximo 60 recargas por minuto por usuario
+def obtener_categorias(request: Request, db: Session = Depends(get_db)):
     return db.query(models.Categoria).all()
 
-@app.post("/categorias", response_model=schemas.CategoriaRespuesta)
-def crear_categoria(nombre: str = Form(...), db: Session = Depends(get_db)):
-    nueva_categoria = models.Categoria(nombre=nombre)
-    db.add(nueva_categoria)
-    db.commit()
-    db.refresh(nueva_categoria)
-    return nueva_categoria
-
-# --- RUTAS DE PANTALONES ---
 @app.get("/pantalones", response_model=List[schemas.PantalonRespuesta])
+@limiter.limit("60/minute")
 def obtener_pantalones(
+    request: Request,
     skip: int = 0, 
     limit: int = 20, 
     busqueda: Optional[str] = None,
@@ -53,26 +63,30 @@ def obtener_pantalones(
     db: Session = Depends(get_db)
 ):
     query = db.query(models.Pantalon)
-    
-    # Filtro por categoría
     if categoria_id:
         query = query.filter(models.Pantalon.categoria_id == categoria_id)
-        
-    # Filtro del buscador de texto
     if busqueda:
         query = query.filter(models.Pantalon.nombre.ilike(f"%{busqueda}%"))
-        
-    # Ordenamos para que los modelos más nuevos salgan primero
     query = query.order_by(models.Pantalon.id.desc())
-        
-    # Aplicamos la paginación (Limit y Offset)
     return query.offset(skip).limit(limit).all()
 
+# --- RUTAS ADMINISTRATIVAS (Límites estrictos de seguridad) ---
+@app.post("/categorias", response_model=schemas.CategoriaRespuesta)
+@limiter.limit("10/minute") # Solo permitimos crear 10 categorías por minuto
+def crear_categoria(request: Request, nombre: str = Form(...), db: Session = Depends(get_db)):
+    nueva_categoria = models.Categoria(nombre=nombre)
+    db.add(nueva_categoria)
+    db.commit()
+    db.refresh(nueva_categoria)
+    return nueva_categoria
+
 @app.post("/pantalones")
+@limiter.limit("20/minute") # Evita que un bot sature la subida de imágenes a ImgBB
 async def crear_pantalon(
+    request: Request,
     nombre: str = Form(...),
     precio: float = Form(...),
-    stock: int = Form(...), # <--- Guardamos la cantidad
+    stock: int = Form(...),
     categoria_id: int = Form(...),
     foto: UploadFile = File(...),
     db: Session = Depends(get_db)
@@ -104,9 +118,9 @@ async def crear_pantalon(
 
     return {"mensaje": "Pantalón subido con éxito", "url": url_permanente}
 
-# --- NUEVA RUTA: ELIMINAR ---
 @app.delete("/pantalones/{pantalon_id}")
-def eliminar_pantalon(pantalon_id: int, db: Session = Depends(get_db)):
+@limiter.limit("15/minute") # Evita que borren toda la base de datos de golpe
+def eliminar_pantalon(request: Request, pantalon_id: int, db: Session = Depends(get_db)):
     pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == pantalon_id).first()
     if not pantalon:
         return {"error": "Pantalón no encontrado"}
@@ -114,7 +128,6 @@ def eliminar_pantalon(pantalon_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"mensaje": "Pantalón eliminado"}
 
-# --- RUTA DE REINICIO ---
 @app.get("/reset-db-total")
 def reset_db_total():
     models.Base.metadata.drop_all(bind=engine)
