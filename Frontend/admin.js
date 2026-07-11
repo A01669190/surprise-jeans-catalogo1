@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:8000';
+const API_URL = 'https://surprise-jeans-api.onrender.com';
 
 document.addEventListener('DOMContentLoaded', () => {
     cargarCategoriasEnSelect();
