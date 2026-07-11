@@ -89,6 +89,40 @@
         </div>
 
     </div>
+    <div id="modal-editar" class="fixed inset-0 bg-stone-900 bg-opacity-75 z-50 hidden flex items-center justify-center p-4 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md relative">
+            <button onclick="cerrarModal()" class="absolute top-4 right-4 text-gray-400 hover:text-rose-500 font-bold text-2xl leading-none">&times;</button>
+            <h2 class="text-xl font-black text-gray-800 mb-4">Editar Modelo</h2>
+            
+            <form id="formulario-editar" class="space-y-4">
+                <input type="hidden" id="edit-id"> <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Nombre</label>
+                    <input type="text" id="edit-nombre" class="w-full border border-gray-300 p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                </div>
+                
+                <div class="flex gap-4">
+                    <div class="flex-1">
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Precio ($)</label>
+                        <input type="number" id="edit-precio" class="w-full border border-gray-300 p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Stock</label>
+                        <input type="number" id="edit-stock" class="w-full border border-gray-300 p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Categoría</label>
+                    <select id="edit-categoria" class="w-full border border-gray-300 p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white" required>
+                    </select>
+                </div>
+                
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-lg font-bold transition-colors mt-4 shadow-md">
+                    GUARDAR CAMBIOS
+                </button>
+            </form>
+        </div>
+    </div>
 
     <script src="admin.js"></script>
 </body>

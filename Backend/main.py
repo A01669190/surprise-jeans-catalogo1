@@ -146,3 +146,28 @@ def reset_db_total():
     models.Base.metadata.drop_all(bind=engine)
     models.Base.metadata.create_all(bind=engine)
     return {"mensaje": "Tablas formateadas exitosamente."}
+
+@app.put("/pantalones/{pantalon_id}")
+@limiter.limit("20/minute")
+def editar_pantalon(
+    request: Request, 
+    pantalon_id: int, 
+    nombre: str = Form(...), 
+    precio: float = Form(...),
+    stock: int = Form(...), 
+    categoria_id: int = Form(...),
+    db: Session = Depends(get_db), 
+    token: str = Depends(verificar_token) # <-- Candado VIP
+):
+    pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == pantalon_id).first()
+    if not pantalon: 
+        return {"error": "Pantalón no encontrado"}
+    
+    # Sobrescribimos los datos antiguos con los nuevos
+    pantalon.nombre = nombre
+    pantalon.precio = precio
+    pantalon.stock = stock
+    pantalon.categoria_id = categoria_id
+    
+    db.commit()
+    return {"mensaje": "Pantalón actualizado correctamente"}
