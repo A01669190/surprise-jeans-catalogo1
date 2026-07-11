@@ -4,10 +4,10 @@ from fastapi import FastAPI, Depends, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
-from typing import List
 import base64
 import requests
 import models, schemas
+from typing import List, Optional
 from database import engine, get_db
 
 # Crea las tablas si no existen
@@ -45,8 +45,28 @@ def crear_categoria(nombre: str = Form(...), db: Session = Depends(get_db)):
 
 # --- RUTAS DE PANTALONES ---
 @app.get("/pantalones", response_model=List[schemas.PantalonRespuesta])
-def obtener_pantalones(db: Session = Depends(get_db)):
-    return db.query(models.Pantalon).all()
+def obtener_pantalones(
+    skip: int = 0, 
+    limit: int = 20, 
+    busqueda: Optional[str] = None,
+    categoria_id: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.Pantalon)
+    
+    # Filtro por categoría
+    if categoria_id:
+        query = query.filter(models.Pantalon.categoria_id == categoria_id)
+        
+    # Filtro del buscador de texto
+    if busqueda:
+        query = query.filter(models.Pantalon.nombre.ilike(f"%{busqueda}%"))
+        
+    # Ordenamos para que los modelos más nuevos salgan primero
+    query = query.order_by(models.Pantalon.id.desc())
+        
+    # Aplicamos la paginación (Limit y Offset)
+    return query.offset(skip).limit(limit).all()
 
 @app.post("/pantalones")
 async def crear_pantalon(
@@ -65,7 +85,7 @@ async def crear_pantalon(
     payload = {"key": API_KEY, "image": imagen_base64}
     
     respuesta = requests.post(url_imgbb, data=payload)
-    datos = respuesta.json() # <--- Corrección crucial aquí
+    datos = respuesta.json()
 
     if respuesta.status_code == 200:
         url_permanente = datos["data"]["url"]
