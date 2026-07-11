@@ -6,6 +6,8 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 import base64
 import requests
+import pandas as pd
+from io import BytesIO
 import models, schemas
 from typing import List, Optional
 from database import engine, get_db
@@ -28,7 +30,7 @@ limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# 2. CORS ESTRICTO
+# 2. CORS ESTRICTO (Con método PUT habilitado)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -60,9 +62,8 @@ def verificar_token(token: str = Depends(oauth2_scheme)):
 
 @app.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    # Aquí escondemos la contraseña real en el servidor
     if form_data.username == "admin" and form_data.password == "yessica2026":
-        expiracion = datetime.utcnow() + timedelta(hours=3) # El token dura 3 horas
+        expiracion = datetime.utcnow() + timedelta(hours=3)
         token = jwt.encode({"sub": "admin_yessica", "exp": expiracion}, SECRET_KEY, algorithm=ALGORITHM)
         return {"access_token": token, "token_type": "bearer"}
     
@@ -73,7 +74,7 @@ def inicio():
     return {"mensaje": "Servidor Seguro de Surprise Jeans Operativo 🔒"}
 
 # ==========================================
-# 4. RUTAS PÚBLICAS (No requieren Token)
+# 4. RUTAS PÚBLICAS
 # ==========================================
 @app.get("/categorias", response_model=List[schemas.CategoriaRespuesta])
 @limiter.limit("60/minute")
@@ -94,13 +95,13 @@ def obtener_pantalones(
     return query.order_by(models.Pantalon.id.desc()).offset(skip).limit(limit).all()
 
 # ==========================================
-# 5. RUTAS ADMINISTRADOR (Exigen Token JWT)
+# 5. RUTAS ADMINISTRADOR (Exigen Token)
 # ==========================================
 @app.post("/categorias", response_model=schemas.CategoriaRespuesta)
 @limiter.limit("10/minute")
 def crear_categoria(
     request: Request, nombre: str = Form(...), 
-    db: Session = Depends(get_db), token: str = Depends(verificar_token) # <-- Candado
+    db: Session = Depends(get_db), token: str = Depends(verificar_token)
 ):
     nueva_categoria = models.Categoria(nombre=nombre)
     db.add(nueva_categoria)
@@ -108,12 +109,32 @@ def crear_categoria(
     db.refresh(nueva_categoria)
     return nueva_categoria
 
+@app.delete("/categorias/{categoria_id}")
+@limiter.limit("10/minute")
+def eliminar_categoria(
+    request: Request, categoria_id: int, 
+    db: Session = Depends(get_db), token: str = Depends(verificar_token)
+):
+    categoria = db.query(models.Categoria).filter(models.Categoria.id == categoria_id).first()
+    if not categoria: raise HTTPException(status_code=404, detail="Categoría no encontrada")
+    
+    pantalones_asociados = db.query(models.Pantalon).filter(models.Pantalon.categoria_id == categoria_id).count()
+    if pantalones_asociados > 0:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"No puedes borrar esta categoría porque tiene {pantalones_asociados} pantalón(es) asociados. Bórralos o edítalos primero."
+        )
+
+    db.delete(categoria)
+    db.commit()
+    return {"mensaje": "Categoría eliminada"}
+
 @app.post("/pantalones")
 @limiter.limit("20/minute")
 async def crear_pantalon(
     request: Request, nombre: str = Form(...), precio: float = Form(...),
     stock: int = Form(...), categoria_id: int = Form(...), foto: UploadFile = File(...),
-    db: Session = Depends(get_db), token: str = Depends(verificar_token) # <-- Candado
+    db: Session = Depends(get_db), token: str = Depends(verificar_token)
 ):
     contenido = await foto.read()
     imagen_base64 = base64.b64encode(contenido).decode("utf-8")
@@ -129,11 +150,41 @@ async def crear_pantalon(
     db.commit()
     return {"mensaje": "Pantalón subido con éxito", "url": url_permanente}
 
+@app.put("/pantalones/{pantalon_id}")
+@limiter.limit("20/minute")
+async def editar_pantalon(
+    request: Request, pantalon_id: int, 
+    nombre: str = Form(...), precio: float = Form(...),
+    stock: int = Form(...), categoria_id: int = Form(...),
+    foto: Optional[UploadFile] = File(None), 
+    db: Session = Depends(get_db), token: str = Depends(verificar_token)
+):
+    pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == pantalon_id).first()
+    if not pantalon: return {"error": "Pantalón no encontrado"}
+    
+    pantalon.nombre = nombre
+    pantalon.precio = precio
+    pantalon.stock = stock
+    pantalon.categoria_id = categoria_id
+    
+    # Procesamiento de foto opcional
+    if foto and foto.filename:
+        contenido = await foto.read()
+        imagen_base64 = base64.b64encode(contenido).decode("utf-8")
+        API_KEY = "967d4560b8e4d58a4f50db487013722f"
+        respuesta = requests.post("https://api.imgbb.com/1/upload", data={"key": API_KEY, "image": imagen_base64})
+        
+        if respuesta.status_code == 200:
+            pantalon.imagen_url = respuesta.json()["data"]["url"]
+    
+    db.commit()
+    return {"mensaje": "Pantalón actualizado correctamente"}
+
 @app.delete("/pantalones/{pantalon_id}")
 @limiter.limit("15/minute")
 def eliminar_pantalon(
     request: Request, pantalon_id: int, 
-    db: Session = Depends(get_db), token: str = Depends(verificar_token) # <-- Candado
+    db: Session = Depends(get_db), token: str = Depends(verificar_token)
 ):
     pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == pantalon_id).first()
     if not pantalon: return {"error": "Pantalón no encontrado"}
@@ -141,44 +192,11 @@ def eliminar_pantalon(
     db.commit()
     return {"mensaje": "Pantalón eliminado"}
 
-@app.get("/reset-db-total")
-def reset_db_total():
-    models.Base.metadata.drop_all(bind=engine)
-    models.Base.metadata.create_all(bind=engine)
-    return {"mensaje": "Tablas formateadas exitosamente."}
-
-@app.put("/pantalones/{pantalon_id}")
-@limiter.limit("20/minute")
-def editar_pantalon(
-    request: Request, 
-    pantalon_id: int, 
-    nombre: str = Form(...), 
-    precio: float = Form(...),
-    stock: int = Form(...), 
-    categoria_id: int = Form(...),
-    db: Session = Depends(get_db), 
-    token: str = Depends(verificar_token) # <-- Candado VIP
-):
-    pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == pantalon_id).first()
-    if not pantalon: 
-        return {"error": "Pantalón no encontrado"}
-    
-    # Sobrescribimos los datos antiguos con los nuevos
-    pantalon.nombre = nombre
-    pantalon.precio = precio
-    pantalon.stock = stock
-    pantalon.categoria_id = categoria_id
-    
-    db.commit()
-    return {"mensaje": "Pantalón actualizado correctamente"}
-
 @app.post("/pantalones/excel")
-@limiter.limit("5/minute") # Límite estricto porque procesar Excel consume mucha memoria
+@limiter.limit("5/minute") 
 async def subir_excel(
-    request: Request, 
-    archivo: UploadFile = File(...), 
-    db: Session = Depends(get_db), 
-    token: str = Depends(verificar_token) # <-- Candado VIP
+    request: Request, archivo: UploadFile = File(...), 
+    db: Session = Depends(get_db), token: str = Depends(verificar_token)
 ):
     if not archivo.filename.endswith(('.xlsx', '.xls')):
         return {"error": "El archivo debe ser un Excel (.xlsx o .xls)"}
@@ -186,22 +204,16 @@ async def subir_excel(
     contenido = await archivo.read()
     
     try:
-        # Leemos el Excel usando pandas
         df = pd.read_excel(BytesIO(contenido))
-        
-        # Validamos que el Excel tenga las columnas correctas
         columnas_esperadas = ["Nombre", "Precio", "Stock", "Categoria", "Foto_URL"]
         for col in columnas_esperadas:
             if col not in df.columns:
-                return {"error": f"Falta la columna '{col}' en el Excel. Revisa el formato."}
+                return {"error": f"Falta la columna '{col}' en el Excel."}
 
         pantalones_creados = 0
-
-        # Iteramos fila por fila del Excel
         for index, fila in df.iterrows():
             nombre_cat = str(fila['Categoria']).strip()
             
-            # 1. PROTECCIÓN DE CATEGORÍA: Si no existe, la creamos
             categoria = db.query(models.Categoria).filter(models.Categoria.nombre.ilike(nombre_cat)).first()
             if not categoria:
                 categoria = models.Categoria(nombre=nombre_cat)
@@ -209,19 +221,13 @@ async def subir_excel(
                 db.commit()
                 db.refresh(categoria)
             
-            # 2. PROCESAMIENTO DE FOTO
             foto_url = str(fila['Foto_URL'])
-            # Si la celda está vacía (pandas lo lee como 'nan'), ponemos una de relleno
             if foto_url == 'nan' or not foto_url.startswith('http'):
                 foto_url = "https://via.placeholder.com/400x500?text=FOTO+PENDIENTE"
 
-            # 3. CREACIÓN DEL PANTALÓN
             nuevo_pantalon = models.Pantalon(
-                nombre=str(fila['Nombre']).strip(),
-                precio=float(fila['Precio']),
-                stock=int(fila['Stock']),
-                categoria_id=categoria.id,
-                imagen_url=foto_url
+                nombre=str(fila['Nombre']).strip(), precio=float(fila['Precio']),
+                stock=int(fila['Stock']), categoria_id=categoria.id, imagen_url=foto_url
             )
             db.add(nuevo_pantalon)
             pantalones_creados += 1
@@ -231,4 +237,10 @@ async def subir_excel(
         
     except Exception as e:
         print("Error leyendo Excel:", e)
-        return {"error": "Hubo un problema al leer los datos del Excel. Verifica que no haya celdas rotas."}
+        return {"error": "Hubo un problema al leer los datos del Excel."}
+
+@app.get("/reset-db-total")
+def reset_db_total():
+    models.Base.metadata.drop_all(bind=engine)
+    models.Base.metadata.create_all(bind=engine)
+    return {"mensaje": "Tablas formateadas exitosamente."}

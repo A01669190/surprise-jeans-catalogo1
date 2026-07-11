@@ -49,7 +49,7 @@ async function cargarCategoriasEnSelect() {
         
         const select = document.getElementById('categoria');
         const selectEdit = document.getElementById('edit-categoria'); 
-        const listaAdmin = document.getElementById('lista-categorias-admin'); // Nueva lista visual
+        const listaAdmin = document.getElementById('lista-categorias-admin'); 
         
         if(select) select.innerHTML = ''; 
         if(selectEdit) selectEdit.innerHTML = '';
@@ -248,7 +248,7 @@ async function subirTodos() {
 }
 
 // ==========================================
-// 6. GESTOR DE INVENTARIO ACTUAL Y EDICIÓN
+// 6. GESTOR DE INVENTARIO ACTUAL
 // ==========================================
 async function cargarInventarioAdmin() {
     try {
@@ -306,7 +306,7 @@ async function borrarPantalonDefinitivo(id) {
 }
 
 // ==========================================
-// 7. VENTANA FLOTANTE (EDICIÓN)
+// 7. VENTANA FLOTANTE (EDICIÓN Y ACTUALIZAR FOTO)
 // ==========================================
 function abrirModal(id, nombre, precio, stock, categoria_id) {
     document.getElementById('edit-id').value = id;
@@ -314,6 +314,7 @@ function abrirModal(id, nombre, precio, stock, categoria_id) {
     document.getElementById('edit-precio').value = precio;
     document.getElementById('edit-stock').value = stock;
     document.getElementById('edit-categoria').value = categoria_id;
+    document.getElementById('edit-foto').value = ''; // Limpiamos el input de la foto al abrir
     document.getElementById('modal-editar').classList.remove('hidden');
 }
 
@@ -324,12 +325,22 @@ function cerrarModal() {
 document.getElementById('formulario-editar').addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = document.getElementById('edit-id').value;
+    const btnGuardar = e.target.querySelector('button[type="submit"]');
+    
+    btnGuardar.innerText = "Guardando...";
+    btnGuardar.disabled = true;
     
     const formData = new FormData();
     formData.append('nombre', document.getElementById('edit-nombre').value);
     formData.append('precio', document.getElementById('edit-precio').value);
     formData.append('stock', document.getElementById('edit-stock').value);
     formData.append('categoria_id', document.getElementById('edit-categoria').value);
+
+    // Atrapamos la nueva foto si Yessica decidió actualizarla
+    const fotoEdit = document.getElementById('edit-foto').files[0];
+    if (fotoEdit) {
+        formData.append('foto', fotoEdit);
+    }
 
     try {
         const respuesta = await fetch(`${API_URL}/pantalones/${id}`, {
@@ -341,9 +352,15 @@ document.getElementById('formulario-editar').addEventListener('submit', async (e
         if(respuesta.ok) {
             alert('¡Pantalón actualizado con éxito!');
             cerrarModal();
+            document.getElementById('edit-foto').value = ''; 
             cargarInventarioAdmin();
         } else {
             alert('Error al actualizar. Verifica tu sesión.');
         }
-    } catch (error) { console.error("Error al editar:", error); }
+    } catch (error) { 
+        console.error("Error al editar:", error); 
+    } finally {
+        btnGuardar.innerText = "GUARDAR CAMBIOS";
+        btnGuardar.disabled = false;
+    }
 });
