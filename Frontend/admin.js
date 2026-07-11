@@ -1,10 +1,30 @@
+// 1. FUNCIÓN DE SEGURIDAD - ¡Ahora está libre y hasta arriba!
+function verificarAcceso() {
+    const input = document.getElementById('input-password').value;
+    const passwordCorrecta = 'yessica2026'; // <-- ¡Cambia tu contraseña aquí si quieres!
+
+    if (input === passwordCorrecta) {
+        // Desvanece la pantalla de bloqueo y la oculta
+        const panel = document.getElementById('panel-login');
+        panel.style.opacity = '0';
+        setTimeout(() => {
+            panel.style.display = 'none';
+        }, 500);
+    } else {
+        // Muestra el mensaje de error
+        document.getElementById('error-password').classList.remove('hidden');
+        document.getElementById('input-password').value = ''; // Limpia la cajita
+    }
+}
+
+// 2. CONFIGURACIÓN DE LA API
 const API_URL = 'https://surprise-jeans-api.onrender.com';
 
 document.addEventListener('DOMContentLoaded', () => {
     cargarCategoriasEnSelect();
 });
 
-// Función para cargar categorías en la lista desplegable
+// 3. FUNCIÓN PARA CARGAR CATEGORÍAS EN EL SELECT
 async function cargarCategoriasEnSelect() {
     try {
         const respuesta = await fetch(`${API_URL}/categorias`);
@@ -25,7 +45,7 @@ async function cargarCategoriasEnSelect() {
     }
 }
 
-// NUEVA FUNCIÓN: Crear Categoría
+// 4. FUNCIÓN PARA CREAR UNA NUEVA CATEGORÍA
 document.getElementById('formulario-categoria').addEventListener('submit', async (e) => {
     e.preventDefault();
     
@@ -52,7 +72,7 @@ document.getElementById('formulario-categoria').addEventListener('submit', async
     }
 });
 
-// FUNCIÓN EXISTENTE: Subir Pantalones
+// 5. FUNCIÓN PARA SUBIR PANTALONES AL CATÁLOGO
 document.getElementById('formulario-admin').addEventListener('submit', async (e) => {
     e.preventDefault(); 
 
@@ -77,22 +97,4 @@ document.getElementById('formulario-admin').addEventListener('submit', async (e)
     } catch (error) {
         console.error("Error al enviar:", error);
     }
-
-function verificarAcceso() {
-    const input = document.getElementById('input-password').value;
-    const passwordCorrecta = 'yessica2026'; // <-- ¡Cambia tu contraseña aquí!
-
-    if (input === passwordCorrecta) {
-        // Desvanece la pantalla de bloqueo y la oculta
-        const panel = document.getElementById('panel-login');
-        panel.style.opacity = '0';
-        setTimeout(() => {
-            panel.style.display = 'none';
-        }, 500);
-    } else {
-        // Muestra el mensaje de error
-        document.getElementById('error-password').classList.remove('hidden');
-        document.getElementById('input-password').value = ''; // Limpia la cajita
-    }
-}
 });
