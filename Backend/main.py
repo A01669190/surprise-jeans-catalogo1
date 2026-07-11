@@ -198,21 +198,34 @@ async def subir_excel(
     request: Request, archivo: UploadFile = File(...), 
     db: Session = Depends(get_db), token: str = Depends(verificar_token)
 ):
-    if not archivo.filename.endswith(('.xlsx', '.xls')):
-        return {"error": "El archivo debe ser un Excel (.xlsx o .xls)"}
+    # ¡AHORA ACEPTAMOS .CSV TAMBIÉN!
+    if not archivo.filename.endswith(('.xlsx', '.xls', '.csv')):
+        return {"error": "El archivo debe ser un Excel (.xlsx, .xls) o CSV (.csv)"}
 
     contenido = await archivo.read()
     
     try:
-        df = pd.read_excel(BytesIO(contenido))
+        # Detectamos el formato exacto para que pandas lo lea bien
+        if archivo.filename.endswith('.csv'):
+            df = pd.read_csv(BytesIO(contenido))
+        else:
+            df = pd.read_excel(BytesIO(contenido))
+            
+        # Limpiamos los nombres de las columnas por si se coló un espacio en blanco
+        df.columns = df.columns.str.strip()
+        
         columnas_esperadas = ["Nombre", "Precio", "Stock", "Categoria", "Foto_URL"]
         for col in columnas_esperadas:
             if col not in df.columns:
-                return {"error": f"Falta la columna '{col}' en el Excel."}
+                return {"error": f"Falta la columna '{col}' en el archivo."}
 
         pantalones_creados = 0
         for index, fila in df.iterrows():
-            nombre_cat = str(fila['Categoria']).strip()
+            nombre_cat = str(fila.get('Categoria', '')).strip()
+            
+            # Si hay una fila vacía en el Excel, la saltamos
+            if not nombre_cat or nombre_cat == 'nan':
+                continue
             
             categoria = db.query(models.Categoria).filter(models.Categoria.nombre.ilike(nombre_cat)).first()
             if not categoria:
@@ -221,9 +234,9 @@ async def subir_excel(
                 db.commit()
                 db.refresh(categoria)
             
-            foto_url = str(fila['Foto_URL'])
+            foto_url = str(fila.get('Foto_URL', ''))
             if foto_url == 'nan' or not foto_url.startswith('http'):
-                foto_url = "https://via.placeholder.com/400x500?text=FOTO+PENDIENTE"
+                foto_url = "https://dummyimage.com/400x500/e0e7ff/3730a3&text=FOTO+PENDIENTE"
 
             nuevo_pantalon = models.Pantalon(
                 nombre=str(fila['Nombre']).strip(), precio=float(fila['Precio']),
@@ -236,11 +249,5 @@ async def subir_excel(
         return {"mensaje": f"Carga masiva exitosa. Se crearon {pantalones_creados} modelos."}
         
     except Exception as e:
-        print("Error leyendo Excel:", e)
-        return {"error": "Hubo un problema al leer los datos del Excel."}
-
-@app.get("/reset-db-total")
-def reset_db_total():
-    models.Base.metadata.drop_all(bind=engine)
-    models.Base.metadata.create_all(bind=engine)
-    return {"mensaje": "Tablas formateadas exitosamente."}
+        print("Error leyendo archivo:", e)
+        return {"error": "Hubo un problema al leer los datos. Verifica el formato del archivo."}
