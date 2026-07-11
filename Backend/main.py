@@ -24,7 +24,9 @@ app.add_middleware(
 
 # 1. Crear carpeta para guardar fotos y hacerla pública
 os.makedirs("static/uploads", exist_ok=True)
-app.mount("/static", StaticFiles(directory="Backend/static"), name="static")
+# CORRECCIÓN: Render ya está en la carpeta Backend, así que solo buscamos "static"
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 @app.get("/")
 def inicio():
     return {"mensaje": "¡El servidor de Surprise Jeans está vivo! 🚀"}
@@ -63,8 +65,9 @@ def crear_pantalon(
     with open(ruta_foto, "wb") as buffer:
         shutil.copyfileobj(foto.file, buffer)
     
-    # Generar el enlace público y guardar en base de datos
-    url_publica = f"http://localhost:8000/{ruta_foto}"
+    # CORRECCIÓN: Guardamos solo la ruta relativa, sin el "localhost"
+    url_publica = f"/{ruta_foto}"
+    
     nuevo_pantalon = models.Pantalon(
         nombre=nombre,
         descripcion=descripcion,

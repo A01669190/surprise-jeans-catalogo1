@@ -4,17 +4,20 @@ document.addEventListener('DOMContentLoaded', () => {
     cargarCategoriasEnSelect();
 });
 
-// Función para llenar el menú desplegable
+// Función para cargar categorías en la lista desplegable
 async function cargarCategoriasEnSelect() {
     try {
         const respuesta = await fetch(`${API_URL}/categorias`);
         const categorias = await respuesta.json();
         const select = document.getElementById('categoria');
         
+        // Limpiamos el select por si se acaba de agregar una nueva
+        select.innerHTML = ''; 
+        
         categorias.forEach(cat => {
             const opcion = document.createElement('option');
-            opcion.value = cat.id; // El ID oculto
-            opcion.textContent = cat.nombre; // El nombre visible
+            opcion.value = cat.id; 
+            opcion.textContent = cat.nombre; 
             select.appendChild(opcion);
         });
     } catch (error) {
@@ -22,11 +25,37 @@ async function cargarCategoriasEnSelect() {
     }
 }
 
-// Función para enviar los datos al darle click a Guardar
-document.getElementById('formulario-admin').addEventListener('submit', async (e) => {
-    e.preventDefault(); // Evita que la página parpadee o se recargue
+// NUEVA FUNCIÓN: Crear Categoría
+document.getElementById('formulario-categoria').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    // Usamos FormData porque tu API requiere Form(...)
+    const formData = new FormData();
+    formData.append('nombre', document.getElementById('nueva-categoria').value);
 
-    // FormData nos permite agrupar textos e imágenes al mismo tiempo
+    try {
+        const respuesta = await fetch(`${API_URL}/categorias`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (respuesta.ok) {
+            alert('¡Categoría creada con éxito!');
+            document.getElementById('nueva-categoria').value = '';
+            // Recargamos el select para que aparezca la nueva opción
+            cargarCategoriasEnSelect(); 
+        } else {
+            alert('Hubo un error al crear la categoría.');
+        }
+    } catch (error) {
+        console.error("Error:", error);
+    }
+});
+
+// FUNCIÓN EXISTENTE: Subir Pantalones
+document.getElementById('formulario-admin').addEventListener('submit', async (e) => {
+    e.preventDefault(); 
+
     const formData = new FormData();
     formData.append('nombre', document.getElementById('nombre').value);
     formData.append('precio', document.getElementById('precio').value);
@@ -41,7 +70,7 @@ document.getElementById('formulario-admin').addEventListener('submit', async (e)
 
         if (respuesta.ok) {
             alert('¡Listo! El pantalón ya está en el catálogo público.');
-            document.getElementById('formulario-admin').reset(); // Limpia los campos
+            document.getElementById('formulario-admin').reset(); 
         } else {
             alert('Hubo un error al guardar.');
         }
