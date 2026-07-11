@@ -1,117 +1,231 @@
+// 1. FUNCIÓN DE SEGURIDAD (CANDADO)
+function verificarAcceso() {
+    const input = document.getElementById('input-password').value;
+    const passwordCorrecta = 'yessica2026'; 
+
+    if (input === passwordCorrecta) {
+        const panel = document.getElementById('panel-login');
+        panel.style.opacity = '0';
+        setTimeout(() => { panel.style.display = 'none'; }, 500);
+    } else {
+        document.getElementById('error-password').classList.remove('hidden');
+        document.getElementById('input-password').value = ''; 
+    }
+}
+
+// 2. CONFIGURACIÓN DE LA API
 const API_URL = 'https://surprise-jeans-api-denz.onrender.com';
 
 document.addEventListener('DOMContentLoaded', () => {
-    cargarCategorias();
-    cargarPantalones(); // Carga todos al inicio
+    cargarCategoriasEnSelect();
+    cargarInventarioAdmin(); // Carga la lista de inventario al entrar
 });
 
-async function cargarCategorias() {
+// 3. FUNCIÓN PARA CARGAR CATEGORÍAS
+async function cargarCategoriasEnSelect() {
     try {
         const respuesta = await fetch(`${API_URL}/categorias`);
         const categorias = await respuesta.json();
+        const select = document.getElementById('categoria');
         
-        const contenedor = document.getElementById('contenedor-categorias');
-        contenedor.innerHTML = ''; // Limpiamos el contenedor
-        
-        // 1. Creamos el botón de "TODOS"
-        const btnTodos = document.createElement('button');
-        btnTodos.className = 'bg-stone-800 text-white border border-stone-800 px-5 py-2 rounded-full text-xs uppercase tracking-widest hover:bg-stone-700 transition-all shadow-sm';
-        btnTodos.innerText = 'TODOS';
-        btnTodos.onclick = () => cargarPantalones(); 
-        contenedor.appendChild(btnTodos);
-
-        // 2. Creamos los botones de cada categoría
-        categorias.forEach(categoria => {
-            const boton = document.createElement('button');
-            boton.className = 'bg-white border border-rose-100 text-stone-500 px-5 py-2 rounded-full text-xs uppercase tracking-widest hover:border-rose-300 hover:text-stone-800 transition-all shadow-sm';
-            boton.innerText = categoria.nombre;
-            
-            // Filtro por ID de categoría
-            boton.onclick = () => cargarPantalones(categoria.id);
-            
-            contenedor.appendChild(boton);
+        select.innerHTML = ''; 
+        categorias.forEach(cat => {
+            const opcion = document.createElement('option');
+            opcion.value = cat.id; 
+            opcion.textContent = cat.nombre; 
+            select.appendChild(opcion);
         });
     } catch (error) {
         console.error("Error al cargar categorías:", error);
     }
 }
 
-async function cargarPantalones(categoriaId = null) {
+// 4. FUNCIÓN PARA CREAR UNA NUEVA CATEGORÍA
+document.getElementById('formulario-categoria').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData();
+    formData.append('nombre', document.getElementById('nueva-categoria').value);
+
+    try {
+        const respuesta = await fetch(`${API_URL}/categorias`, { method: 'POST', body: formData });
+        if (respuesta.ok) {
+            alert('¡Categoría creada con éxito!');
+            document.getElementById('nueva-categoria').value = '';
+            cargarCategoriasEnSelect(); 
+        } else {
+            alert('Hubo un error al crear la categoría.');
+        }
+    } catch (error) { console.error("Error:", error); }
+});
+
+// ==========================================
+// 5. SISTEMA DE CARGA MÚLTIPLE (COLA)
+// ==========================================
+let pantalonesEnCola = [];
+
+// A. Añadir al carrito temporal
+document.getElementById('formulario-admin').addEventListener('submit', (e) => {
+    e.preventDefault();
+    
+    const nombre = document.getElementById('nombre').value;
+    const precio = document.getElementById('precio').value;
+    const stock = document.getElementById('stock').value;
+    const categoriaSelect = document.getElementById('categoria');
+    const categoriaNombre = categoriaSelect.options[categoriaSelect.selectedIndex].text;
+    const categoria_id = categoriaSelect.value;
+    const fotoInput = document.getElementById('foto');
+    const fotoFile = fotoInput.files[0];
+
+    if(!fotoFile) return;
+
+    pantalonesEnCola.push({
+        nombre: nombre,
+        precio: precio,
+        stock: stock,
+        categoria_id: categoria_id,
+        categoriaNombre: categoriaNombre,
+        foto: fotoFile
+    });
+
+    document.getElementById('formulario-admin').reset(); 
+    // Restaurar el valor de stock a 1 por defecto
+    document.getElementById('stock').value = 1;
+    actualizarUICola(); 
+});
+
+// B. Dibujar la lista visual de la cola
+function actualizarUICola() {
+    const lista = document.getElementById('lista-cola');
+    const contador = document.getElementById('contador-cola');
+    const btnSubir = document.getElementById('btn-subir-todos');
+
+    lista.innerHTML = '';
+    contador.innerText = pantalonesEnCola.length;
+
+    if(pantalonesEnCola.length > 0) {
+        btnSubir.classList.remove('hidden');
+    } else {
+        btnSubir.classList.add('hidden');
+    }
+
+    pantalonesEnCola.forEach((pantalon, index) => {
+        const li = document.createElement('li');
+        li.className = 'py-3 flex justify-between items-center text-sm';
+        li.innerHTML = `
+            <div>
+                <span class="font-bold text-gray-800">${pantalon.nombre}</span> 
+                <span class="text-gray-500">($${pantalon.precio}) - ${pantalon.categoriaNombre} | Stock: ${pantalon.stock}</span>
+            </div>
+            <button onclick="eliminarDeCola(${index})" class="text-rose-500 hover:bg-rose-100 hover:text-rose-700 rounded-full w-6 h-6 flex items-center justify-center font-bold text-lg transition-colors pb-1" title="Quitar de la lista">×</button>
+        `;
+        lista.appendChild(li);
+    });
+}
+
+// C. Quitar de la cola
+function eliminarDeCola(index) {
+    pantalonesEnCola.splice(index, 1);
+    actualizarUICola();
+}
+
+// D. Mandar todo de golpe al servidor
+async function subirTodos() {
+    const btnSubir = document.getElementById('btn-subir-todos');
+    btnSubir.innerText = 'Subiendo archivos, por favor espera...';
+    btnSubir.disabled = true;
+    btnSubir.classList.replace('bg-indigo-600', 'bg-indigo-400');
+
+    let subidosExito = 0;
+
+    for (let i = 0; i < pantalonesEnCola.length; i++) {
+        const p = pantalonesEnCola[i];
+        const formData = new FormData();
+        formData.append('nombre', p.nombre);
+        formData.append('precio', p.precio);
+        formData.append('stock', p.stock);
+        formData.append('categoria_id', p.categoria_id);
+        formData.append('foto', p.foto);
+
+        try {
+            const respuesta = await fetch(`${API_URL}/pantalones`, {
+                method: 'POST',
+                body: formData
+            });
+            if (respuesta.ok) subidosExito++;
+        } catch (error) {
+            console.error("Error al subir:", p.nombre, error);
+        }
+    }
+
+    alert(`¡Inventario actualizado! Se subieron ${subidosExito} modelos con éxito al catálogo.`);
+    
+    pantalonesEnCola = [];
+    actualizarUICola();
+    cargarInventarioAdmin(); // Recarga la lista de abajo para mostrar los nuevos
+    
+    btnSubir.innerText = '🚀 SUBIR TODOS AL CATÁLOGO';
+    btnSubir.disabled = false;
+    btnSubir.classList.replace('bg-indigo-400', 'bg-indigo-600');
+}
+
+// ==========================================
+// 6. GESTOR DE INVENTARIO ACTUAL
+// ==========================================
+
+// Cargar lo que ya existe en la base de datos
+async function cargarInventarioAdmin() {
     try {
         const respuesta = await fetch(`${API_URL}/pantalones`);
-        let pantalones = await respuesta.json();
+        const pantalones = await respuesta.json();
+        const contenedor = document.getElementById('lista-inventario');
         
-        // Si recibimos un ID, filtramos la lista para mostrar solo esos
-        if (categoriaId !== null) {
-            pantalones = pantalones.filter(pantalon => pantalon.categoria_id === categoriaId);
-        }
+        contenedor.innerHTML = '';
         
-        const contenedor = document.getElementById('contenedor-pantalones');
-        contenedor.innerHTML = ''; 
-        
-        // Si no hay pantalones en esa categoría, mostramos un mensaje
-        if (pantalones.length === 0) {
-            contenedor.innerHTML = '<p class="col-span-full text-center text-stone-400 py-10">No hay modelos en esta categoría aún.</p>';
+        if(pantalones.length === 0){
+            contenedor.innerHTML = '<p class="text-sm text-gray-500 text-center py-4">No hay pantalones en el catálogo.</p>';
             return;
         }
 
-        pantalones.forEach((pantalon, index) => {
-            const tarjeta = document.createElement('div');
-            tarjeta.className = 'group flex flex-col cursor-pointer';
-            
-            let imageUrl = pantalon.imagen_url;
-            if (imageUrl && imageUrl.includes('localhost:8000')) {
-                imageUrl = imageUrl.replace('http://localhost:8000', '');
-            }
-            
-            const imageUrlDefinitiva = imageUrl && imageUrl.startsWith('http') 
-                ? imageUrl 
-                : `${API_URL}${imageUrl && imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
-            
-            // --- LÓGICA DE STOCK Y ETIQUETAS VISUALES ---
-            let etiqueta = '';
-            let claseImagen = 'absolute top-0 left-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out';
-            
-            // Botón por defecto (Disponible)
-            let botonAccion = `
-                <a href="https://wa.me/525581410686?text=Hola! Me encantó el modelo ${pantalon.nombre}. ¿Tienen disponibilidad?" target="_blank" class="bg-stone-900 text-white hover:bg-rose-500 hover:text-white px-4 py-2 rounded-full text-xs font-semibold tracking-wider transition-colors shadow-md">
-                    COMPRAR
-                </a>
-            `;
-
-            // Verificamos si está agotado
-            if (pantalon.stock === 0) {
-                etiqueta = '<span class="absolute top-3 left-3 bg-rose-600 text-white text-xs font-black px-3 py-1 rounded-full shadow-md tracking-wider z-10">AGOTADO</span>';
-                claseImagen += ' grayscale opacity-60'; // Aplica el filtro gris a la foto
-                // Cambia el botón para que no se pueda dar clic
-                botonAccion = `
-                    <button disabled class="bg-stone-200 text-stone-400 px-4 py-2 rounded-full text-xs font-semibold tracking-wider cursor-not-allowed">
-                        SIN STOCK
-                    </button>
-                `;
-            } 
-            // Si hay stock y es de los últimos 5, le ponemos la etiqueta de NUEVO
-            else if (index >= pantalones.length - 5) {
-                etiqueta = '<span class="absolute top-3 left-3 bg-indigo-600 text-white text-xs font-black px-3 py-1 rounded-full shadow-md tracking-wider z-10">NUEVO ✨</span>';
-            }
-
-            tarjeta.innerHTML = `
-                <div class="relative pt-[130%] bg-stone-50 rounded-xl overflow-hidden mb-4">
-                    ${etiqueta}
-                    <img src="${imageUrlDefinitiva}" alt="${pantalon.nombre}" class="${claseImagen}">
-                </div>
-                <div class="flex flex-col flex-grow px-1">
-                    <h3 class="font-serif text-stone-800 text-lg md:text-xl mb-1">${pantalon.nombre}</h3>
-                    <p class="text-xs text-stone-500 font-light mb-3 line-clamp-2">${pantalon.descripcion || 'Calidad y ajuste perfecto.'}</p>
-                    <div class="mt-auto flex items-center justify-between">
-                        <span class="text-stone-900 font-semibold text-lg">$${pantalon.precio}</span>
-                        ${botonAccion}
+        pantalones.forEach(p => {
+            const div = document.createElement('div');
+            div.className = 'flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-200';
+            div.innerHTML = `
+                <div class="flex items-center gap-4">
+                    <img src="${p.imagen_url}" class="w-12 h-12 object-cover rounded-md shadow-sm">
+                    <div>
+                        <p class="font-bold text-sm text-gray-800 uppercase">${p.nombre}</p>
+                        <p class="text-xs text-indigo-600 font-semibold">Stock: ${p.stock} <span class="text-stone-400 font-normal">| $${p.precio} MXN</span></p>
                     </div>
                 </div>
+                <button onclick="borrarPantalonDefinitivo(${p.id})" class="text-rose-500 hover:text-rose-700 hover:bg-rose-100 p-2 rounded-lg transition-colors" title="Eliminar de la base de datos">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
             `;
-            contenedor.appendChild(tarjeta);
+            contenedor.appendChild(div);
         });
     } catch (error) {
-        console.error("Error al cargar pantalones:", error);
+        console.error("Error al cargar inventario:", error);
+    }
+}
+
+// Función para borrar de la nube
+async function borrarPantalonDefinitivo(id) {
+    if(!confirm("¿Estás seguro de que quieres borrar este pantalón para siempre? Esto no se puede deshacer.")) return;
+
+    try {
+        const respuesta = await fetch(`${API_URL}/pantalones/${id}`, {
+            method: 'DELETE'
+        });
+
+        if(respuesta.ok) {
+            alert("Pantalón eliminado de la tienda.");
+            cargarInventarioAdmin(); // Recarga la lista
+        } else {
+            alert("Hubo un error al intentar borrarlo.");
+        }
+    } catch (error) {
+        console.error("Error al borrar:", error);
     }
 }

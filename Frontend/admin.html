@@ -70,7 +70,7 @@
             </form>
         </div>
 
-        <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 mb-10">
+        <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
             <h2 class="text-xl font-black text-gray-800 mb-4">3. Listos para subir: <span id="contador-cola" class="text-indigo-600">0</span></h2>
             
             <ul id="lista-cola" class="divide-y divide-gray-200 mb-4"></ul>
@@ -78,6 +78,14 @@
             <button onclick="subirTodos()" id="btn-subir-todos" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-lg font-bold transition-colors hidden shadow-md">
                 🚀 SUBIR TODOS AL CATÁLOGO
             </button>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 mb-10">
+            <h2 class="text-xl font-black text-gray-800 mb-4">4. Inventario Actual</h2>
+            <p class="text-xs text-stone-500 mb-4">Aquí puedes ver todo lo que está en la base de datos y eliminar modelos.</p>
+            
+            <div id="lista-inventario" class="space-y-3 max-h-96 overflow-y-auto pr-2">
+                </div>
         </div>
 
     </div>
