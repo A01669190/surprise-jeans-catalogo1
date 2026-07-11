@@ -2,7 +2,7 @@ const API_URL = 'https://surprise-jeans-api.onrender.com';
 
 document.addEventListener('DOMContentLoaded', () => {
     cargarCategorias();
-    cargarPantalones();
+    cargarPantalones(); // Carga todos al inicio
 });
 
 async function cargarCategorias() {
@@ -11,11 +11,25 @@ async function cargarCategorias() {
         const categorias = await respuesta.json();
         
         const contenedor = document.getElementById('contenedor-categorias');
+        contenedor.innerHTML = ''; // Limpiamos el contenedor
         
+        // 1. Creamos el botón de "TODOS"
+        const btnTodos = document.createElement('button');
+        btnTodos.className = 'bg-stone-800 text-white border border-stone-800 px-5 py-2 rounded-full text-xs uppercase tracking-widest hover:bg-stone-700 transition-all shadow-sm';
+        btnTodos.innerText = 'TODOS';
+        // Al darle clic, carga los pantalones sin ningún filtro
+        btnTodos.onclick = () => cargarPantalones(); 
+        contenedor.appendChild(btnTodos);
+
+        // 2. Creamos los botones de cada categoría
         categorias.forEach(categoria => {
             const boton = document.createElement('button');
             boton.className = 'bg-white border border-rose-100 text-stone-500 px-5 py-2 rounded-full text-xs uppercase tracking-widest hover:border-rose-300 hover:text-stone-800 transition-all shadow-sm';
             boton.innerText = categoria.nombre;
+            
+            // ¡LA MAGIA DEL FILTRO! Le pasamos el ID de la categoría
+            boton.onclick = () => cargarPantalones(categoria.id);
+            
             contenedor.appendChild(boton);
         });
     } catch (error) {
@@ -23,19 +37,30 @@ async function cargarCategorias() {
     }
 }
 
-async function cargarPantalones() {
+// Modificamos la función para que reciba un ID de categoría opcional
+async function cargarPantalones(categoriaId = null) {
     try {
         const respuesta = await fetch(`${API_URL}/pantalones`);
-        const pantalones = await respuesta.json();
+        let pantalones = await respuesta.json();
+        
+        // Si recibimos un ID, filtramos la lista para mostrar solo esos
+        if (categoriaId !== null) {
+            pantalones = pantalones.filter(pantalon => pantalon.categoria_id === categoriaId);
+        }
         
         const contenedor = document.getElementById('contenedor-pantalones');
         contenedor.innerHTML = ''; 
         
+        // Si no hay pantalones en esa categoría, mostramos un mensaje
+        if (pantalones.length === 0) {
+            contenedor.innerHTML = '<p class="col-span-full text-center text-stone-400 py-10">No hay modelos en esta categoría aún.</p>';
+            return;
+        }
+
         pantalones.forEach(pantalon => {
             const tarjeta = document.createElement('div');
             tarjeta.className = 'group flex flex-col cursor-pointer';
             
-            // CORRECCIÓN: Limpiamos el 'localhost' si existe por los registros viejos
             let imageUrl = pantalon.imagen_url;
             if (imageUrl.includes('localhost:8000')) {
                 imageUrl = imageUrl.replace('http://localhost:8000', '');
