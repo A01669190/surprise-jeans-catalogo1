@@ -55,4 +55,17 @@
 
     <script src="admin.js"></script>
 </body>
+<div id="panel-login" class="fixed inset-0 bg-gray-200 z-50 flex flex-col items-center justify-center p-4 transition-opacity duration-500">
+        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm text-center border border-gray-100">
+            <h2 class="text-2xl font-black text-gray-800 mb-2">Acceso Restringido</h2>
+            <p class="text-stone-500 text-sm mb-6">Administración de Surprise Jeans</p>
+            
+            <input type="password" id="input-password" class="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4 text-center tracking-widest" placeholder="••••••••" onkeypress="if(event.key === 'Enter') verificarAcceso()">
+            
+            <button onclick="verificarAcceso()" class="w-full bg-stone-900 hover:bg-rose-500 text-white p-3 rounded-lg font-bold transition-colors shadow-md">
+                ENTRAR
+            </button>
+            <p id="error-password" class="text-rose-500 text-xs mt-4 hidden font-semibold">Contraseña incorrecta. Intenta de nuevo.</p>
+        </div>
+    </div>
 </html>

@@ -77,4 +77,22 @@ document.getElementById('formulario-admin').addEventListener('submit', async (e)
     } catch (error) {
         console.error("Error al enviar:", error);
     }
+
+function verificarAcceso() {
+    const input = document.getElementById('input-password').value;
+    const passwordCorrecta = 'yessica2026'; // <-- ¡Cambia tu contraseña aquí!
+
+    if (input === passwordCorrecta) {
+        // Desvanece la pantalla de bloqueo y la oculta
+        const panel = document.getElementById('panel-login');
+        panel.style.opacity = '0';
+        setTimeout(() => {
+            panel.style.display = 'none';
+        }, 500);
+    } else {
+        // Muestra el mensaje de error
+        document.getElementById('error-password').classList.remove('hidden');
+        document.getElementById('input-password').value = ''; // Limpia la cajita
+    }
+}
 });
