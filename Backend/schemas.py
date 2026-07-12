@@ -34,8 +34,12 @@ class ItemCarrito(BaseModel):
 class InfoEnvio(BaseModel):
     nombre: str
     telefono: str
-    direccion: str
+    calle_numero: str
+    colonia: str
+    ciudad: str
+    estado: str
     cp: str
+    referencias: Optional[str] = None
 
 class PedidoSeguro(BaseModel):
     envio: InfoEnvio

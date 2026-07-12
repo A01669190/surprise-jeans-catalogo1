@@ -119,11 +119,16 @@ def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, db: Session = Depends(ge
         })
 
     # Guardar en bóveda como PENDIENTE
+    # Guardar en bóveda como PENDIENTE
     nuevo_pedido = models.Pedido(
         nombre_cliente=pedido_req.envio.nombre,
         telefono=pedido_req.envio.telefono,
-        direccion=pedido_req.envio.direccion,
+        calle_numero=pedido_req.envio.calle_numero,
+        colonia=pedido_req.envio.colonia,
+        ciudad=pedido_req.envio.ciudad,
+        estado=pedido_req.envio.estado,
         codigo_postal=pedido_req.envio.cp,
+        referencias=pedido_req.envio.referencias,
         total=total_pedido,
         estatus="PENDIENTE"
     )

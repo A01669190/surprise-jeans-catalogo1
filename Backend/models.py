@@ -29,18 +29,13 @@ class Pedido(Base):
     id = Column(Integer, primary_key=True, index=True)
     nombre_cliente = Column(String)
     telefono = Column(String)
-    direccion = Column(String)
+    calle_numero = Column(String)
+    colonia = Column(String)
+    ciudad = Column(String)
+    estado = Column(String)
     codigo_postal = Column(String)
+    referencias = Column(String, nullable=True)
     total = Column(Float)
-    estatus = Column(String, default="PENDIENTE") # <- Escudo Anti-Falsificación
+    estatus = Column(String, default="PENDIENTE")
     fecha = Column(DateTime, default=datetime.datetime.utcnow)
     detalles = relationship("DetallePedido", back_populates="pedido")
-
-class DetallePedido(Base):
-    __tablename__ = "detalles_pedido"
-    id = Column(Integer, primary_key=True, index=True)
-    pedido_id = Column(Integer, ForeignKey("pedidos.id"))
-    pantalon_id = Column(Integer, ForeignKey("pantalones.id"))
-    cantidad = Column(Integer)
-    precio_unitario = Column(Float)
-    pedido = relationship("Pedido", back_populates="detalles")
