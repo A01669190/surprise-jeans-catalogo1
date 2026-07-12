@@ -23,6 +23,8 @@ class Pantalon(Base):
 
 # ==========================================
 # TABLAS DE SEGURIDAD (PEDIDOS)
+## ==========================================
+# TABLAS DE SEGURIDAD (PEDIDOS)
 # ==========================================
 class Pedido(Base):
     __tablename__ = "pedidos"
@@ -39,3 +41,12 @@ class Pedido(Base):
     estatus = Column(String, default="PENDIENTE")
     fecha = Column(DateTime, default=datetime.datetime.utcnow)
     detalles = relationship("DetallePedido", back_populates="pedido")
+
+class DetallePedido(Base):
+    __tablename__ = "detalles_pedido"
+    id = Column(Integer, primary_key=True, index=True)
+    pedido_id = Column(Integer, ForeignKey("pedidos.id"))
+    pantalon_id = Column(Integer, ForeignKey("pantalones.id"))
+    cantidad = Column(Integer)
+    precio_unitario = Column(Float)
+    pedido = relationship("Pedido", back_populates="detalles")
