@@ -14,6 +14,7 @@ from database import engine, get_db
 import json
 from fastapi.responses import FileResponse
 import mercadopago # <-- MOTOR BANCARIO
+from sqlalchemy import text
 
 # Seguridad de Tráfico
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -323,9 +324,13 @@ async def subir_excel(request: Request, archivo: UploadFile = File(...), db: Ses
 
 @app.get("/reset-db-total")
 def reset_db_total():
-    models.Base.metadata.drop_all(bind=engine)
+    # Borrado forzado usando instrucción CASCADE de PostgreSQL
+    with engine.begin() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS detalles_pedido, pedidos, pantalones, categorias CASCADE;"))
+        
+    # Volvemos a construir la estructura limpia
     models.Base.metadata.create_all(bind=engine)
-    return {"mensaje": "Tablas formateadas exitosamente. Lista para el E-Commerce de alta seguridad."}
+    return {"mensaje": "Base de datos formateada con éxito mediante CASCADE. Lista para el nuevo diseño de envíos."}
 
 @app.get("/backup/descargar")
 @limiter.limit("3/minute")
