@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Centro de Despacho | Surprise Jeans</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans p-6">
+
+    <div class="max-w-5xl mx-auto">
+        <header class="flex justify-between items-center mb-8 bg-white p-6 rounded-2xl shadow-sm">
+            <div>
+                <h1 class="text-2xl font-black text-indigo-600">Centro de Despacho 📦</h1>
+                <p class="text-xs text-gray-500 mt-1">Gestión de envíos y paquetería</p>
+            </div>
+            <button onclick="cerrarSesion()" class="text-sm font-bold text-rose-500 hover:text-rose-700">Cerrar Sesión</button>
+        </header>
+
+        <div id="pantalla-login" class="bg-white p-8 rounded-2xl shadow-sm max-w-sm mx-auto mt-20 hidden">
+            <h2 class="text-xl font-bold text-center mb-6">Acceso a Almacén</h2>
+            <input type="text" id="user" value="admin" class="hidden">
+            <input type="password" id="pass" placeholder="Contraseña de Yessica" class="w-full p-3 border rounded-lg mb-4 outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+            <button onclick="iniciarSesion()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700">Entrar</button>
+        </div>
+
+        <div id="pantalla-pedidos" class="hidden">
+            <div id="grid-pedidos" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://surprise-jeans-api-denz.onrender.com';
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('token_surprise');
+            if (token) {
+                mostrarPanel(token);
+            } else {
+                document.getElementById('pantalla-login').classList.remove('hidden');
+            }
+        });
+
+        async function iniciarSesion() {
+            const pass = document.getElementById('pass').value;
+            const formData = new URLSearchParams();
+            formData.append('username', 'admin');
+            formData.append('password', pass);
+
+            try {
+                const respuesta = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData
+                });
+
+                if (respuesta.ok) {
+                    const data = await respuesta.json();
+                    localStorage.setItem('token_surprise', data.access_token);
+                    document.getElementById('pantalla-login').classList.add('hidden');
+                    mostrarPanel(data.access_token);
+                } else {
+                    alert("Contraseña incorrecta.");
+                }
+            } catch (error) {
+                alert("Error de conexión al servidor.");
+            }
+        }
+
+        function cerrarSesion() {
+            localStorage.removeItem('token_surprise');
+            window.location.reload();
+        }
+
+        async function mostrarPanel(token) {
+            document.getElementById('pantalla-pedidos').classList.remove('hidden');
+            
+            try {
+                const respuesta = await fetch(`${API_URL}/pedidos-admin`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (respuesta.ok) {
+                    const pedidos = await respuesta.json();
+                    renderizarPedidos(pedidos);
+                } else {
+                    cerrarSesion(); // Si el token expiró, lo saca
+                }
+            } catch (error) {
+                console.error("Error al obtener pedidos", error);
+            }
+        }
+
+        function renderizarPedidos(pedidos) {
+            const grid = document.getElementById('grid-pedidos');
+            grid.innerHTML = '';
+
+            if(pedidos.length === 0) {
+                grid.innerHTML = '<p class="text-gray-500 col-span-2 text-center mt-10">Aún no hay pedidos registrados.</p>';
+                return;
+            }
+
+            pedidos.forEach(p => {
+                const esPagado = p.estatus === "PAGADO";
+                const colorBadge = esPagado ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-amber-100 text-amber-700 border-amber-200";
+                const iconoAviso = esPagado ? "✅ LISTO PARA ENVÍO" : "⏳ ESPERANDO PAGO";
+
+                let listaRopa = p.detalles.map(d => `<li class="text-xs text-gray-600 border-b border-gray-50 pb-1 mt-1 font-medium">• ${d.cantidad}x [${d.codigo}] ${d.nombre}</li>`).join('');
+
+                const textoParaCopiar = `NOMBRE: ${p.cliente}\nTELÉFONO: ${p.telefono}\nDIRECCIÓN: ${p.direccion_completa}\nREFERENCIAS: ${p.referencias}`;
+
+                grid.innerHTML += `
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
+                        <div class="p-4 border-b border-gray-50 flex justify-between items-center bg-gray-50">
+                            <span class="font-black text-indigo-900">${p.folio}</span>
+                            <span class="text-[10px] font-bold px-3 py-1 rounded-full border ${colorBadge}">${iconoAviso}</span>
+                        </div>
+                        
+                        <div class="p-5 flex-1">
+                            <p class="text-sm font-bold text-gray-800 mb-1">${p.cliente} <span class="text-xs font-normal text-gray-400">(${p.telefono})</span></p>
+                            
+                            <div class="bg-indigo-50 p-3 rounded-lg mb-4 mt-3">
+                                <p class="text-xs text-indigo-900 leading-relaxed font-medium" id="dir-${p.folio}">
+                                    ${p.direccion_completa}<br>
+                                    <span class="text-indigo-400 italic">Ref: ${p.referencias}</span>
+                                </p>
+                                <button onclick="copiarDireccion(\`${textoParaCopiar}\`)" class="mt-2 text-[10px] font-bold text-indigo-600 bg-white px-3 py-1.5 rounded shadow-sm hover:bg-indigo-600 hover:text-white transition-colors uppercase tracking-wider">
+                                    Copiar para Guía
+                                </button>
+                            </div>
+
+                            <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Artículos comprados:</p>
+                            <ul class="mb-4">
+                                ${listaRopa}
+                            </ul>
+                        </div>
+                        
+                        <div class="p-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
+                            <span class="text-xs font-bold text-gray-400">Fecha: ${p.fecha}</span>
+                            <span class="text-lg font-black text-gray-900">$${p.total.toFixed(2)}</span>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function copiarDireccion(texto) {
+            navigator.clipboard.writeText(texto).then(() => {
+                alert("¡Dirección copiada! Ya puedes pegarla en la página de paquetería.");
+            }).catch(err => {
+                alert("Error al copiar: ", err);
+            });
+        }
+    </script>
+</body>
+</html>

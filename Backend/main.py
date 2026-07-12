@@ -321,6 +321,40 @@ async def subir_excel(request: Request, archivo: UploadFile = File(...), db: Ses
         
     except Exception as e:
         return {"error": "Hubo un problema al leer los datos. Verifica el formato del archivo."}
+    
+# ==========================================
+# CENTRO DE DESPACHO (EXCLUSIVO YESSICA)
+# ==========================================
+@app.get("/pedidos-admin")
+@limiter.limit("30/minute")
+def obtener_pedidos_admin(request: Request, db: Session = Depends(get_db), token: str = Depends(verificar_token)):
+    # Traemos todos los pedidos ordenados del más nuevo al más viejo
+    pedidos = db.query(models.Pedido).order_by(models.Pedido.fecha.desc()).all()
+    resultado = []
+    
+    for p in pedidos:
+        lista_ropa = []
+        for d in p.detalles:
+            pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == d.pantalon_id).first()
+            lista_ropa.append({
+                "cantidad": d.cantidad,
+                "nombre": pantalon.nombre if pantalon else "Modelo eliminado",
+                "codigo": pantalon.codigo if pantalon else "S/C"
+            })
+        
+        resultado.append({
+            "folio": f"SJ-{p.id:04d}",
+            "cliente": p.nombre_cliente,
+            "telefono": p.telefono,
+            "direccion_completa": f"{p.calle_numero}, Col. {p.colonia}, {p.ciudad}, {p.estado}, C.P. {p.codigo_postal}",
+            "referencias": p.referencias or "Sin referencias adicionales",
+            "total": p.total,
+            "estatus": p.estatus,
+            "fecha": p.fecha.strftime("%d/%m/%Y"),
+            "detalles": lista_ropa
+        })
+        
+    return resultado
 
 @app.get("/reset-db-total")
 def reset_db_total():
