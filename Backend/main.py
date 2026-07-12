@@ -159,7 +159,15 @@ def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, db: Session = Depends(ge
         "statement_descriptor": "SURPRISE JEANS" 
     }
 
+   # 5. Enviar a Mercado Pago
     respuesta = sdk.preference().create(preference_data)
+
+        # ESCUDO: Verificamos si Mercado Pago rechazó la creación del link
+    if respuesta["status"] != 201:
+            print("❌ ERROR INTERNO DE MERCADO PAGO:", respuesta)
+            raise HTTPException(status_code=400, detail="Mercado Pago bloqueó la solicitud. Revisa tu Token.")
+
+        # Si todo salió bien, extraemos el link y lo mandamos al Frontend
     return {"link_pago": respuesta["response"]["init_point"]}
 
 @app.post("/webhook/mercadopago")
