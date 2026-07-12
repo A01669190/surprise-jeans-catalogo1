@@ -33,13 +33,13 @@
     <script>
         const API_URL = 'https://surprise-jeans-api-denz.onrender.com';
         
+        // 🚨 LA BOVEDA VOLÁTIL: El token ahora vive solo en la memoria temporal
+        let tokenPrivado = null; 
+
         document.addEventListener('DOMContentLoaded', () => {
-            const token = localStorage.getItem('token_surprise');
-            if (token) {
-                mostrarPanel(token);
-            } else {
-                document.getElementById('pantalla-login').classList.remove('hidden');
-            }
+            // Siempre que se abra o se recargue la página, exigimos contraseña
+            document.getElementById('pantalla-login').classList.remove('hidden');
+            document.getElementById('pantalla-pedidos').classList.add('hidden');
         });
 
         async function iniciarSesion() {
@@ -57,9 +57,14 @@
 
                 if (respuesta.ok) {
                     const data = await respuesta.json();
-                    localStorage.setItem('token_surprise', data.access_token);
+                    
+                    // Guardamos la llave solo en la variable temporal, no en el navegador
+                    tokenPrivado = data.access_token; 
+                    
                     document.getElementById('pantalla-login').classList.add('hidden');
-                    mostrarPanel(data.access_token);
+                    document.getElementById('pass').value = ''; // Borramos lo que escribió por seguridad
+                    
+                    mostrarPanel(tokenPrivado);
                 } else {
                     alert("Contraseña incorrecta.");
                 }
@@ -69,8 +74,8 @@
         }
 
         function cerrarSesion() {
-            localStorage.removeItem('token_surprise');
-            window.location.reload();
+            tokenPrivado = null; // Destruimos la llave
+            window.location.reload(); // Obligamos al reinicio de la página
         }
 
         async function mostrarPanel(token) {
@@ -85,13 +90,14 @@
                     const pedidos = await respuesta.json();
                     renderizarPedidos(pedidos);
                 } else {
-                    cerrarSesion(); // Si el token expiró, lo saca
+                    cerrarSesion(); // Si expiró la sesión, lo expulsa
                 }
             } catch (error) {
                 console.error("Error al obtener pedidos", error);
             }
         }
 
+        // ... (Tus funciones renderizarPedidos y copiarDireccion se quedan exactamente igual)
         function renderizarPedidos(pedidos) {
             const grid = document.getElementById('grid-pedidos');
             grid.innerHTML = '';
