@@ -201,6 +201,7 @@
         }
 
         // 3. PINTAR PANTALONES EN LA PANTALLA
+        // 3. PINTAR PANTALONES EN LA PANTALLA (CON SISTEMA DE ESCASEZ)
         function renderizarCatalogo(listaPantalones) {
             const grid = document.getElementById('grid-pantalones');
             grid.innerHTML = '';
@@ -211,13 +212,27 @@
             }
 
             listaPantalones.forEach(p => {
-                // Si el stock es 0, no lo mostramos o lo mostramos agotado (aquí lo mostramos normal pero podrías ocultarlo)
+                // 1. Evaluamos si el inventario llegó a cero
+                const estaAgotado = p.stock === 0;
+                
+                // 2. Efectos visuales: Si está agotado lo ponemos gris, si no, le dejamos el zoom al pasar el mouse
+                const filtroImagen = estaAgotado ? 'grayscale opacity-50' : 'transform group-hover:scale-105 transition-transform duration-500';
+                
+                // 3. Etiqueta gigante de "AGOTADO" que cruza la imagen
+                const etiquetaAgotado = estaAgotado ? '<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-600 text-white text-lg font-black px-6 py-2 rounded-xl shadow-2xl tracking-widest z-20 -rotate-12 border-2 border-white">AGOTADO</div>' : '';
+                
+                // 4. Cambiamos el botón para que no puedan agregarlo al carrito si no hay stock
+                const botonAccion = estaAgotado
+                    ? `<button disabled class="w-full bg-gray-200 text-gray-400 font-bold py-3 rounded-xl cursor-not-allowed text-sm uppercase tracking-wider">Sin existencias</button>`
+                    : `<button onclick="agregarAlCarrito(${p.id})" class="w-full bg-stone-100 hover:bg-stone-900 text-stone-900 hover:text-white font-bold py-3 rounded-xl transition-colors text-sm shadow-sm">Añadir a la bolsa</button>`;
+
                 const div = document.createElement('div');
-                div.className = 'bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 group';
+                div.className = 'bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 group relative';
                 
                 div.innerHTML = `
-                    <div class="relative overflow-hidden aspect-[3/4]">
-                        <img src="${p.imagen_url}" alt="${p.nombre}" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500">
+                    <div class="relative overflow-hidden aspect-[3/4] bg-gray-50">
+                        ${etiquetaAgotado}
+                        <img src="${p.imagen_url}" alt="${p.nombre}" class="w-full h-full object-cover ${filtroImagen}">
                         <div class="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-black text-indigo-600 shadow-sm">
                             [${p.codigo || 'S/C'}]
                         </div>
@@ -226,17 +241,14 @@
                         <h3 class="font-bold text-stone-800 text-lg uppercase leading-tight mb-2 truncate" title="${p.nombre}">${p.nombre}</h3>
                         <div class="flex justify-between items-end mb-4">
                             <p class="text-2xl font-black text-stone-900">$${p.precio}</p>
-                            <p class="text-xs text-stone-400 font-medium">Quedan ${p.stock}</p>
+                            <p class="text-xs ${estaAgotado ? 'text-red-500 font-bold' : 'text-stone-400 font-medium'}">Quedan ${p.stock}</p>
                         </div>
-                        <button onclick="agregarAlCarrito(${p.id})" class="w-full bg-stone-100 hover:bg-stone-900 text-stone-900 hover:text-white font-bold py-3 rounded-xl transition-colors text-sm shadow-sm">
-                            Añadir a la bolsa
-                        </button>
+                        ${botonAccion}
                     </div>
                 `;
                 grid.appendChild(div);
             });
         }
-
         // 4. MOTOR DEL BUSCADOR EN TIEMPO REAL
         document.getElementById('buscador').addEventListener('input', (e) => {
             const texto = e.target.value.toLowerCase();
