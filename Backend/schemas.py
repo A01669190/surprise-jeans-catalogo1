@@ -1,7 +1,6 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
-# Esquema para crear y leer categorías
 class CategoriaBase(BaseModel):
     nombre: str
 
@@ -10,10 +9,9 @@ class CategoriaRespuesta(CategoriaBase):
     class Config:
         from_attributes = True
 
-# Esquema para leer pantalones
 class PantalonRespuesta(BaseModel):
     id: int
-    codigo: str  # <--- AQUÍ ESTÁ EL NUEVO CAMPO
+    codigo: str  
     nombre: str
     descripcion: Optional[str] = None
     precio: float
@@ -22,3 +20,23 @@ class PantalonRespuesta(BaseModel):
     stock: int
     class Config:
         from_attributes = True
+
+# ==========================================
+# ESQUEMAS PARA LA BÓVEDA FINANCIERA
+# ==========================================
+class ItemCarrito(BaseModel):
+    id: int
+    nombre: str
+    precio: float
+    cantidad: int
+    codigo: str
+
+class InfoEnvio(BaseModel):
+    nombre: str
+    telefono: str
+    direccion: str
+    cp: str
+
+class PedidoSeguro(BaseModel):
+    envio: InfoEnvio
+    items: List[ItemCarrito]

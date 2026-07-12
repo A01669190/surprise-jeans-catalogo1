@@ -15,11 +15,6 @@
     <meta property="og:description" content="Descubre nuestra nueva colección. El fit perfecto diseñado para ti, directo de fábrica.">
     <meta property="og:image" content="https://i.ibb.co/M9F7mR5/tu-foto-estrella.jpg">
 
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="https://surprisejeanysk.com/">
-    <meta property="twitter:title" content="Surprise Jeans | Catálogo Oficial">
-    <meta property="twitter:description" content="Descubre nuestra nueva colección. El fit perfecto diseñado para ti, directo de fábrica.">
-    <meta property="twitter:image" content="https://i.ibb.co/M9F7mR5/tu-foto-estrella.jpg">
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50 text-gray-800 font-sans relative pb-20">
@@ -71,26 +66,71 @@
                 </ul>
             </div>
             
+            <div class="p-6 border-t border-gray-100 bg-gray-50">
+                <h4 class="text-xs font-black text-indigo-500 uppercase tracking-widest mb-3">Datos de Envío</h4>
+                <div class="space-y-3">
+                    <input type="text" id="envio-nombre" placeholder="Nombre completo" class="w-full p-3 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm">
+                    <input type="tel" id="envio-telefono" placeholder="WhatsApp de contacto" class="w-full p-3 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm">
+                    <div class="flex gap-3">
+                        <input type="text" id="envio-cp" placeholder="C.P." class="w-1/3 p-3 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm">
+                        <input type="text" id="envio-direccion" placeholder="Calle, No. y Colonia" class="w-2/3 p-3 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm">
+                    </div>
+                </div>
+            </div>
+
             <div class="p-6 border-t border-gray-100 bg-white shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)]">
                 <div class="flex justify-between items-center mb-6">
-                    <span class="font-bold text-stone-500 uppercase tracking-widest text-xs">Total Estimado</span>
+                    <span class="font-bold text-stone-500 uppercase tracking-widest text-xs">Total a Pagar</span>
                     <span id="total-carrito" class="text-3xl font-black text-stone-900">$0.00</span>
                 </div>
-                <button onclick="enviarWhatsApp()" class="w-full bg-[#25D366] hover:bg-[#128C7E] text-white font-black py-4 rounded-xl flex justify-center items-center gap-3 shadow-lg transition-colors text-lg">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                
+                <button onclick="procesarPagoSeguro()" id="btn-pagar" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl flex justify-center items-center gap-3 shadow-lg transition-colors text-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
-                    Enviar Pedido por WhatsApp
+                    Pagar Pedido Seguro
                 </button>
-                <p class="text-[10px] text-center text-stone-400 mt-3">Al hacer clic, se abrirá WhatsApp con el resumen de tu pedido.</p>
             </div>
         </div>
     </div>
-    <!-- ========================================== -->
-    <!-- BOTÓN Y VENTANA DEL ASISTENTE VIRTUAL (FAQ) -->
-    <!-- ========================================== -->
+
+    <div id="modal-recibo" class="fixed inset-0 bg-stone-900 bg-opacity-90 z-[60] hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl relative overflow-hidden flex flex-col">
+            <div class="absolute inset-0 z-0 flex items-center justify-center opacity-[0.03] pointer-events-none transform -rotate-45">
+                <p class="text-6xl font-black whitespace-nowrap tracking-tighter">PAGADO SURPRISE JEANS PAGADO</p>
+            </div>
+            <div class="p-6 text-center border-b border-dashed border-gray-300 relative z-10 bg-emerald-50">
+                <div class="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center text-3xl mx-auto mb-4 shadow-lg">✓</div>
+                <h3 class="text-2xl font-black text-emerald-700 uppercase tracking-tight">Pago Aprobado</h3>
+                <p class="text-xs text-emerald-600 font-bold mt-1">Tu compra está 100% segura</p>
+            </div>
+            <div class="p-6 relative z-10 space-y-4 bg-white">
+                <div class="flex justify-between items-center border-b border-gray-100 pb-3">
+                    <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Folio Interno</span>
+                    <span id="recibo-folio" class="font-black text-indigo-600 text-lg">SJ-000</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-gray-100 pb-3">
+                    <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">ID MercadoPago</span>
+                    <span id="recibo-mp" class="font-mono text-sm text-gray-700 font-bold">0000000000</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-gray-100 pb-3">
+                    <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Fecha Exacta</span>
+                    <span id="recibo-fecha" class="text-xs font-bold text-gray-800 text-right">00/00/0000<br>00:00:00</span>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-xl mt-4 border border-gray-200">
+                    <p class="text-[10px] text-gray-500 text-center leading-relaxed font-medium">Guarda una captura de este recibo. El inventario ha sido asegurado. Haz clic abajo para notificar a almacén y coordinar tu envío.</p>
+                </div>
+            </div>
+            <div class="p-4 bg-white relative z-10">
+                <button onclick="enviarWhatsAppRecibo()" class="w-full bg-[#25D366] hover:bg-[#128C7E] text-white font-black py-4 rounded-xl shadow-lg transition-colors text-sm uppercase tracking-wider flex justify-center items-center gap-2">
+                    Avisar a Yessica por WhatsApp
+                </button>
+                <button onclick="cerrarRecibo()" class="w-full mt-3 text-xs text-gray-400 font-bold hover:text-gray-700 transition-colors">Volver a la tienda</button>
+            </div>
+        </div>
+    </div>
+
     <div class="fixed bottom-6 left-6 z-50 flex flex-col items-start">
-        
         <div id="faq-window" class="hidden bg-white w-80 sm:w-96 rounded-2xl shadow-2xl border border-gray-200 overflow-hidden mb-4 transition-all duration-300">
             <div class="bg-indigo-600 p-4 flex justify-between items-center text-white shadow-md">
                 <div class="flex items-center gap-3">
@@ -102,68 +142,33 @@
                 </div>
                 <button onclick="toggleFaq()" class="hover:text-rose-300 font-bold text-2xl leading-none">&times;</button>
             </div>
-
             <div class="p-4 h-96 overflow-y-auto space-y-3 bg-gray-50 text-sm">
-                
                 <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
                     <button onclick="toggleRespuesta('res-1')" class="w-full text-left font-bold text-gray-700 p-3 hover:bg-indigo-50 transition-colors flex justify-between items-center">
-                        📍 ¿Dónde están ubicados?
-                        <span class="text-indigo-400">▾</span>
+                        📍 ¿Dónde están ubicados? <span class="text-indigo-400">▾</span>
                     </button>
                     <div id="res-1" class="hidden p-3 pt-0 text-gray-600 text-xs border-t border-gray-50 leading-relaxed">
-                        Nos encontramos en:<br><strong>Eje 1 Nte. 15, Tepito, Morelos, Cuauhtémoc, 06200 Ciudad de México, CDMX.</strong>
+                        Eje 1 Nte. 15, Tepito, Morelos, Cuauhtémoc, 06200 Ciudad de México, CDMX.
                     </div>
                 </div>
-
                 <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
                     <button onclick="toggleRespuesta('res-2')" class="w-full text-left font-bold text-gray-700 p-3 hover:bg-indigo-50 transition-colors flex justify-between items-center">
-                        📦 ¿Cómo funciona el mayoreo?
-                        <span class="text-indigo-400">▾</span>
+                        📦 ¿Cómo funciona el mayoreo? <span class="text-indigo-400">▾</span>
                     </button>
                     <div id="res-2" class="hidden p-3 pt-0 text-gray-600 text-xs border-t border-gray-50 leading-relaxed">
-                        La venta es exclusiva por <strong>PAQUETE CERRADO</strong>.<br><br>
-                        • Contiene 12 piezas de un mismo modelo (No se pueden mezclar).<br>
-                        • Incluye la curva de tallas completa: 3, 5, 7, 9, 11, 13 y 15.
+                        Venta exclusiva por PAQUETE CERRADO (12 piezas de un mismo modelo con curva de tallas completa).
                     </div>
                 </div>
-
                 <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
                     <button onclick="toggleRespuesta('res-3')" class="w-full text-left font-bold text-gray-700 p-3 hover:bg-indigo-50 transition-colors flex justify-between items-center">
-                        🚚 ¿Hacen envíos y qué paqueterías usan?
-                        <span class="text-indigo-400">▾</span>
+                        🚚 ¿Hacen envíos? <span class="text-indigo-400">▾</span>
                     </button>
                     <div id="res-3" class="hidden p-3 pt-0 text-gray-600 text-xs border-t border-gray-50 leading-relaxed">
-                        ¡Hacemos envíos a todo el país! 🇲🇽<br><br>
-                        <strong>Nacionales:</strong> FedEx, Estafeta, Castores, Paquete Express, Envía.<br>
-                        <strong>Regionales:</strong> OMAJA, Exal, Peña y Peña, Titanium, Transportes El Chavo, Jaguares Tours y muchas más.
+                        ¡A todo el país! Usamos FedEx, Estafeta, Castores, OMAJA, Exal, y muchos más.
                     </div>
                 </div>
-
-                <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-                    <button onclick="toggleRespuesta('res-4')" class="w-full text-left font-bold text-gray-700 p-3 hover:bg-indigo-50 transition-colors flex justify-between items-center">
-                        👖 ¿Cómo vienen las tallas y hay devoluciones?
-                        <span class="text-indigo-400">▾</span>
-                    </button>
-                    <div id="res-4" class="hidden p-3 pt-0 text-gray-600 text-xs border-t border-gray-50 leading-relaxed">
-                        Nuestras tallas vienen <strong>exactas</strong>. <br><br>
-                        Sí realizamos cambios por defectos de fábrica, pero ten en cuenta que <strong>NO manejamos reembolsos</strong>.
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-                    <button onclick="toggleRespuesta('res-5')" class="w-full text-left font-bold text-gray-700 p-3 hover:bg-indigo-50 transition-colors flex justify-between items-center">
-                        📝 ¿Cómo realizo mi pedido final?
-                        <span class="text-indigo-400">▾</span>
-                    </button>
-                    <div id="res-5" class="hidden p-3 pt-0 text-gray-600 text-xs border-t border-gray-50 leading-relaxed">
-                        Manda un mensaje al WhatsApp oficial <strong>55 1322 0695</strong> con las imágenes de tus modelos.<br><br>
-                        ⚠️ Por la alta rotación, te sugerimos mandar <strong>varias opciones de reserva</strong> por si algún modelo se agota mientras armamos tu paquete.
-                    </div>
-                </div>
-
             </div>
         </div>
-
         <button onclick="toggleFaq()" class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-2xl transition-transform hover:scale-110 mr-auto">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
@@ -171,38 +176,61 @@
         </button>
     </div>
 
-
     <script>
-        // 1. CONFIGURACIÓN PRINCIPAL
         const API_URL = 'https://surprise-jeans-api-denz.onrender.com';
-        const NUMERO_WHATSAPP = '525581410686'; // <-- CAMBIA ESTO POR EL NÚMERO REAL
+        const NUMERO_WHATSAPP = '525513220695'; 
         
         let catalogoCompleto = [];
         let carrito = [];
 
-        // 2. DESCARGAR CATÁLOGO DEL SERVIDOR
+        // EL ESCÁNER DE RECIBOS (Se ejecuta apenas abre la página)
+        document.addEventListener('DOMContentLoaded', () => {
+            cargarCatalogo();
+
+            const parametrosURL = new URLSearchParams(window.location.search);
+            const estadoPago = parametrosURL.get('pago');
+
+            if (estadoPago === 'exito') {
+                const paymentId = parametrosURL.get('payment_id');
+                const externalReference = parametrosURL.get('external_reference');
+                
+                const ahora = new Date();
+                const opcionesFecha = { year: 'numeric', month: '2-digit', day: '2-digit' };
+                const opcionesHora = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+                
+                document.getElementById('recibo-folio').innerText = `SJ-${externalReference.padStart(4, '0')}`;
+                document.getElementById('recibo-mp').innerText = paymentId;
+                document.getElementById('recibo-fecha').innerHTML = `${ahora.toLocaleDateString('es-MX', opcionesFecha)}<br>${ahora.toLocaleTimeString('es-MX', opcionesHora)}`;
+
+                carrito = [];
+                actualizarUICarrito();
+                document.getElementById('modal-recibo').classList.remove('hidden');
+                
+                window.history.replaceState({}, document.title, "/");
+            } else if (estadoPago === 'fallo') {
+                alert("⚠️ Tu pago fue rechazado. Intenta con otra tarjeta o en OXXO.");
+                window.history.replaceState({}, document.title, "/");
+            }
+        });
+
         async function cargarCatalogo() {
             try {
                 const respuesta = await fetch(`${API_URL}/pantalones`);
                 catalogoCompleto = await respuesta.json();
                 renderizarCatalogo(catalogoCompleto);
             } catch (error) {
-                console.error("Error al cargar:", error);
-                document.getElementById('grid-pantalones').innerHTML = '<p class="text-center text-rose-500 col-span-full">Error al cargar la colección. Recarga la página.</p>';
+                document.getElementById('grid-pantalones').innerHTML = '<p class="text-center text-rose-500 col-span-full">Error al cargar la colección.</p>';
             }
         }
 
-        // 3. PINTAR PANTALONES EN LA PANTALLA
-        // 3. PINTAR PANTALONES EN LA PANTALLA (CON ORDENAMIENTO DE AGOTADOS)
         function renderizarCatalogo(listaPantalones) {
             const grid = document.getElementById('grid-pantalones');
             grid.innerHTML = '';
 
-            // 🚀 EL MOTOR DE ORDENAMIENTO: Manda el stock 0 hasta el fondo
             listaPantalones.sort((a, b) => {
-                if (a.stock === 0 && b.stock > 0) return 1;  // Manda 'a' hacia abajo
-                if (a.stock > 0 && b.stock === 0) return -1; // Mantiene 'a' arriba
-                return 0; // Si ambos tienen stock, no los mueve
+                if (a.stock === 0 && b.stock > 0) return 1;
+                if (a.stock > 0 && b.stock === 0) return -1;
+                return 0; 
             });
 
             if (listaPantalones.length === 0) {
@@ -211,16 +239,10 @@
             }
 
             listaPantalones.forEach(p => {
-                // 1. Evaluamos si el inventario llegó a cero
                 const estaAgotado = p.stock === 0;
-                
-                // 2. Efectos visuales: Si está agotado lo ponemos gris, si no, le dejamos el zoom
                 const filtroImagen = estaAgotado ? 'grayscale opacity-50' : 'transform group-hover:scale-105 transition-transform duration-500';
-                
-                // 3. Etiqueta gigante de "AGOTADO" que cruza la imagen
                 const etiquetaAgotado = estaAgotado ? '<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-600 text-white text-lg font-black px-6 py-2 rounded-xl shadow-2xl tracking-widest z-20 -rotate-12 border-2 border-white">AGOTADO</div>' : '';
                 
-                // 4. Cambiamos el botón para que no puedan agregarlo al carrito
                 const botonAccion = estaAgotado
                     ? `<button disabled class="w-full bg-gray-200 text-gray-400 font-bold py-3 rounded-xl cursor-not-allowed text-sm uppercase tracking-wider">Sin existencias</button>`
                     : `<button onclick="agregarAlCarrito(${p.id})" class="w-full bg-stone-100 hover:bg-stone-900 text-stone-900 hover:text-white font-bold py-3 rounded-xl transition-colors text-sm shadow-sm">Añadir a la bolsa</button>`;
@@ -248,7 +270,7 @@
                 grid.appendChild(div);
             });
         }
-        // 4. MOTOR DEL BUSCADOR EN TIEMPO REAL
+
         document.getElementById('buscador').addEventListener('input', (e) => {
             const texto = e.target.value.toLowerCase();
             const filtrados = catalogoCompleto.filter(p => 
@@ -258,39 +280,26 @@
             renderizarCatalogo(filtrados);
         });
 
-        // 5. LÓGICA DEL CARRITO
         function agregarAlCarrito(id) {
             const pantalon = catalogoCompleto.find(p => p.id === id);
             if (!pantalon) return;
 
             const itemExistente = carrito.find(item => item.id === id);
-            
-            // Verificamos que no pida más del stock que hay
             if (itemExistente) {
-                if(itemExistente.cantidad < pantalon.stock) {
-                    itemExistente.cantidad++;
-                } else {
-                    alert(`Solo tenemos ${pantalon.stock} unidades en existencia de este modelo.`);
-                    return;
-                }
+                if(itemExistente.cantidad < pantalon.stock) itemExistente.cantidad++;
+                else { alert(`Solo tenemos ${pantalon.stock} unidades en existencia.`); return; }
             } else {
-                if(pantalon.stock > 0) {
-                    carrito.push({ ...pantalon, cantidad: 1 });
-                } else {
-                    alert('Este modelo está agotado.');
-                    return;
-                }
+                if(pantalon.stock > 0) carrito.push({ ...pantalon, cantidad: 1 });
+                else { alert('Este modelo está agotado.'); return; }
             }
-            
             actualizarUICarrito();
-            abrirCarrito(); // Despliega el carrito visualmente para que el cliente vea que se agregó
+            abrirCarrito();
         }
 
         function actualizarUICarrito() {
             const lista = document.getElementById('lista-carrito');
             const badge = document.getElementById('cart-badge');
             const totalEl = document.getElementById('total-carrito');
-            
             let total = 0;
             let cantidadTotal = 0;
 
@@ -316,9 +325,9 @@
                         <div class="flex justify-between items-center">
                             <p class="font-black text-stone-900">$${item.precio}</p>
                             <div class="flex items-center gap-3 bg-gray-50 rounded-lg p-1 border border-gray-200">
-                                <button onclick="cambiarCantidad(${index}, -1)" class="w-6 h-6 flex items-center justify-center bg-white rounded-md font-bold text-gray-500 hover:bg-rose-100 hover:text-rose-600 shadow-sm transition-colors">-</button>
+                                <button onclick="cambiarCantidad(${index}, -1)" class="w-6 h-6 flex justify-center bg-white rounded-md font-bold text-gray-500 hover:text-rose-600">-</button>
                                 <span class="text-sm font-bold text-stone-700 w-4 text-center">${item.cantidad}</span>
-                                <button onclick="cambiarCantidad(${index}, 1)" class="w-6 h-6 flex items-center justify-center bg-white rounded-md font-bold text-gray-500 hover:bg-indigo-100 hover:text-indigo-600 shadow-sm transition-colors">+</button>
+                                <button onclick="cambiarCantidad(${index}, 1)" class="w-6 h-6 flex justify-center bg-white rounded-md font-bold text-gray-500 hover:text-indigo-600">+</button>
                             </div>
                         </div>
                     </div>
@@ -329,73 +338,85 @@
             badge.innerText = cantidadTotal;
             totalEl.innerText = `$${total.toFixed(2)}`;
         }
-    
 
         function cambiarCantidad(index, delta) {
             const item = carrito[index];
-            
-            // Regla: no superar el stock
             if (delta === 1 && item.cantidad >= item.stock) {
-                alert(`Solo hay ${item.stock} unidades en existencia.`);
-                return;
+                alert(`Solo hay ${item.stock} unidades en existencia.`); return;
             }
-
             item.cantidad += delta;
-            
-            // Si baja de 1, se elimina del carrito
-            if (item.cantidad <= 0) {
-                carrito.splice(index, 1);
-            }
+            if (item.cantidad <= 0) carrito.splice(index, 1);
             actualizarUICarrito();
         }
 
-        // 6. CONTROL VISUAL DEL MODAL
-        function abrirCarrito() {
-            document.getElementById('modal-carrito').classList.remove('hidden');
+        function abrirCarrito() { document.getElementById('modal-carrito').classList.remove('hidden'); }
+        function cerrarCarrito() { document.getElementById('modal-carrito').classList.add('hidden'); }
+        function cerrarRecibo() { document.getElementById('modal-recibo').classList.add('hidden'); }
+
+        function toggleFaq() { document.getElementById('faq-window').classList.toggle('hidden'); }
+        function toggleRespuesta(id) { document.getElementById(id).classList.toggle('hidden'); }
+
+        function enviarWhatsAppRecibo() {
+            const folio = document.getElementById('recibo-folio').innerText;
+            const pagoId = document.getElementById('recibo-mp').innerText;
+            const mensaje = `¡Hola Yessica! Acabo de realizar un pago en la página web. ✅\n\n*Folio Interno:* ${folio}\n*ID MercadoPago:* ${pagoId}\n\nTe envío mi comprobante (captura) para coordinar el envío de mi mercancía. 📦`;
+            window.open(`https://wa.me/${NUMERO_WHATSAPP}?text=${encodeURIComponent(mensaje)}`, '_blank');
+            cerrarRecibo();
         }
-        function cerrarCarrito() {
-            document.getElementById('modal-carrito').classList.add('hidden');
-        }
-
-       // 7. COMPILADOR HACIA WHATSAPP (CORREGIDO)
-        function enviarWhatsApp() {
-            if (carrito.length === 0) return;
-
-            // Usamos una sola diagonal invertida (\n) para que haga el salto de línea real
-            let mensaje = "¡Hola! Me interesan estos modelos que armé en mi carrito:\n\n";
-            let totalPedido = 0;
-
-            carrito.forEach(item => {
-                const subtotal = item.precio * item.cantidad;
-                totalPedido += subtotal;
-                
-                // Usamos un emoji de pantalón como viñeta
-                mensaje += ` *${item.cantidad}x* [${item.codigo}] ${item.nombre} - $${subtotal}\n`;
-            });
-
-            mensaje += `\n *Total estimado: $${totalPedido.toFixed(2)}*\n\n¿Tienen estos modelos disponibles para coordinar el pago/entrega?`;
-
-            // Empaquetamos todo para enviarlo al enlace de WhatsApp
-            const url = `https://wa.me/${NUMERO_WHATSAPP}?text=${encodeURIComponent(mensaje)}`;
-            
-            window.open(url, '_blank');
-        }
-
-        // 8. AL INICIAR LA PÁGINA
-        document.addEventListener('DOMContentLoaded', cargarCatalogo);
 
         // ==========================================
-        // FUNCIONES DEL ASISTENTE VIRTUAL (FAQ)
+        // LA BÓVEDA DE PAGO
         // ==========================================
-        function toggleFaq() {
-            const ventanaFaq = document.getElementById('faq-window');
-            ventanaFaq.classList.toggle('hidden');
-        }
+        async function procesarPagoSeguro() {
+            if (carrito.length === 0) { alert("Tu carrito está vacío."); return; }
 
-        function toggleRespuesta(idRespuesta) {
-            const respuesta = document.getElementById(idRespuesta);
-            // Si la respuesta está oculta, la muestra. Si está visible, la oculta.
-            respuesta.classList.toggle('hidden');
+            const nombre = document.getElementById('envio-nombre').value;
+            const telefono = document.getElementById('envio-telefono').value;
+            const cp = document.getElementById('envio-cp').value;
+            const direccion = document.getElementById('envio-direccion').value;
+
+            if(!nombre || !telefono || !cp || !direccion) {
+                alert("⚠️ Por favor, llena todos tus datos de envío para continuar.");
+                return;
+            }
+
+            const btnPagar = document.getElementById('btn-pagar');
+            const textoOriginal = btnPagar.innerHTML;
+            btnPagar.innerHTML = "Asegurando inventario... ⏳";
+            btnPagar.disabled = true;
+
+            try {
+                const pedidoSeguro = {
+                    envio: { nombre, telefono, cp, direccion },
+                    items: carrito.map(item => ({
+                        id: item.id,
+                        codigo: item.codigo || "S/C",
+                        nombre: item.nombre,
+                        precio: parseFloat(item.precio),
+                        cantidad: parseInt(item.cantidad)
+                    }))
+                };
+
+                const respuesta = await fetch(`${API_URL}/crear-pago-seguro`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(pedidoSeguro)
+                });
+
+                if (respuesta.ok) {
+                    const data = await respuesta.json();
+                    window.location.href = data.link_pago; 
+                } else {
+                    const errorData = await respuesta.json();
+                    alert(`Operación rechazada: ${errorData.detail}`);
+                }
+            } catch (error) {
+                console.error(error);
+                alert("Fallo de conexión. Verifica tu internet.");
+            } finally {
+                btnPagar.innerHTML = textoOriginal;
+                btnPagar.disabled = false;
+            }
         }
     </script>
 </body>

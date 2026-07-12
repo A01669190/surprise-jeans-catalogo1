@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+mercadopago
+requests
+pandas
+openpyxl
+python-multipart
+slowapi
+passlib[bcrypt]
+PyJWT

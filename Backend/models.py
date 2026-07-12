@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
-from datetime import datetime
+import datetime
 from database import Base
 
 class Categoria(Base):
@@ -14,12 +14,33 @@ class Pantalon(Base):
     id = Column(Integer, primary_key=True, index=True)
     codigo = Column(String, index=True)
     nombre = Column(String, index=True)
+    descripcion = Column(String, nullable=True)
     precio = Column(Float)
+    stock = Column(Integer, default=0)
     imagen_url = Column(String)
-    
-    # --- NUEVOS CAMPOS ---
-    stock = Column(Integer, default=1) 
-    fecha_creacion = Column(DateTime, default=datetime.utcnow) 
-    
     categoria_id = Column(Integer, ForeignKey("categorias.id"))
     categoria = relationship("Categoria", back_populates="pantalones")
+
+# ==========================================
+# TABLAS DE SEGURIDAD (PEDIDOS)
+# ==========================================
+class Pedido(Base):
+    __tablename__ = "pedidos"
+    id = Column(Integer, primary_key=True, index=True)
+    nombre_cliente = Column(String)
+    telefono = Column(String)
+    direccion = Column(String)
+    codigo_postal = Column(String)
+    total = Column(Float)
+    estatus = Column(String, default="PENDIENTE") # <- Escudo Anti-Falsificación
+    fecha = Column(DateTime, default=datetime.datetime.utcnow)
+    detalles = relationship("DetallePedido", back_populates="pedido")
+
+class DetallePedido(Base):
+    __tablename__ = "detalles_pedido"
+    id = Column(Integer, primary_key=True, index=True)
+    pedido_id = Column(Integer, ForeignKey("pedidos.id"))
+    pantalon_id = Column(Integer, ForeignKey("pantalones.id"))
+    cantidad = Column(Integer)
+    precio_unitario = Column(Float)
+    pedido = relationship("Pedido", back_populates="detalles")

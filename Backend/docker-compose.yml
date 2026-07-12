@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  backend-surprise:
+    build: .
+    container_name: api_surprise_jeans
+    ports:
+      - "8000:8000"
+    volumes:
+      # Esto sincroniza tu código en tiempo real. 
+      # Si cambias algo en VS Code, se actualiza en el contenedor sin tener que reiniciarlo.
+      - .:/app
+    restart: unless-stopped
