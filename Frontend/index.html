@@ -256,7 +256,7 @@
             if (carrito.length === 0) return;
 
             // Usamos una sola diagonal invertida (\n) para que haga el salto de línea real
-            let mensaje = "¡Hola! 👋 Me interesan estos modelos que armé en mi carrito:\n\n";
+            let mensaje = "¡Hola! Me interesan estos modelos que armé en mi carrito:\n\n";
             let totalPedido = 0;
 
             carrito.forEach(item => {
@@ -264,10 +264,10 @@
                 totalPedido += subtotal;
                 
                 // Usamos un emoji de pantalón como viñeta
-                mensaje += `👖 *${item.cantidad}x* [${item.codigo}] ${item.nombre} - $${subtotal}\n`;
+                mensaje += ` *${item.cantidad}x* [${item.codigo}] ${item.nombre} - $${subtotal}\n`;
             });
 
-            mensaje += `\n💰 *Total estimado: $${totalPedido.toFixed(2)}*\n\n¿Tienen estos modelos disponibles para coordinar el pago/entrega?`;
+            mensaje += `\n *Total estimado: $${totalPedido.toFixed(2)}*\n\n¿Tienen estos modelos disponibles para coordinar el pago/entrega?`;
 
             // Empaquetamos todo para enviarlo al enlace de WhatsApp
             const url = `https://wa.me/${NUMERO_WHATSAPP}?text=${encodeURIComponent(mensaje)}`;
