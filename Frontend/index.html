@@ -53,10 +53,13 @@
         <span id="cart-badge" class="absolute -top-2 -right-2 bg-rose-500 text-white text-xs font-black w-6 h-6 rounded-full flex items-center justify-center shadow-md">0</span>
     </button>
 
+    <!-- ========================================== -->
+    <!-- VENTANA DEL CARRITO (Limpia) -->
+    <!-- ========================================== -->
     <div id="modal-carrito" class="fixed inset-0 bg-stone-900 bg-opacity-75 z-50 hidden flex justify-end transition-opacity">
         <div class="bg-white w-full max-w-md h-full shadow-2xl flex flex-col transform transition-transform translate-x-0">
             <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                <h3 class="text-xl font-black text-stone-800">Tu Pedido</h3>
+                <h3 class="text-xl font-black text-stone-800">Tu Carrito</h3>
                 <button onclick="cerrarCarrito()" class="text-stone-400 hover:text-rose-500 text-3xl font-bold leading-none">&times;</button>
             </div>
             
@@ -66,30 +69,91 @@
                 </ul>
             </div>
             
-            <div class="p-6 border-t border-gray-100 bg-gray-50">
-                <h4 class="text-xs font-black text-indigo-500 uppercase tracking-widest mb-3">Datos de Envío</h4>
-                <div class="space-y-3">
-                    <input type="text" id="envio-nombre" placeholder="Nombre completo" class="w-full p-3 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm">
-                    <input type="tel" id="envio-telefono" placeholder="WhatsApp de contacto" class="w-full p-3 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm">
-                    <div class="flex gap-3">
-                        <input type="text" id="envio-cp" placeholder="C.P." class="w-1/3 p-3 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm">
-                        <input type="text" id="envio-direccion" placeholder="Calle, No. y Colonia" class="w-2/3 p-3 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm">
-                    </div>
-                </div>
-            </div>
-
+            <!-- TOTAL Y BOTÓN DE CHECKOUT -->
             <div class="p-6 border-t border-gray-100 bg-white shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)]">
                 <div class="flex justify-between items-center mb-6">
-                    <span class="font-bold text-stone-500 uppercase tracking-widest text-xs">Total a Pagar</span>
+                    <span class="font-bold text-stone-500 uppercase tracking-widest text-xs">Subtotal</span>
                     <span id="total-carrito" class="text-3xl font-black text-stone-900">$0.00</span>
                 </div>
                 
-                <button onclick="procesarPagoSeguro()" id="btn-pagar" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl flex justify-center items-center gap-3 shadow-lg transition-colors text-lg">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                    Pagar Pedido Seguro
+                <button onclick="abrirCheckout()" id="btn-checkout" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-xl flex justify-center items-center gap-3 shadow-lg transition-colors text-lg">
+                    Proceder al Pago
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- PANTALLA DE CHECKOUT (Estilo Shopify) -->
+    <!-- ========================================== -->
+    <div id="modal-checkout" class="fixed inset-0 bg-white z-[60] hidden flex-col md:flex-row overflow-y-auto md:overflow-hidden h-screen">
+        
+        <!-- Columna Izquierda: Formulario (Blanco) -->
+        <div class="w-full md:w-3/5 h-full overflow-y-auto bg-white p-6 md:p-12 lg:px-32 flex flex-col">
+            <div class="flex-1 max-w-xl w-full mx-auto">
+                <h2 class="text-3xl font-black text-indigo-600 italic tracking-tighter mb-8">Surprise<span class="text-sm font-normal text-gray-400 block -mt-1">Jeans</span></h2>
+                
+                <!-- Navegación -->
+                <nav class="flex text-xs text-gray-500 font-medium mb-8 gap-2">
+                    <span class="text-indigo-600 font-bold">Carrito</span> &gt; 
+                    <span class="text-gray-900 font-bold">Información</span> &gt; 
+                    <span>Pago seguro</span>
+                </nav>
+
+                <h3 class="text-xl font-bold text-gray-900 mb-4">Contacto</h3>
+                <div class="mb-8 relative">
+                    <input type="tel" id="chk-telefono" placeholder="Número de WhatsApp" class="w-full p-3.5 rounded-md border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 outline-none transition-all shadow-sm peer">
+                    <p class="text-xs text-gray-500 mt-2">Recibirás actualizaciones de tu envío en este número.</p>
+                </div>
+
+                <h3 class="text-xl font-bold text-gray-900 mb-4">Dirección de envío</h3>
+                <div class="space-y-4 mb-8">
+                    <input type="text" id="chk-nombre" placeholder="Nombre completo" class="w-full p-3.5 rounded-md border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-600 outline-none shadow-sm">
+                    <input type="text" id="chk-direccion" placeholder="Calle, número, apartamento y colonia" class="w-full p-3.5 rounded-md border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-600 outline-none shadow-sm">
+                    <div class="flex gap-4">
+                        <input type="text" value="México" disabled class="w-1/2 p-3.5 rounded-md border border-gray-200 bg-gray-50 text-sm text-gray-500 shadow-sm cursor-not-allowed">
+                        <input type="text" id="chk-cp" placeholder="Código Postal" class="w-1/2 p-3.5 rounded-md border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-600 outline-none shadow-sm">
+                    </div>
+                </div>
+
+                <div class="flex flex-col-reverse md:flex-row justify-between items-center mt-10 gap-4">
+                    <button onclick="cerrarCheckout()" class="text-indigo-600 font-medium text-sm hover:underline flex items-center gap-1">
+                        &lt; Volver al carrito
+                    </button>
+                    <button onclick="procesarPagoSeguro()" id="btn-pagar" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-md shadow-md transition-colors text-sm">
+                        Pagar ahora
+                    </button>
+                </div>
+                <div class="mt-8 pt-8 border-t border-gray-200 text-xs text-gray-400">
+                    Todas las transacciones son seguras y están encriptadas.
+                </div>
+            </div>
+        </div>
+
+        <!-- Columna Derecha: Resumen de Pedido (Gris) -->
+        <div class="w-full md:w-2/5 h-full overflow-y-auto bg-gray-50 border-l border-gray-200 p-6 md:p-12 lg:px-16 hidden md:block">
+            <div class="max-w-md w-full">
+                <!-- Lista de productos (Se llena con JS) -->
+                <div id="checkout-lista" class="space-y-4 mb-6"></div>
+                
+                <div class="border-t border-gray-200 pt-4 space-y-3 text-sm text-gray-600">
+                    <div class="flex justify-between">
+                        <span>Subtotal</span>
+                        <span id="chk-subtotal" class="font-medium"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Envío</span>
+                        <span class="text-xs text-gray-500">Calculado en el siguiente paso</span>
+                    </div>
+                </div>
+                
+                <div class="border-t border-gray-200 mt-4 pt-4 flex justify-between items-end">
+                    <span class="text-base text-gray-900 font-bold">Total</span>
+                    <div class="text-right">
+                        <span class="text-xs text-gray-500 mr-1">MXN</span>
+                        <span id="chk-total" class="text-2xl font-black text-gray-900"></span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -367,22 +431,68 @@
         // ==========================================
         // LA BÓVEDA DE PAGO
         // ==========================================
-        async function procesarPagoSeguro() {
-            if (carrito.length === 0) { alert("Tu carrito está vacío."); return; }
+        // ==========================================
+        // LÓGICA DE CHECKOUT Y PASARELA DE PAGO
+        // ==========================================
+        function abrirCheckout() {
+            if (carrito.length === 0) {
+                alert("Tu carrito está vacío."); return;
+            }
+            
+            // Llenamos el resumen visual en la columna derecha
+            const contenedorCheckout = document.getElementById('checkout-lista');
+            contenedorCheckout.innerHTML = '';
+            let total = 0;
 
-            const nombre = document.getElementById('envio-nombre').value;
-            const telefono = document.getElementById('envio-telefono').value;
-            const cp = document.getElementById('envio-cp').value;
-            const direccion = document.getElementById('envio-direccion').value;
+            carrito.forEach(item => {
+                const subtotal = item.precio * item.cantidad;
+                total += subtotal;
+
+                contenedorCheckout.innerHTML += `
+                    <div class="flex items-center gap-4">
+                        <div class="relative">
+                            <img src="${item.imagen_url}" class="w-16 h-16 object-cover rounded-lg border border-gray-200">
+                            <span class="absolute -top-2 -right-2 bg-gray-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">${item.cantidad}</span>
+                        </div>
+                        <div class="flex-1">
+                            <p class="font-bold text-sm text-gray-800 leading-tight">${item.nombre}</p>
+                            <p class="text-[10px] text-gray-500">${item.codigo}</p>
+                        </div>
+                        <span class="font-medium text-sm text-gray-900">$${subtotal.toFixed(2)}</span>
+                    </div>
+                `;
+            });
+
+            document.getElementById('chk-subtotal').innerText = `$${total.toFixed(2)}`;
+            document.getElementById('chk-total').innerText = `$${total.toFixed(2)}`;
+
+            // Ocultamos el carrito pequeño y mostramos la pantalla completa
+            cerrarCarrito();
+            document.getElementById('modal-checkout').classList.remove('hidden');
+            document.getElementById('modal-checkout').classList.add('flex');
+        }
+
+        function cerrarCheckout() {
+            document.getElementById('modal-checkout').classList.add('hidden');
+            document.getElementById('modal-checkout').classList.remove('flex');
+            abrirCarrito();
+        }
+
+        async function procesarPagoSeguro() {
+            // 1. Recolección de la nueva pantalla
+            const telefono = document.getElementById('chk-telefono').value;
+            const nombre = document.getElementById('chk-nombre').value;
+            const direccion = document.getElementById('chk-direccion').value;
+            const cp = document.getElementById('chk-cp').value;
 
             if(!nombre || !telefono || !cp || !direccion) {
-                alert("⚠️ Por favor, llena todos tus datos de envío para continuar.");
+                alert("⚠️ Por favor, llena todos tus datos de contacto y envío para continuar.");
                 return;
             }
 
             const btnPagar = document.getElementById('btn-pagar');
             const textoOriginal = btnPagar.innerHTML;
-            btnPagar.innerHTML = "Asegurando inventario... ⏳";
+            btnPagar.innerHTML = "Procesando de forma segura... ⏳";
             btnPagar.disabled = true;
 
             try {
@@ -412,7 +522,7 @@
                 }
             } catch (error) {
                 console.error(error);
-                alert("Fallo de conexión. Verifica tu internet.");
+                alert("Fallo de conexión. El servidor de Mercado Pago puede estar tardando, intenta de nuevo.");
             } finally {
                 btnPagar.innerHTML = textoOriginal;
                 btnPagar.disabled = false;
