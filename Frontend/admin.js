@@ -438,4 +438,42 @@ document.getElementById('formulario-editar').addEventListener('submit', async (e
         btn.innerText = "GUARDAR CAMBIOS"; 
         btn.disabled = false; 
     }
+
+    // ==========================================
+// 9. RESPALDOS DE SEGURIDAD
+// ==========================================
+async function descargarBaseDeDatos() {
+    try {
+        const respuesta = await fetch(`${API_URL}/backup/descargar`, {
+            method: 'GET',
+            headers: obtenerTokenHeader()
+        });
+
+        if (!respuesta.ok) {
+            alert("No se pudo descargar el respaldo. Verifica tu sesión.");
+            return;
+        }
+
+        // Magia para descargar el archivo JSON en el navegador
+        const blob = await respuesta.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        
+        // Nombra el archivo con la fecha de hoy
+        const fecha = new Date().toISOString().split('T')[0];
+        link.download = `SurpriseJeans_Respaldo_${fecha}.json`;
+        
+        document.body.appendChild(link);
+        link.click();
+        
+        // Limpiamos la memoria
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+    } catch (error) {
+        console.error("Error al descargar el respaldo:", error);
+        alert("Hubo un problema de conexión al generar el respaldo.");
+    }
+}
 });

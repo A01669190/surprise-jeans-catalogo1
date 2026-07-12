@@ -11,6 +11,8 @@ from io import BytesIO
 import models, schemas
 from typing import List, Optional
 from database import engine, get_db
+import json
+from fastapi.responses import FileResponse
 
 # Seguridad de Tráfico
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -255,3 +257,38 @@ def reset_db_total():
     models.Base.metadata.drop_all(bind=engine)
     models.Base.metadata.create_all(bind=engine)
     return {"mensaje": "Tablas formateadas exitosamente. Lista para el nuevo campo de código."}
+
+# ==========================================
+# 6. SISTEMA DE RESPALDOS (BACKUP)
+# ==========================================
+@app.get("/backup/descargar")
+@limiter.limit("3/minute")
+def descargar_respaldo_seguro(
+    request: Request, db: Session = Depends(get_db), token: str = Depends(verificar_token)
+):
+    # 1. Extraemos toda la base de datos
+    categorias = db.query(models.Categoria).all()
+    pantalones = db.query(models.Pantalon).all()
+
+    # 2. Construimos el paquete de datos
+    datos_respaldo = {
+        "fecha_respaldo": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+        "total_modelos": len(pantalones),
+        "categorias": [{"id": c.id, "nombre": c.nombre} for c in categorias],
+        "inventario": [
+            {
+                "id": p.id, "codigo": p.codigo, "nombre": p.nombre, 
+                "precio": p.precio, "stock": p.stock, 
+                "categoria_id": p.categoria_id, "imagen_url": p.imagen_url
+            } for p in pantalones
+        ]
+    }
+
+    # 3. Lo guardamos como archivo temporal en el servidor
+    ruta_archivo = "static/respaldo_surprise.json"
+    with open(ruta_archivo, "w", encoding="utf-8") as f:
+        json.dump(datos_respaldo, f, indent=4, ensure_ascii=False)
+
+    # 4. Forzamos la descarga al navegador del usuario
+    nombre_archivo = f"SurpriseJeans_Backup_{datetime.now().strftime('%Y%m%d')}.json"
+    return FileResponse(path=ruta_archivo, filename=nombre_archivo, media_type='application/json')
