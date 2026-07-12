@@ -438,10 +438,12 @@ document.getElementById('formulario-editar').addEventListener('submit', async (e
         btn.innerText = "GUARDAR CAMBIOS"; 
         btn.disabled = false; 
     }
+}); // <-- ¡AQUÍ ES DONDE FALTABA CERRAR EL BLOQUE ANTERIOR!
 
-    // ==========================================
-// 9. RESPALDOS DE SEGURIDAD
 // ==========================================
+// 9. RESPALDOS DE SEGURIDAD (GLOBAL)
+// ==========================================
+// Esta función ahora vive libre en el espacio global y los botones ya la pueden encontrar.
 async function descargarBaseDeDatos() {
     try {
         const respuesta = await fetch(`${API_URL}/backup/descargar`, {
@@ -476,4 +478,3 @@ async function descargarBaseDeDatos() {
         alert("Hubo un problema de conexión al generar el respaldo.");
     }
 }
-});
