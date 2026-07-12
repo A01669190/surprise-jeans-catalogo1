@@ -255,9 +255,3 @@ def reset_db_total():
     models.Base.metadata.drop_all(bind=engine)
     models.Base.metadata.create_all(bind=engine)
     return {"mensaje": "Tablas formateadas exitosamente. Lista para el nuevo campo de código."}
-
-@app.get("/reset-db-total")
-def reset_db_total():
-    models.Base.metadata.drop_all(bind=engine)
-    models.Base.metadata.create_all(bind=engine)
-    return {"mensaje": "Tablas formateadas exitosamente. Lista para el nuevo campo de código."}
