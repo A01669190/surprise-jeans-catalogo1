@@ -201,10 +201,17 @@
         }
 
         // 3. PINTAR PANTALONES EN LA PANTALLA
-        // 3. PINTAR PANTALONES EN LA PANTALLA (CON SISTEMA DE ESCASEZ)
+        // 3. PINTAR PANTALONES EN LA PANTALLA (CON ORDENAMIENTO DE AGOTADOS)
         function renderizarCatalogo(listaPantalones) {
             const grid = document.getElementById('grid-pantalones');
             grid.innerHTML = '';
+
+            // 🚀 EL MOTOR DE ORDENAMIENTO: Manda el stock 0 hasta el fondo
+            listaPantalones.sort((a, b) => {
+                if (a.stock === 0 && b.stock > 0) return 1;  // Manda 'a' hacia abajo
+                if (a.stock > 0 && b.stock === 0) return -1; // Mantiene 'a' arriba
+                return 0; // Si ambos tienen stock, no los mueve
+            });
 
             if (listaPantalones.length === 0) {
                 grid.innerHTML = '<p class="text-center col-span-full text-stone-500 py-10">No encontramos modelos con esa búsqueda.</p>';
@@ -215,13 +222,13 @@
                 // 1. Evaluamos si el inventario llegó a cero
                 const estaAgotado = p.stock === 0;
                 
-                // 2. Efectos visuales: Si está agotado lo ponemos gris, si no, le dejamos el zoom al pasar el mouse
+                // 2. Efectos visuales: Si está agotado lo ponemos gris, si no, le dejamos el zoom
                 const filtroImagen = estaAgotado ? 'grayscale opacity-50' : 'transform group-hover:scale-105 transition-transform duration-500';
                 
                 // 3. Etiqueta gigante de "AGOTADO" que cruza la imagen
                 const etiquetaAgotado = estaAgotado ? '<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-600 text-white text-lg font-black px-6 py-2 rounded-xl shadow-2xl tracking-widest z-20 -rotate-12 border-2 border-white">AGOTADO</div>' : '';
                 
-                // 4. Cambiamos el botón para que no puedan agregarlo al carrito si no hay stock
+                // 4. Cambiamos el botón para que no puedan agregarlo al carrito
                 const botonAccion = estaAgotado
                     ? `<button disabled class="w-full bg-gray-200 text-gray-400 font-bold py-3 rounded-xl cursor-not-allowed text-sm uppercase tracking-wider">Sin existencias</button>`
                     : `<button onclick="agregarAlCarrito(${p.id})" class="w-full bg-stone-100 hover:bg-stone-900 text-stone-900 hover:text-white font-bold py-3 rounded-xl transition-colors text-sm shadow-sm">Añadir a la bolsa</button>`;
