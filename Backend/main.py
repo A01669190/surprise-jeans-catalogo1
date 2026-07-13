@@ -104,7 +104,7 @@ def registrar_cliente(cliente: schemas.ClienteRegistro, db: Session = Depends(ge
     try:
         # Configuración del remitente
         remitente = "denzellopezcabrera@gmail.com" 
-        password_app = "ljux zzxi vxzx hdjz" # 🚨 Ojo con este dato (Lee abajo)
+        password_app = "ljuxzzxivxzxhdjz" # 🚨 Ojo con este dato (Lee abajo)
 
         # Armado del mensaje profesional
         mensaje = MIMEMultipart("alternative")
