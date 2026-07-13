@@ -44,3 +44,12 @@ class InfoEnvio(BaseModel):
 class PedidoSeguro(BaseModel):
     envio: InfoEnvio
     items: List[ItemCarrito]
+
+# ==========================================
+# ESQUEMAS DE CLIENTES
+# ==========================================
+class ClienteRegistro(BaseModel):
+    nombre_completo: str
+    correo: str
+    password: str
+    telefono: str
