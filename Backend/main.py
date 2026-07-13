@@ -15,8 +15,7 @@ import json
 from fastapi.responses import FileResponse
 import mercadopago # <-- MOTOR BANCARIO
 from sqlalchemy import text
-from passlib.context import CryptContext
-
+import bcrypt
 # Seguridad de Tráfico
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -58,15 +57,20 @@ SECRET_KEY = "llave_secreta_del_catalogo_surprise"
 ALGORITHM = "HS256"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 # ==========================================
-# MOTOR CRIPTOGRÁFICO (BCRYPT)
+# MOTOR CRIPTOGRÁFICO (PURO BCRYPT - SIN BUGS)
 # ==========================================
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+def obtener_hash_password(password: str):
+    # Convertimos la contraseña a bytes y le aplicamos sal (seguridad extra)
+    pwd_bytes = password.encode('utf-8')
+    salt = bcrypt.gensalt()
+    hashed_password = bcrypt.hashpw(pwd_bytes, salt)
+    return hashed_password.decode('utf-8')
 
-def obtener_hash_password(password):
-    return pwd_context.hash(password)
-
-def verificar_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+def verificar_password(plain_password: str, hashed_password: str):
+    # Comparamos la contraseña limpia con el código de la bóveda
+    password_byte_enc = plain_password.encode('utf-8')
+    hashed_password_bytes = hashed_password.encode('utf-8')
+    return bcrypt.checkpw(password_byte_enc, hashed_password_bytes)
 
 # ==========================================
 # SISTEMA DE CLIENTES (REGISTRO Y LOGIN)
