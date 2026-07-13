@@ -455,7 +455,7 @@
                         <input type="password" id="reg-pass" placeholder="Mínimo 6 caracteres" class="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-600 outline-none text-sm">
                     </div>
                     <button onclick="procesarRegistroCliente()" class="w-full bg-gray-900 hover:bg-black text-white font-black py-3.5 rounded-lg shadow-md transition-all mt-4">
-                        Crear Bóveda Segura
+                        Crear Cuenta
                     </button>
                 </div>
                 
@@ -857,13 +857,27 @@
         }
 
         async function procesarRegistroCliente() {
-            const nombre_completo = document.getElementById('reg-nombre').value;
-            const telefono = document.getElementById('reg-tel').value;
-            const correo = document.getElementById('reg-correo').value;
+            // .trim() elimina los espacios en blanco accidentales al inicio y final
+            const nombre_completo = document.getElementById('reg-nombre').value.trim();
+            const telefono = document.getElementById('reg-tel').value.trim();
+            const correo = document.getElementById('reg-correo').value.trim();
             const password = document.getElementById('reg-pass').value;
 
+            // 🛡️ REGLAS ESTRICTAS DE VALIDACIÓN
+            const reglaCorreo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            const reglaTelefono = /^\d{10}$/; // Exactamente 10 números
+
             if(!nombre_completo || !telefono || !correo || !password) {
-                alert("Por favor llena todos los campos."); return;
+                alert("⚠️ Por favor llena todos los campos."); return;
+            }
+            if (!reglaTelefono.test(telefono)) {
+                alert("⚠️ El celular debe tener exactamente 10 dígitos (Sin espacios ni ladas)."); return;
+            }
+            if (!reglaCorreo.test(correo)) {
+                alert("⚠️ Por favor ingresa un correo electrónico válido (Ej. juan@gmail.com)."); return;
+            }
+            if (password.length < 6) {
+                alert("⚠️ La contraseña debe tener al menos 6 caracteres por seguridad."); return;
             }
 
             try {

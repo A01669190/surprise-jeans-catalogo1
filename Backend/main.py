@@ -20,6 +20,9 @@ import bcrypt
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Seguridad de Sesión (JWT)
 import jwt
@@ -82,7 +85,7 @@ def registrar_cliente(cliente: schemas.ClienteRegistro, db: Session = Depends(ge
     if db_cliente:
         raise HTTPException(status_code=400, detail="Este correo ya está registrado.")
     
-    # 2. Encriptamos la contraseña (Nivel Bancario)
+    # 2. Encriptamos la contraseña
     password_encriptada = obtener_hash_password(cliente.password)
     
     # 3. Guardamos en la bóveda
@@ -94,7 +97,50 @@ def registrar_cliente(cliente: schemas.ClienteRegistro, db: Session = Depends(ge
     )
     db.add(nuevo_cliente)
     db.commit()
-    
+
+    # ==========================================
+    # 4. ENVÍO DE CORREO DE BIENVENIDA
+    # ==========================================
+    try:
+        # Configuración del remitente
+        remitente = "denzellopezcabrera@gmail.com" 
+        password_app = "ljux zzxi vxzx hdjz" # 🚨 Ojo con este dato (Lee abajo)
+
+        # Armado del mensaje profesional
+        mensaje = MIMEMultipart("alternative")
+        mensaje["Subject"] = "¡Bienvenido a Surprise Jeans! 🎉"
+        mensaje["From"] = f"Surprise Jeans <{remitente}>"
+        mensaje["To"] = cliente.correo
+
+        html = f"""
+        <html>
+          <body style="font-family: Arial, sans-serif; color: #333;">
+            <div style="max-w: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                <h2 style="color: #4f46e5; font-style: italic;">Surprise Jeans</h2>
+                <h3>¡Hola {cliente.nombre_completo}!</h3>
+                <p>Gracias por crear tu cuenta con nosotros. Tu información de envío está segura en nuestra plataforma.</p>
+                <p>A partir de ahora, realizar tus compras de mayoreo y menudeo será mucho más rápido.</p>
+                <br>
+                <p>Cualquier duda, estamos a tus órdenes en nuestro WhatsApp de soporte.</p>
+                <p><strong>El equipo de Surprise Jeans</strong></p>
+            </div>
+          </body>
+        </html>
+        """
+        mensaje.attach(MIMEText(html, "html"))
+
+        # Conexión al servidor de Gmail y envío
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(remitente, password_app)
+        server.sendmail(remitente, cliente.correo, mensaje.as_string())
+        server.quit()
+        
+    except Exception as e:
+        print("Error al enviar correo:", e)
+        # No detenemos el registro si falla el correo, solo lo imprimimos en consola
+        pass 
+
     return {"mensaje": "Cuenta creada con éxito."}
 
 @app.post("/login-cliente")
