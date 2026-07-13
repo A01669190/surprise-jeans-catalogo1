@@ -405,6 +405,75 @@
         </button>
     </div>
 
+    <div id="modal-perfil" class="fixed inset-0 bg-stone-900 bg-opacity-75 z-[60] hidden flex justify-center items-center transition-opacity">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden transform transition-all m-4">
+            
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <h3 class="text-xl font-black text-indigo-600">Mi Cuenta</h3>
+                <button onclick="cerrarPerfilCliente()" class="text-gray-400 hover:text-rose-500 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <div class="flex border-b border-gray-200">
+                <button id="tab-login" onclick="cambiarTabPerfil('login')" class="flex-1 py-4 text-sm font-bold text-indigo-600 border-b-2 border-indigo-600 transition-colors">Iniciar Sesión</button>
+                <button id="tab-registro" onclick="cambiarTabPerfil('registro')" class="flex-1 py-4 text-sm font-bold text-gray-400 hover:text-gray-600 border-b-2 border-transparent transition-colors">Crear Cuenta</button>
+            </div>
+
+            <div class="p-8">
+                <div id="form-login" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1">Correo Electrónico</label>
+                        <input type="email" id="login-correo" class="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-600 outline-none text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1">Contraseña</label>
+                        <input type="password" id="login-pass" class="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-600 outline-none text-sm">
+                    </div>
+                    <button onclick="procesarLoginCliente()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3.5 rounded-lg shadow-md transition-all mt-4">
+                        Entrar
+                    </button>
+                </div>
+
+                <div id="form-registro" class="space-y-4 hidden">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1">Nombre Completo</label>
+                        <input type="text" id="reg-nombre" class="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-600 outline-none text-sm">
+                    </div>
+                    <div class="flex gap-4">
+                        <div class="flex-1">
+                            <label class="block text-xs font-bold text-gray-500 mb-1">Celular</label>
+                            <input type="tel" id="reg-tel" class="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-600 outline-none text-sm">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1">Correo Electrónico</label>
+                        <input type="email" id="reg-correo" class="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-600 outline-none text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1">Contraseña</label>
+                        <input type="password" id="reg-pass" placeholder="Mínimo 6 caracteres" class="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-600 outline-none text-sm">
+                    </div>
+                    <button onclick="procesarRegistroCliente()" class="w-full bg-gray-900 hover:bg-black text-white font-black py-3.5 rounded-lg shadow-md transition-all mt-4">
+                        Crear Bóveda Segura
+                    </button>
+                </div>
+                
+                <div id="area-sesion-activa" class="hidden text-center py-6">
+                    <div class="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="text-2xl text-indigo-600 font-black">👋</span>
+                    </div>
+                    <h4 class="text-lg font-bold text-gray-900 mb-1" id="nombre-cliente-bienvenida">¡Hola!</h4>
+                    <p class="text-sm text-gray-500 mb-8">Tu información de envío está protegida.</p>
+                    <button onclick="cerrarSesionCliente()" class="text-sm font-bold text-rose-500 hover:underline">
+                        Cerrar Sesión
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_URL = 'https://surprise-jeans-api-denz.onrender.com';
         const NUMERO_WHATSAPP = '525513220695'; 
@@ -740,6 +809,122 @@
             document.getElementById('modal-checkout').classList.add('hidden');
             document.getElementById('modal-checkout').classList.remove('flex');
             abrirCarrito();
+        }
+
+        // ==========================================
+        // UI Y LÓGICA: PERFIL DE CLIENTE
+        // ==========================================
+        function abrirPerfilCliente() {
+            document.getElementById('modal-perfil').classList.remove('hidden');
+            document.getElementById('modal-perfil').classList.add('flex');
+            
+            // Revisar si ya está logueado
+            const token = localStorage.getItem('token_cliente_sj');
+            const nombre = localStorage.getItem('nombre_cliente_sj');
+            
+            if (token && nombre) {
+                document.getElementById('tab-login').parentElement.classList.add('hidden');
+                document.getElementById('form-login').classList.add('hidden');
+                document.getElementById('form-registro').classList.add('hidden');
+                
+                document.getElementById('area-sesion-activa').classList.remove('hidden');
+                document.getElementById('nombre-cliente-bienvenida').innerText = `¡Hola, ${nombre}!`;
+            }
+        }
+
+        function cerrarPerfilCliente() {
+            document.getElementById('modal-perfil').classList.add('hidden');
+            document.getElementById('modal-perfil').classList.remove('flex');
+        }
+
+        function cambiarTabPerfil(tab) {
+            const btnLogin = document.getElementById('tab-login');
+            const btnRegistro = document.getElementById('tab-registro');
+            const formLogin = document.getElementById('form-login');
+            const formRegistro = document.getElementById('form-registro');
+
+            if(tab === 'login') {
+                btnLogin.className = "flex-1 py-4 text-sm font-bold text-indigo-600 border-b-2 border-indigo-600 transition-colors";
+                btnRegistro.className = "flex-1 py-4 text-sm font-bold text-gray-400 hover:text-gray-600 border-b-2 border-transparent transition-colors";
+                formLogin.classList.remove('hidden');
+                formRegistro.classList.add('hidden');
+            } else {
+                btnRegistro.className = "flex-1 py-4 text-sm font-bold text-indigo-600 border-b-2 border-indigo-600 transition-colors";
+                btnLogin.className = "flex-1 py-4 text-sm font-bold text-gray-400 hover:text-gray-600 border-b-2 border-transparent transition-colors";
+                formRegistro.classList.remove('hidden');
+                formLogin.classList.add('hidden');
+            }
+        }
+
+        async function procesarRegistroCliente() {
+            const nombre_completo = document.getElementById('reg-nombre').value;
+            const telefono = document.getElementById('reg-tel').value;
+            const correo = document.getElementById('reg-correo').value;
+            const password = document.getElementById('reg-pass').value;
+
+            if(!nombre_completo || !telefono || !correo || !password) {
+                alert("Por favor llena todos los campos."); return;
+            }
+
+            try {
+                const respuesta = await fetch(`${API_URL}/registro`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre_completo, correo, password, telefono })
+                });
+
+                if (respuesta.ok) {
+                    alert("¡Cuenta creada exitosamente! Ahora puedes iniciar sesión.");
+                    cambiarTabPerfil('login');
+                    document.getElementById('login-correo').value = correo;
+                } else {
+                    const errorData = await respuesta.json();
+                    alert(`Error: ${errorData.detail}`);
+                }
+            } catch (error) {
+                alert("Error al conectar con el servidor.");
+            }
+        }
+
+        async function procesarLoginCliente() {
+            const username = document.getElementById('login-correo').value;
+            const password = document.getElementById('login-pass').value;
+
+            if(!username || !password) {
+                alert("Ingresa correo y contraseña."); return;
+            }
+
+            const formData = new URLSearchParams();
+            formData.append('username', username);
+            formData.append('password', password);
+
+            try {
+                const respuesta = await fetch(`${API_URL}/login-cliente`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData
+                });
+
+                if (respuesta.ok) {
+                    const data = await respuesta.json();
+                    // Guardamos el token en la memoria local del cliente
+                    localStorage.setItem('token_cliente_sj', data.access_token);
+                    localStorage.setItem('nombre_cliente_sj', data.nombre);
+                    
+                    alert(`¡Bienvenido de vuelta, ${data.nombre}!`);
+                    cerrarPerfilCliente();
+                } else {
+                    alert("Correo o contraseña incorrectos.");
+                }
+            } catch (error) {
+                alert("Error de conexión al servidor.");
+            }
+        }
+
+        function cerrarSesionCliente() {
+            localStorage.removeItem('token_cliente_sj');
+            localStorage.removeItem('nombre_cliente_sj');
+            window.location.reload();
         }
 
         async function procesarPagoSeguro() {
