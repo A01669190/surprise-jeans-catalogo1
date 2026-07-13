@@ -18,6 +18,44 @@
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50 text-gray-800 font-sans relative pb-20">
+
+    <div id="overlay-menu" onclick="cerrarMenuLateral()" class="fixed inset-0 bg-stone-900 bg-opacity-50 z-40 hidden transition-opacity"></div>
+    
+    <div id="menu-lateral" class="fixed inset-y-0 left-0 w-80 bg-white shadow-2xl transform -translate-x-full transition-transform duration-300 z-50 overflow-y-auto">
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-2xl font-black text-indigo-600 italic tracking-tighter">Surprise<span class="text-sm font-normal text-gray-400">Jeans</span></h2>
+                <button onclick="cerrarMenuLateral()" class="text-gray-400 hover:text-rose-500">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <h3 class="font-bold text-gray-800 mb-4 border-b border-gray-100 pb-2">Nuestras Referencias ⭐</h3>
+            <p class="text-xs text-gray-500 mb-4">Más de 500 envíos seguros a todo México.</p>
+            
+            <div class="space-y-4 text-sm text-gray-600">
+                <div class="bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
+                    <p class="italic">"Excelente calidad, me llegaron mis 12 paquetes hasta Monterrey sin problema. Super atentos en WhatsApp."</p>
+                    <p class="text-right font-black text-indigo-900 mt-2 text-xs">- Mariana V.</p>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
+                    <p class="italic">"La mezclilla estira padrísimo y horma súper bien. Hice mi pedido menudeo y me llegó por FedEx al día siguiente."</p>
+                    <p class="text-right font-black text-indigo-900 mt-2 text-xs">- Sofía G.</p>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
+                    <p class="italic">"Llevo 6 meses surtiendo mi boutique con ustedes y mis clientas aman el corte colombiano. 100% confiable."</p>
+                    <p class="text-right font-black text-indigo-900 mt-2 text-xs">- Boutique 'Estilo', GDL.</p>
+                </div>
+            </div>
+
+            <div class="mt-8 pt-6 border-t border-gray-100 text-center">
+                <p class="text-xs text-gray-400 mb-2">¿Tienes dudas sobre tu envío?</p>
+                <a href="https://wa.me/525513220695" target="_blank" class="inline-block bg-green-500 text-white font-bold text-xs px-4 py-2 rounded-full hover:bg-green-600 transition-colors">
+                    Contactar Soporte
+                </a>
+            </div>
+        </div>
+    </div>
     
    <header class="bg-white border-b border-gray-100 sticky top-0 z-40 shadow-sm">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
@@ -474,6 +512,42 @@
                 btnMenudeo.className = "px-6 py-1.5 rounded-md text-sm font-bold text-gray-500 hover:text-gray-900 transition-all";
                 // Aquí irá tu lógica futura de mayoreo
             }
+        }
+
+        // ==========================================
+        // UI: MENÚ LATERAL Y REFERENCIAS
+        // ==========================================
+        function abrirMenuLateral() {
+            document.getElementById('menu-lateral').classList.remove('-translate-x-full');
+            document.getElementById('overlay-menu').classList.remove('hidden');
+        }
+
+        function cerrarMenuLateral() {
+            document.getElementById('menu-lateral').classList.add('-translate-x-full');
+            document.getElementById('overlay-menu').classList.add('hidden');
+        }
+
+        // ==========================================
+        // UI: TOGGLE MAYOREO / MENUDEO (Opción A)
+        // ==========================================
+        function cambiarModo(modo) {
+            const btnMenudeo = document.getElementById('btn-menudeo');
+            const btnMayoreo = document.getElementById('btn-mayoreo');
+
+            if (modo === 'mayoreo') {
+                // Alerta al cliente y teletransporte a WhatsApp
+                alert("📦 ¡Venta de Mayoreo!\n\nEl mayoreo es a partir de 1 paquete cerrado (12 piezas con curva de tallas completa).\n\nSerás redirigido a nuestro WhatsApp oficial para verificar existencias y armar tu paquete.");
+                window.open("https://wa.me/525513220695?text=Hola,%20me%20interesa%20comprar%20por%20paquete%20cerrado%20(Mayoreo).", "_blank");
+
+                // Regresamos el botón visualmente a menudeo para no bloquear el catálogo
+                btnMenudeo.className = "px-6 py-1.5 rounded-md text-sm font-bold bg-white text-gray-900 shadow-sm transition-all";
+                btnMayoreo.className = "px-6 py-1.5 rounded-md text-sm font-bold text-gray-500 hover:text-gray-900 transition-all";
+            }
+        }
+        
+        // (Opcional) Abrir el modal de login de cliente que construiremos después
+        function abrirPerfilCliente() {
+            alert("El área de clientes está en construcción. 🚧");
         }
 
         function renderizarCatalogo(listaPantalones) {

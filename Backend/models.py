@@ -23,9 +23,7 @@ class Pantalon(Base):
 
 # ==========================================
 # TABLAS DE SEGURIDAD (PEDIDOS)
-## ==========================================
-# TABLAS DE SEGURIDAD (PEDIDOS)
-# ==========================================
+
 class Pedido(Base):
     __tablename__ = "pedidos"
     id = Column(Integer, primary_key=True, index=True)
@@ -50,3 +48,24 @@ class DetallePedido(Base):
     cantidad = Column(Integer)
     precio_unitario = Column(Float)
     pedido = relationship("Pedido", back_populates="detalles")
+
+# ==========================================
+# TABLA DE CLIENTES (USUARIOS REGISTRADOS)
+# ==========================================
+class Cliente(Base):
+    __tablename__ = "clientes"
+    id = Column(Integer, primary_key=True, index=True)
+    nombre_completo = Column(String)
+    correo = Column(String, unique=True, index=True)
+    password_hash = Column(String)  # Contraseña encriptada (Seguridad Nivel Bancario)
+    telefono = Column(String, nullable=True)
+    
+    # Direcciones guardadas para autocompletar el Checkout
+    calle_numero = Column(String, nullable=True)
+    colonia = Column(String, nullable=True)
+    ciudad = Column(String, nullable=True)
+    estado = Column(String, nullable=True)
+    codigo_postal = Column(String, nullable=True)
+    referencias_domicilio = Column(String, nullable=True)
+    
+    fecha_registro = Column(DateTime, default=datetime.datetime.utcnow)
