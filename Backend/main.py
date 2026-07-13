@@ -455,3 +455,23 @@ def descargar_respaldo_seguro(request: Request, db: Session = Depends(get_db), t
         json.dump(datos_respaldo, f, indent=4, ensure_ascii=False)
     nombre_archivo = f"SurpriseJeans_Backup_{datetime.now().strftime('%Y%m%d')}.json"
     return FileResponse(path=ruta_archivo, filename=nombre_archivo, media_type='application/json')
+
+# ==========================================
+# RUTA SECRETA PARA VERIFICAR BASE DE DATOS
+# ==========================================
+@app.get("/ver-clientes")
+def ver_clientes(db: Session = Depends(get_db)):
+    clientes = db.query(models.Cliente).all()
+    resultado = []
+    
+    for c in clientes:
+        resultado.append({
+            "id": c.id,
+            "nombre": c.nombre_completo,
+            "correo": c.correo,
+            "telefono": c.telefono,
+            # Mostramos el hash para comprobar que la contraseña está blindada
+            "password_encriptada": c.password_hash 
+        })
+        
+    return resultado
