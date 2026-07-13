@@ -15,6 +15,7 @@ import json
 from fastapi.responses import FileResponse
 import mercadopago # <-- MOTOR BANCARIO
 from sqlalchemy import text
+from passlib.context import CryptContext
 
 # Seguridad de Tráfico
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -56,6 +57,60 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 SECRET_KEY = "llave_secreta_del_catalogo_surprise"
 ALGORITHM = "HS256"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+# ==========================================
+# MOTOR CRIPTOGRÁFICO (BCRYPT)
+# ==========================================
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def obtener_hash_password(password):
+    return pwd_context.hash(password)
+
+def verificar_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+# ==========================================
+# SISTEMA DE CLIENTES (REGISTRO Y LOGIN)
+# ==========================================
+@app.post("/registro")
+def registrar_cliente(cliente: schemas.ClienteRegistro, db: Session = Depends(get_db)):
+    # 1. Verificamos que el correo no esté duplicado
+    db_cliente = db.query(models.Cliente).filter(models.Cliente.correo == cliente.correo).first()
+    if db_cliente:
+        raise HTTPException(status_code=400, detail="Este correo ya está registrado.")
+    
+    # 2. Encriptamos la contraseña (Nivel Bancario)
+    password_encriptada = obtener_hash_password(cliente.password)
+    
+    # 3. Guardamos en la bóveda
+    nuevo_cliente = models.Cliente(
+        nombre_completo=cliente.nombre_completo,
+        correo=cliente.correo,
+        password_hash=password_encriptada,
+        telefono=cliente.telefono
+    )
+    db.add(nuevo_cliente)
+    db.commit()
+    
+    return {"mensaje": "Cuenta creada con éxito."}
+
+@app.post("/login-cliente")
+def login_cliente(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    # Usamos form_data.username para recibir el correo del cliente
+    cliente = db.query(models.Cliente).filter(models.Cliente.correo == form_data.username).first()
+    
+    # Verificamos que el cliente exista y que la contraseña coincida con el hash
+    if not cliente or not verificar_password(form_data.password, cliente.password_hash):
+        raise HTTPException(status_code=401, detail="Correo o contraseña incorrectos.")
+    
+    # Generamos su Pase VIP (JWT)
+    token_data = {"sub": cliente.correo, "rol": "cliente", "id": cliente.id}
+    token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
+    
+    return {
+        "access_token": token, 
+        "token_type": "bearer", 
+        "nombre": cliente.nombre_completo
+    }
 
 def verificar_token(token: str = Depends(oauth2_scheme)):
     try:
