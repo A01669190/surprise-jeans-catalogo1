@@ -23,6 +23,8 @@ from slowapi.errors import RateLimitExceeded
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import string
+import random
 
 # Seguridad de Sesión (JWT)
 import jwt
@@ -169,6 +171,89 @@ def verificar_token(token: str = Depends(oauth2_scheme)):
             raise HTTPException(status_code=401, detail="Pase VIP inválido")
     except:
         raise HTTPException(status_code=401, detail="Token expirado o inválido")
+    
+def verificar_token_cliente(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("rol") != "cliente":
+            raise HTTPException(status_code=401, detail="Token no válido para cliente")
+        return payload.get("sub") # Devuelve el correo del cliente
+    except:
+        raise HTTPException(status_code=401, detail="Token expirado o inválido")
+
+@app.get("/mis-pedidos")
+def obtener_mis_pedidos(correo: str = Depends(verificar_token_cliente), db: Session = Depends(get_db)):
+    cliente = db.query(models.Cliente).filter(models.Cliente.correo == correo).first()
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    
+    # Buscamos los pedidos que coincidan con el celular del cliente registrado
+    pedidos = db.query(models.Pedido).filter(models.Pedido.telefono == cliente.telefono).order_by(models.Pedido.fecha.desc()).all()
+    
+    resultado = []
+    for p in pedidos:
+        resultado.append({
+            "folio": f"SJ-{p.id:04d}",
+            "fecha": p.fecha.strftime("%d/%m/%Y"),
+            "total": p.total,
+            "estatus": p.estatus
+        })
+    return resultado
+
+@app.post("/recuperar-password")
+async def recuperar_password(request: Request, db: Session = Depends(get_db)):
+    data = await request.json()
+    correo = data.get("correo")
+    cliente = db.query(models.Cliente).filter(models.Cliente.correo == correo).first()
+    
+    # Por seguridad, si el correo no existe, igual decimos que se envió (para evitar hackeos de rastreo)
+    if not cliente:
+        return {"mensaje": "Proceso completado."}
+    
+    # 1. Generamos contraseña temporal de 8 letras/números
+    caracteres = string.ascii_letters + string.digits
+    nueva_pass = ''.join(random.choice(caracteres) for i in range(8))
+    
+    # 2. La encriptamos y la guardamos en la bóveda
+    cliente.password_hash = obtener_hash_password(nueva_pass)
+    db.commit()
+
+    # 3. Se la enviamos por correo al cliente
+    try:
+        remitente = GMAIL_USER 
+        password_app = GMAIL_PASSWORD
+        mensaje = MIMEMultipart("alternative")
+        mensaje["Subject"] = "🔐 Recuperación de Contraseña - Surprise Jeans"
+        mensaje["From"] = f"Surprise Jeans <{remitente}>"
+        mensaje["To"] = cliente.correo
+
+        html = f"""
+        <html>
+          <body style="font-family: Arial, sans-serif; color: #333;">
+            <div style="max-w: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                <h2 style="color: #4f46e5; font-style: italic;">Surprise Jeans</h2>
+                <h3>¡Hola {cliente.nombre_completo}!</h3>
+                <p>Solicitaste restablecer tu contraseña. Tu nueva <strong>contraseña temporal</strong> es:</p>
+                <div style="background-color: #f3f4f6; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 3px; border-radius: 8px;">
+                    {nueva_pass}
+                </div>
+                <p>Te recomendamos iniciar sesión con esta contraseña. Tu bóveda sigue segura.</p>
+                <br>
+                <p><strong>El equipo de Surprise Jeans</strong></p>
+            </div>
+          </body>
+        </html>
+        """
+        mensaje.attach(MIMEText(html, "html"))
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(remitente, password_app)
+        server.sendmail(remitente, cliente.correo, mensaje.as_string())
+        server.quit()
+    except Exception as e:
+        print("Error al enviar correo de recuperación:", e)
+
+    return {"mensaje": "Proceso completado."}
 
 @app.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
