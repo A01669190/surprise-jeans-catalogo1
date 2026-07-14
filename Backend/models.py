@@ -21,19 +21,24 @@ class Pantalon(Base):
     categoria_id = Column(Integer, ForeignKey("categorias.id"))
     
     categoria = relationship("Categoria", back_populates="pantalones")
-    # ⚡ CONECTAMOS LAS RESEÑAS
     resenas = relationship("Resena", back_populates="pantalon", cascade="all, delete-orphan")
     detalles = relationship("DetallePedido", back_populates="pantalon")
 
-    # ⚡ CALCULADORA AUTOMÁTICA DE ESTRELLAS
+    # ⚡ CALCULADORA AUTOMÁTICA DE ESTRELLAS (FILTRO POSITIVO)
     @property
     def promedio_estrellas(self):
-        if not self.resenas: return 0.0
-        return sum(r.calificacion for r in self.resenas) / len(self.resenas)
+        # 1. Filtramos en secreto: Solo tomamos en cuenta reseñas de 3, 4 o 5 estrellas
+        resenas_buenas = [r for r in self.resenas if r.calificacion >= 4]
+        
+        if not resenas_buenas: return 0.0
+        # 2. Calculamos el promedio solo usando las buenas
+        return sum(r.calificacion for r in resenas_buenas) / len(resenas_buenas)
 
     @property
     def total_resenas(self):
-        return len(self.resenas)
+        # El número entre paréntesis () en tu catálogo también ignorará las malas
+        resenas_buenas = [r for r in self.resenas if r.calificacion >= 3]
+        return len(resenas_buenas)
 
 class Resena(Base):
     __tablename__ = "resenas"
