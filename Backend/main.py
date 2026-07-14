@@ -50,7 +50,7 @@ app.add_middleware(
 )
 
 # 🚨 INYECTA TU TOKEN AQUÍ 🚨
-MERCADO_PAGO_TOKEN = "APP_USR-6792882002477550-071212-6f1803d40518512e66004fa3f88bf870-3538372902" 
+MERCADO_PAGO_TOKEN = os.getenv("MERCADO_PAGO_TOKEN", "")
 sdk = mercadopago.SDK(MERCADO_PAGO_TOKEN)
 
 os.makedirs("static/uploads", exist_ok=True)
