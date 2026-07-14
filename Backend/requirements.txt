@@ -11,3 +11,4 @@ pandas
 openpyxl
 mercadopago
 bcrypt
+resend

@@ -14,6 +14,7 @@ from database import engine, get_db
 import json
 from fastapi.responses import FileResponse
 import mercadopago # <-- MOTOR BANCARIO
+import resend
 from sqlalchemy import text
 import bcrypt
 # Seguridad de Tráfico
@@ -69,6 +70,58 @@ GMAIL_USER = os.getenv("GMAIL_USER", "denzellopezcabrera@gmail.com")
 GMAIL_PASSWORD = os.getenv("GMAIL_PASSWORD", "")
 ALGORITHM = "HS256"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+# 🚨 MOTOR DE CORREOS PROFESIONAL (RESEND) 🚨
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+resend.api_key = RESEND_API_KEY
+
+def enviar_correo_recibo(correo_destino, nombre, folio, total, lista_ropa, puntos_ganados):
+    try:
+        # Armamos la lista de la ropa en HTML
+        items_html = "".join([f"<li style='margin-bottom: 5px; color: #4b5563;'><b>{i['cantidad']}x</b> {i['nombre']} - ${i['precio']}</li>" for i in lista_ropa])
+        
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff;">
+            <h2 style="color: #4f46e5; text-align: center; font-style: italic; font-size: 28px; margin-bottom: 5px;">Surprise Jeans</h2>
+            <p style="text-align: center; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; margin-top: 0;">Recibo Oficial</p>
+            
+            <h3 style="color: #111827; text-align: center; margin-top: 30px;">¡Gracias por tu compra, {nombre}! 📦</h3>
+            <p style="color: #4b5563; font-size: 15px; text-align: center; line-height: 1.5;">Tu pago ha sido procesado con éxito y ya estamos preparando tu paquete en nuestro almacén.</p>
+            
+            <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 30px 0; border: 1px solid #f3f4f6;">
+                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 10px;">
+                    <span style="color: #6b7280; font-weight: bold;">Folio de Pedido:</span>
+                    <span style="color: #4f46e5; font-weight: 900;">SJ-{folio}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #6b7280; font-weight: bold;">Total Pagado:</span>
+                    <span style="color: #10b981; font-weight: 900; font-size: 18px;">${total} MXN</span>
+                </div>
+            </div>
+            
+            <h4 style="color: #374151; font-size: 16px; margin-bottom: 15px; text-transform: uppercase;">Artículos en tu envío:</h4>
+            <ul style="padding-left: 20px; line-height: 1.6;">
+                {items_html}
+            </ul>
+            
+            <div style="background-color: #fffbeb; border: 1px solid #fde68a; padding: 15px; border-radius: 8px; margin: 30px 0; text-align: center;">
+                <p style="margin: 0; color: #d97706; font-weight: 900; text-transform: uppercase; font-size: 14px;">🌟 Surprise Points Ganados</p>
+                <p style="margin: 5px 0 0; color: #92400e; font-size: 14px; font-weight: bold;">Acabas de sumar ${round(puntos_ganados, 2)} a tu bóveda.</p>
+            </div>
+            
+            <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 40px;">Este correo se generó automáticamente. Surprise Jeans © 2026.</p>
+        </div>
+        """
+        
+        # Resend usa este correo temporal por defecto para cuentas en desarrollo
+        resend.Emails.send({
+            "from": "Surprise Jeans <onboarding@resend.dev>",
+            "to": correo_destino,
+            "subject": f"¡Tu pedido SJ-{folio} está confirmado! 🎉",
+            "html": html_content
+        })
+    except Exception as e:
+        print("Error al enviar el correo:", e)
 
 # ==========================================
 # INFRAESTRUCTURA DE WEBSOCKETS (TIEMPO REAL)
@@ -449,18 +502,23 @@ async def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, 
     # 🚨 LA MAGIA: SI EL PEDIDO ES GRATIS, SALTAMOS A MERCADO PAGO 🚨
     if total_final <= 0:
         nuevo_pedido.estatus = "PAGADO"
+        lista_ropa = []
         for detalle in nuevo_pedido.detalles:
             pantalon_db = db.query(models.Pantalon).filter(models.Pantalon.id == detalle.pantalon_id).first()
             if pantalon_db and pantalon_db.stock >= detalle.cantidad:
                 pantalon_db.stock -= detalle.cantidad
+            if pantalon_db:
+                lista_ropa.append({"cantidad": detalle.cantidad, "nombre": pantalon_db.nombre, "precio": detalle.precio_unitario})
         db.commit()
         
-        # Disparamos el "¡Din!" al Centro de Despacho
         await manager.broadcast("NUEVO_PEDIDO")
         
-        # Redirigimos al cliente directamente a su recibo de éxito
+        # 💌 DISPARO DEL CORREO (PAGO CERO)
+        if cliente_db:
+            enviar_correo_recibo(cliente_db.correo, cliente_db.nombre_completo, f"{nuevo_pedido.id:04d}", total_final, lista_ropa, puntos_ganados)
+            
         return {"link_pago": f"https://surprisejeanysk.com/?pago=exito&payment_id=CUPON-GRATIS&external_reference={nuevo_pedido.id}"}
-
+    
     # SI HAY QUE PAGAR ALGO, VAMOS AL BANCO NORMALMENTE
     preference_data = {
         "items": items_para_banco,
@@ -607,36 +665,39 @@ async def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, 
 
 @app.post("/webhook/mercadopago")
 async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
-    # El banco avisa silenciosamente
     datos = await request.json()
     
     if datos.get("type") == "payment":
         pago_id = datos.get("data", {}).get("id")
-        
-        # Confirmar legitimidad
         info_pago = sdk.payment().get(pago_id)
+        
         if info_pago["status"] == 200:
             estado_pago = info_pago["response"]["status"]
             metadata = info_pago["response"].get("metadata", {})
             pedido_id = metadata.get("pedido_interno_id")
             
-            # Liberar inventario SOLO si se aprobó
             if estado_pago == "approved" and pedido_id:
                 pedido_db = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
                 
-                # Anti-Doble Cobro
                 if pedido_db and pedido_db.estatus == "PENDIENTE":
                     pedido_db.estatus = "PAGADO"
+                    lista_ropa = []
                     
                     for detalle in pedido_db.detalles:
                         pantalon_db = db.query(models.Pantalon).filter(models.Pantalon.id == detalle.pantalon_id).first()
                         if pantalon_db and pantalon_db.stock >= detalle.cantidad:
                             pantalon_db.stock -= detalle.cantidad
+                        if pantalon_db:
+                            lista_ropa.append({"cantidad": detalle.cantidad, "nombre": pantalon_db.nombre, "precio": detalle.precio_unitario})
                     
                     db.commit()
-                    
-                    # ⚡ ¡LA MAGIA DEL DIN! Disparamos la señal por el túnel
                     await manager.broadcast("NUEVO_PEDIDO")
+                    
+                    # 💌 DISPARO DEL CORREO (BANCO REAL)
+                    cliente_db = db.query(models.Cliente).filter(models.Cliente.telefono == pedido_db.telefono).first()
+                    if cliente_db:
+                        puntos_ganados = pedido_db.total * 0.05
+                        enviar_correo_recibo(cliente_db.correo, cliente_db.nombre_completo, f"{pedido_db.id:04d}", pedido_db.total, lista_ropa, puntos_ganados)
                     
     return {"status": "procesado"}
 
