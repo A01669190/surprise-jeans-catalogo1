@@ -1270,15 +1270,6 @@
             const ciudad = document.getElementById('chk-ciudad').value;
             const estado = document.getElementById('chk-estado').value;
             const referencias = document.getElementById('chk-referencias').value;
-            const pedidoSeguro = {
-                    envio: { nombre, telefono, calle_numero, colonia, ciudad, estado, cp, referencias },
-                    items: carrito.map(item => ({
-                        id: item.id, codigo: item.codigo || "S/C", nombre: item.nombre, 
-                        precio: parseFloat(item.precio), cantidad: parseInt(item.cantidad)
-                    })),
-                    cupon: cuponActivo ? cuponActivo.codigo : null,
-                    usar_puntos: document.getElementById('chk-usar-puntos') ? document.getElementById('chk-usar-puntos').checked : false // ENVIAMOS EL SWITCH
-                };
 
             // Validación estricta
             if(!nombre || !telefono || !calle_numero || !colonia || !cp || !ciudad || !estado) {
@@ -1292,16 +1283,17 @@
             btnPagar.disabled = true;
 
             try {
+                // Objeto unificado y correcto
                 const pedidoSeguro = {
                     envio: { nombre, telefono, calle_numero, colonia, ciudad, estado, cp, referencias },
                     items: carrito.map(item => ({
                         id: item.id, codigo: item.codigo || "S/C", nombre: item.nombre, 
                         precio: parseFloat(item.precio), cantidad: parseInt(item.cantidad)
                     })),
-                    cupon: cuponActivo ? cuponActivo.codigo : null // MANDAMOS EL CUPÓN SI EXISTE
+                    cupon: cuponActivo ? cuponActivo.codigo : null,
+                    usar_puntos: document.getElementById('chk-usar-puntos') ? document.getElementById('chk-usar-puntos').checked : false
                 };
                 
-                // Preparar cabeceras y mandar la llave si hay sesión iniciada para el auto-guardado
                 const headers = { 'Content-Type': 'application/json' };
                 const token = localStorage.getItem('token_cliente_sj');
                 if(token) headers['Authorization'] = `Bearer ${token}`;
@@ -1314,7 +1306,7 @@
 
                 if (respuesta.ok) {
                     const data = await respuesta.json();
-                    window.location.href = data.link_pago; // ¡Despegue a Mercado Pago!
+                    window.location.href = data.link_pago; 
                 } else {
                     const errorData = await respuesta.json();
                     alert(`Operación rechazada: ${errorData.detail}`);

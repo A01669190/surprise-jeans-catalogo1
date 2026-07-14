@@ -324,8 +324,9 @@ def generar_cupon_100(db: Session = Depends(get_db)):
 # ==========================================
 # 5. EL CEREBRO FINANCIERO (WEBHOOKS) 🧠
 # ==========================================
+
 @app.post("/crear-pago-seguro")
-def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, db: Session = Depends(get_db)):
+async def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, db: Session = Depends(get_db)):
     total_pedido = 0
     items_para_banco = []
     
@@ -362,7 +363,6 @@ def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, db: Se
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             cliente_db = db.query(models.Cliente).filter(models.Cliente.correo == payload.get("sub")).first()
             if cliente_db:
-                # Guardamos su dirección
                 cliente_db.telefono = pedido_req.envio.telefono
                 cliente_db.calle_numero = pedido_req.envio.calle_numero
                 cliente_db.colonia = pedido_req.envio.colonia
@@ -371,20 +371,18 @@ def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, db: Se
                 cliente_db.codigo_postal = pedido_req.envio.cp
                 cliente_db.referencias_domicilio = pedido_req.envio.referencias
                 
-                # Descontamos puntos si lo solicitó
                 if pedido_req.usar_puntos and cliente_db.puntos > 0:
                     puntos_a_descontar = cliente_db.puntos
-                    cliente_db.puntos = 0.0 # Se vacía la bóveda de puntos al usarlos
-                
+                    cliente_db.puntos = 0.0 
                 db.commit()
         except:
             pass
 
     # 3. APLICAR DESCUENTO DE PUNTOS AL TOTAL
     total_final = total_pedido - puntos_a_descontar
-    if total_final < 0: total_final = 0
+    if total_final <= 0: 
+        total_final = 0
 
-    # Si hay descuento por puntos, lo metemos como un "item negativo" para Mercado Pago
     if puntos_a_descontar > 0:
         items_para_banco.append({
             "title": "Descuento Surprise Points",
@@ -393,7 +391,7 @@ def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, db: Se
             "currency_id": "MXN"
         })
 
-    # 4. CREAR PEDIDO
+    # 4. CREAR PEDIDO EN BASE DE DATOS
     nuevo_pedido = models.Pedido(
         nombre_cliente=pedido_req.envio.nombre, telefono=pedido_req.envio.telefono,
         calle_numero=pedido_req.envio.calle_numero, colonia=pedido_req.envio.colonia,
@@ -411,12 +409,151 @@ def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, db: Se
             pedido_id=nuevo_pedido.id, pantalon_id=item.id, 
             cantidad=item.cantidad, precio_unitario=round(precio_final, 2)
         ))
+    db.commit()
     
-    # 5. REGALAR NUEVOS PUNTOS (5% del total pagado)
     if cliente_db:
         puntos_ganados = total_final * 0.05
         cliente_db.puntos += puntos_ganados
         db.commit()
+
+    # 🚨 LA MAGIA: SI EL PEDIDO ES GRATIS, SALTAMOS A MERCADO PAGO 🚨
+    if total_final <= 0:
+        nuevo_pedido.estatus = "PAGADO"
+        for detalle in nuevo_pedido.detalles:
+            pantalon_db = db.query(models.Pantalon).filter(models.Pantalon.id == detalle.pantalon_id).first()
+            if pantalon_db and pantalon_db.stock >= detalle.cantidad:
+                pantalon_db.stock -= detalle.cantidad
+        db.commit()
+        
+        # Disparamos el "¡Din!" al Centro de Despacho
+        await manager.broadcast("NUEVO_PEDIDO")
+        
+        # Redirigimos al cliente directamente a su recibo de éxito
+        return {"link_pago": f"https://surprisejeanysk.com/?pago=exito&payment_id=CUPON-GRATIS&external_reference={nuevo_pedido.id}"}
+
+    # SI HAY QUE PAGAR ALGO, VAMOS AL BANCO NORMALMENTE
+    preference_data = {
+        "items": items_para_banco,
+        "metadata": {"pedido_interno_id": nuevo_pedido.id}, 
+        "external_reference": str(nuevo_pedido.id),
+        "back_urls": {
+            "success": "https://surprisejeanysk.com/?pago=exito",
+            "failure": "https://surprisejeanysk.com/?pago=fallo",
+            "pending": "https://surprisejeanysk.com/?pago=pendiente"
+        },
+        "auto_return": "approved",
+        "notification_url": "https://surprise-jeans-api-denz.onrender.com/webhook/mercadopago",
+        "statement_descriptor": "SURPRISE JEANS" 
+    }
+
+    respuesta = sdk.preference().create(preference_data)
+    if respuesta["status"] != 201:
+        raise HTTPException(status_code=400, detail="Mercado Pago bloqueó la solicitud.")
+
+    return {"link_pago": respuesta["response"]["init_point"]}
+@app.post("/crear-pago-seguro")
+async def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, db: Session = Depends(get_db)):
+    total_pedido = 0
+    items_para_banco = []
+    
+    # 1. VERIFICAR CUPÓN
+    descuento_porc = 0.0
+    if pedido_req.cupon:
+        cupon_db = db.query(models.Cupon).filter(models.Cupon.codigo == pedido_req.cupon.upper(), models.Cupon.activo == 1).first()
+        if cupon_db:
+            descuento_porc = cupon_db.porcentaje
+
+    for item in pedido_req.items:
+        pantalon_db = db.query(models.Pantalon).filter(models.Pantalon.id == item.id).first()
+        if not pantalon_db or pantalon_db.stock < item.cantidad:
+            raise HTTPException(status_code=400, detail=f"Alguien acaba de comprar el último {item.nombre}")
+        
+        precio_con_descuento = float(item.precio) * (1.0 - (descuento_porc / 100.0))
+        total_pedido += (precio_con_descuento * item.cantidad)
+        
+        items_para_banco.append({
+            "title": f"[{item.codigo}] {item.nombre}",
+            "quantity": item.cantidad,
+            "unit_price": round(precio_con_descuento, 2),
+            "currency_id": "MXN"
+        })
+
+    # 2. SISTEMA DE USUARIOS
+    auth_header = request.headers.get("Authorization")
+    cliente_db = None
+    puntos_a_descontar = 0.0
+
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            cliente_db = db.query(models.Cliente).filter(models.Cliente.correo == payload.get("sub")).first()
+            if cliente_db:
+                cliente_db.telefono = pedido_req.envio.telefono
+                cliente_db.calle_numero = pedido_req.envio.calle_numero
+                cliente_db.colonia = pedido_req.envio.colonia
+                cliente_db.ciudad = pedido_req.envio.ciudad
+                cliente_db.estado = pedido_req.envio.estado
+                cliente_db.codigo_postal = pedido_req.envio.cp
+                cliente_db.referencias_domicilio = pedido_req.envio.referencias
+                
+                if pedido_req.usar_puntos and cliente_db.puntos > 0:
+                    puntos_a_descontar = cliente_db.puntos
+                    cliente_db.puntos = 0.0 
+                db.commit()
+        except:
+            pass
+
+    # 3. APLICAR DESCUENTO DE PUNTOS
+    total_final = total_pedido - puntos_a_descontar
+    if total_final <= 0: 
+        total_final = 0
+
+    if puntos_a_descontar > 0:
+        items_para_banco.append({
+            "title": "Descuento Surprise Points",
+            "quantity": 1,
+            "unit_price": round(-puntos_a_descontar, 2),
+            "currency_id": "MXN"
+        })
+
+    # 4. CREAR PEDIDO EN BASE DE DATOS
+    nuevo_pedido = models.Pedido(
+        nombre_cliente=pedido_req.envio.nombre, telefono=pedido_req.envio.telefono,
+        calle_numero=pedido_req.envio.calle_numero, colonia=pedido_req.envio.colonia,
+        ciudad=pedido_req.envio.ciudad, estado=pedido_req.envio.estado,
+        codigo_postal=pedido_req.envio.cp, referencias=pedido_req.envio.referencias,
+        total=total_final, estatus="PENDIENTE"
+    )
+    db.add(nuevo_pedido)
+    db.commit()
+    db.refresh(nuevo_pedido)
+
+    for item in pedido_req.items:
+        precio_final = float(item.precio) * (1.0 - (descuento_porc / 100.0))
+        db.add(models.DetallePedido(
+            pedido_id=nuevo_pedido.id, pantalon_id=item.id, 
+            cantidad=item.cantidad, precio_unitario=round(precio_final, 2)
+        ))
+    db.commit()
+    
+    if cliente_db:
+        puntos_ganados = total_final * 0.05
+        cliente_db.puntos += puntos_ganados
+        db.commit()
+
+    # 🚨 LA MAGIA: SI EL PEDIDO ES GRATIS, SALTAMOS A MERCADO PAGO 🚨
+    if total_final <= 0:
+        nuevo_pedido.estatus = "PAGADO"
+        for detalle in nuevo_pedido.detalles:
+            pantalon_db = db.query(models.Pantalon).filter(models.Pantalon.id == detalle.pantalon_id).first()
+            if pantalon_db and pantalon_db.stock >= detalle.cantidad:
+                pantalon_db.stock -= detalle.cantidad
+        db.commit()
+        
+        await manager.broadcast("NUEVO_PEDIDO")
+        
+        return {"link_pago": f"https://surprisejeanysk.com/?pago=exito&payment_id=CUPON-GRATIS&external_reference={nuevo_pedido.id}"}
 
     preference_data = {
         "items": items_para_banco,
