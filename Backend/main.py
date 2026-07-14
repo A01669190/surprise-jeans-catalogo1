@@ -310,6 +310,17 @@ def obtener_pantalones(
     if busqueda: query = query.filter(models.Pantalon.nombre.ilike(f"%{busqueda}%"))
     return query.order_by(models.Pantalon.id.desc()).offset(skip).limit(limit).all()
 
+@app.get("/generar-cupon-100")
+def generar_cupon_100(db: Session = Depends(get_db)):
+    # Ejecuta esta ruta en tu navegador para crear un cupón que descuente TODO
+    existe = db.query(models.Cupon).filter(models.Cupon.codigo == "GRATIS100").first()
+    if not existe:
+        nuevo = models.Cupon(codigo="GRATIS100", porcentaje=100.0, activo=1)
+        db.add(nuevo)
+        db.commit()
+        return {"mensaje": "¡Cupón GRATIS100 (100% de descuento) creado y listo para usar!"}
+    return {"mensaje": "El cupón GRATIS100 ya existía."}
+
 # ==========================================
 # 5. EL CEREBRO FINANCIERO (WEBHOOKS) 🧠
 # ==========================================
