@@ -11,3 +11,4 @@ slowapi
 passlib[bcrypt]
 PyJWT
 bcrypt==3.2.2
+websockets
