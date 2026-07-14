@@ -473,11 +473,12 @@ def obtener_pedidos_admin(request: Request, db: Session = Depends(get_db), token
 def reset_db_total():
     # Borrado forzado usando instrucción CASCADE de PostgreSQL
     with engine.begin() as conn:
-        conn.execute(text("DROP TABLE IF EXISTS detalles_pedido, pedidos, pantalones, categorias CASCADE;"))
+        # 🟢 Agregamos 'clientes' a la lista de tablas a destruir
+        conn.execute(text("DROP TABLE IF EXISTS detalles_pedido, pedidos, pantalones, categorias, clientes CASCADE;"))
         
     # Volvemos a construir la estructura limpia
     models.Base.metadata.create_all(bind=engine)
-    return {"mensaje": "Base de datos formateada con éxito mediante CASCADE. Lista para el nuevo diseño de envíos."}
+    return {"mensaje": "Base de datos formateada al 100%. Todo está limpio y listo para empezar."}
 
 @app.get("/backup/descargar")
 @limiter.limit("3/minute")
