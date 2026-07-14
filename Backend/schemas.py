@@ -70,3 +70,7 @@ class CambioPasswordReq(BaseModel):
 
 class ValidarCuponReq(BaseModel):
     codigo: str
+
+class PantalonUpdateRapido(BaseModel):
+    precio: Optional[float] = None
+    stock: Optional[int] = None

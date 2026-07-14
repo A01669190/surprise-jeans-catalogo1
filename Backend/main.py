@@ -612,3 +612,20 @@ def ver_clientes(db: Session = Depends(get_db)):
         })
         
     return resultado
+
+@app.patch("/pantalones/{pantalon_id}/rapido")
+def actualizar_pantalon_rapido(
+    pantalon_id: int, datos: schemas.PantalonUpdateRapido,
+    db: Session = Depends(get_db), token: str = Depends(verificar_token)
+):
+    pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == pantalon_id).first()
+    if not pantalon:
+        raise HTTPException(status_code=404, detail="Modelo no encontrado")
+    
+    if datos.precio is not None:
+        pantalon.precio = datos.precio
+    if datos.stock is not None:
+        pantalon.stock = datos.stock
+        
+    db.commit()
+    return {"mensaje": "Inventario actualizado exitosamente"}
