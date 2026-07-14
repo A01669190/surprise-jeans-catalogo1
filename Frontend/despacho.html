@@ -61,26 +61,43 @@
         let tokenPrivado = null; 
         
         // ⚡ WEBSOCKETS: Sonido y Conexión
-        const sonidoDin = new Audio('https://cdn.pixabay.com/download/audio/2021/08/04/audio_0625c1539c.mp3');
+        // ⚡ WEBSOCKETS: Sonido Blindado y Conexión
+        const sonidoDin = new Audio('https://www.myinstants.com/media/sounds/ding-sound-effect_2.mp3');
         let socket = null;
 
         function conectarTúnelEnVivo() {
             const wsUrl = API_URL.replace('https://', 'wss://').replace('http://', 'ws://') + '/ws/despacho';
             socket = new WebSocket(wsUrl);
 
+            // 1. RASTREADOR: Te avisará si el túnel se abrió correctamente
+            socket.onopen = function(e) {
+                Swal.fire({
+                    title: '📡 Túnel Conectado',
+                    text: 'Escuchando pagos en tiempo real...',
+                    icon: 'success', toast: true, position: 'bottom-end',
+                    showConfirmButton: false, timer: 3000
+                });
+            };
+
+            // 2. RECEPCIÓN: Cuando el servidor dispara el "Din"
             socket.onmessage = function(event) {
                 if (event.data === "NUEVO_PEDIDO") {
-                    sonidoDin.play().catch(e => console.log("Sonido bloqueado temporalmente."));
+                    sonidoDin.play().catch(e => console.log("El navegador bloqueó el sonido."));
                     Swal.fire({
                         title: '¡Nuevo Pedido! 📦',
                         text: 'El pago ha sido procesado con éxito.',
                         icon: 'info', toast: true, position: 'top-end',
                         showConfirmButton: false, timer: 4000, timerProgressBar: true
                     });
-                    cargarPedidos(); // Recarga las tarjetas en secreto
+                    cargarPedidos(); // Recarga las tarjetas
                 }
             };
-            socket.onclose = function() { setTimeout(conectarTúnelEnVivo, 5000); };
+
+            // 3. RECONEXIÓN
+            socket.onclose = function() { 
+                console.log("El túnel se durmió. Reconectando...");
+                setTimeout(conectarTúnelEnVivo, 5000); 
+            };
         }
 
         async function iniciarSesion() {
