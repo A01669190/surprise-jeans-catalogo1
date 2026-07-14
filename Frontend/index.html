@@ -984,11 +984,20 @@
                 Swal.fire({ icon: 'warning', title: 'Celular inválido', text: 'El celular debe tener exactamente 10 dígitos (Sin espacios ni ladas).' }); return;
             }
             if (!reglaCorreo.test(correo)) {
-                Swal.fire({ icon: 'warning', title: 'Correo inválido', text: 'Por favor ingresa un correo electrónico válido (Ej. juan@gmail.com).' }); return;
+                Swal.fire({ icon: 'warning', title: 'Correo inválido', text: 'Por favor ingresa un correo electrónico válido.' }); return;
             }
             if (password.length < 6) {
                 Swal.fire({ icon: 'warning', title: 'Contraseña muy corta', text: 'La contraseña debe tener al menos 6 caracteres por seguridad.' }); return;
             }
+
+            // 👇 PANTALLA DE CARGA ACTIVADA 👇
+            Swal.fire({ 
+                title: 'Creando cuenta...', 
+                text: 'Configurando tu bóveda y enviando mensaje de bienvenida...', 
+                allowOutsideClick: false, 
+                showConfirmButton: false 
+            });
+            Swal.showLoading();
 
             try {
                 const respuesta = await fetch(`${API_URL}/registro`, {
@@ -1001,7 +1010,7 @@
                     Swal.fire({
                         icon: 'success',
                         title: '¡Cuenta creada con éxito!',
-                        text: 'Ahora puedes iniciar sesión para acceder a la bóveda segura.',
+                        text: 'Ahora puedes iniciar sesión para acceder a tu historial.',
                         confirmButtonColor: '#10b981'
                     });
                     cambiarTabPerfil('login');
