@@ -1,9 +1,9 @@
 import os
 import shutil
-from fastapi import FastAPI, Depends, File, UploadFile, Form, Request, HTTPException, status
+from fastapi import FastAPI, Depends, File, UploadFile, Form, Request, HTTPException, status, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session  # <--- ¡ESTA ES LA LÍNEA QUE FALTABA!
 import base64
 import requests
 import pandas as pd
@@ -30,6 +30,7 @@ from pydantic import BaseModel
 import jwt
 from datetime import datetime, timedelta
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi import WebSocket, WebSocketDisconnect
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="API Surprise Jeans - Fortificada")
@@ -68,6 +69,40 @@ GMAIL_USER = os.getenv("GMAIL_USER", "denzellopezcabrera@gmail.com")
 GMAIL_PASSWORD = os.getenv("GMAIL_PASSWORD", "")
 ALGORITHM = "HS256"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+# ==========================================
+# INFRAESTRUCTURA DE WEBSOCKETS (TIEMPO REAL)
+# ==========================================
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except:
+                pass
+
+manager = ConnectionManager()
+
+@app.websocket("/ws/despacho")
+async def websocket_despacho(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+
 # ==========================================
 # MOTOR CRIPTOGRÁFICO (PURO BCRYPT - SIN BUGS)
 # ==========================================
@@ -421,7 +456,17 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                             pantalon_db.stock -= detalle.cantidad
                     
                     db.commit()
+                    
+                    # ⚡ ¡LA MAGIA DEL DIN! Disparamos la señal por el túnel
+                    await manager.broadcast("NUEVO_PEDIDO")
+                    
     return {"status": "procesado"}
+
+@app.get("/simular-din")
+async def simular_din():
+    # Ruta secreta para que tú pruebes el sonido sin hacer una compra real
+    await manager.broadcast("NUEVO_PEDIDO")
+    return {"mensaje": "Señal enviada al centro de despacho."}
 
 # ==========================================
 # 6. RUTAS ADMINISTRADOR (Exigen Token)

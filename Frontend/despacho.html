@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Centro de Despacho | Surprise Jeans</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Librerías de PDF y Alertas -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
@@ -24,26 +23,21 @@
             </div>
         </header>
 
-        <!-- LOGIN -->
         <div id="pantalla-login" class="bg-white p-8 rounded-2xl shadow-sm border border-gray-200 max-w-sm mx-auto mt-20">
             <h2 class="text-xl font-bold text-center mb-6">Acceso a Almacén</h2>
             <input type="password" id="pass" placeholder="Contraseña Maestra" class="w-full p-3 border rounded-lg mb-4 outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
             <button onclick="iniciarSesion()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 shadow-md">Entrar</button>
         </div>
 
-        <!-- PANEL DE PEDIDOS -->
         <div id="pantalla-pedidos" class="hidden">
-            <div id="grid-pedidos" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Se llena con JS -->
-            </div>
+            <div id="grid-pedidos" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
         </div>
 
-        <!-- PANEL DE INVENTARIO -->
         <div id="pantalla-inventario" class="hidden">
             <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                 <div class="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
                     <h3 class="font-bold text-gray-800">Control Rápido de Stock</h3>
-                    <p class="text-xs text-gray-500">Los cambios se guardan al instante en la base de datos.</p>
+                    <p class="text-xs text-gray-500">Los cambios se guardan al instante.</p>
                 </div>
                 <div class="overflow-x-auto h-[600px] overflow-y-auto">
                     <table class="w-full text-left border-collapse">
@@ -55,19 +49,39 @@
                                 <th class="p-4 text-center">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody id="tbody-inventario">
-                            <!-- Se llena con JS -->
-                        </tbody>
+                        <tbody id="tbody-inventario"></tbody>
                     </table>
                 </div>
             </div>
         </div>
-
     </div>
 
     <script>
         const API_URL = 'https://surprise-jeans-api-denz.onrender.com';
         let tokenPrivado = null; 
+        
+        // ⚡ WEBSOCKETS: Sonido y Conexión
+        const sonidoDin = new Audio('https://cdn.pixabay.com/download/audio/2021/08/04/audio_0625c1539c.mp3');
+        let socket = null;
+
+        function conectarTúnelEnVivo() {
+            const wsUrl = API_URL.replace('https://', 'wss://').replace('http://', 'ws://') + '/ws/despacho';
+            socket = new WebSocket(wsUrl);
+
+            socket.onmessage = function(event) {
+                if (event.data === "NUEVO_PEDIDO") {
+                    sonidoDin.play().catch(e => console.log("Sonido bloqueado temporalmente."));
+                    Swal.fire({
+                        title: '¡Nuevo Pedido! 📦',
+                        text: 'El pago ha sido procesado con éxito.',
+                        icon: 'info', toast: true, position: 'top-end',
+                        showConfirmButton: false, timer: 4000, timerProgressBar: true
+                    });
+                    cargarPedidos(); // Recarga las tarjetas en secreto
+                }
+            };
+            socket.onclose = function() { setTimeout(conectarTúnelEnVivo, 5000); };
+        }
 
         async function iniciarSesion() {
             const pass = document.getElementById('pass').value;
@@ -85,6 +99,7 @@
                     document.getElementById('nav-botones').classList.remove('hidden');
                     document.getElementById('pass').value = ''; 
                     
+                    conectarTúnelEnVivo(); // 👈 ABRIMOS EL TÚNEL AL ENTRAR
                     cambiarPestana('pedidos');
                 } else {
                     Swal.fire({icon: 'error', title: 'Acceso Denegado', text: 'Contraseña incorrecta'});
@@ -116,7 +131,7 @@
         }
 
         // ==========================================
-        // MÓDULO 1: PEDIDOS Y ETIQUETAS PDF
+        // PEDIDOS Y PDF
         // ==========================================
         async function cargarPedidos() {
             try {
@@ -131,26 +146,20 @@
             grid.innerHTML = '';
 
             if(pedidos.length === 0) {
-                grid.innerHTML = '<p class="text-gray-500 col-span-full text-center py-10">Aún no hay pedidos registrados.</p>'; 
-                return;
+                grid.innerHTML = '<p class="text-gray-500 col-span-full text-center py-10">Aún no hay pedidos registrados.</p>'; return;
             }
 
             pedidos.forEach(p => {
                 const esPagado = p.estatus === "PAGADO";
-                
-                // Sistema inteligente de colores para el Estatus
                 let colorBadge = "bg-gray-100 text-gray-700 border-gray-200";
                 if (p.estatus === "PAGADO") colorBadge = "bg-emerald-100 text-emerald-700 border-emerald-200";
                 if (p.estatus === "PENDIENTE") colorBadge = "bg-amber-100 text-amber-700 border-amber-200";
                 if (p.estatus === "ENVIADO") colorBadge = "bg-indigo-100 text-indigo-700 border-indigo-200";
                 
                 let listaRopa = p.detalles.map(d => `<li class="text-xs text-gray-600 border-b border-gray-50 pb-1 mt-1 font-medium">• ${d.cantidad}x [${d.codigo}] ${d.nombre}</li>`).join('');
-                
-                // Limpiamos los datos para mandarlos al generador PDF
                 const stringRopa = p.detalles.map(d => `${d.cantidad}x [${d.codigo}] ${d.nombre}`).join('<br>');
                 
                 const btnPDF = esPagado ? `<button onclick="generarTicketPDF('${p.folio}', '${p.cliente}', '${p.direccion_completa}', '${p.referencias || ''}', '${stringRopa}')" class="text-[10px] font-bold text-white bg-indigo-600 px-4 py-2 rounded-lg shadow hover:bg-indigo-700 transition-colors uppercase tracking-wider flex items-center gap-1 w-full justify-center"><span class="text-sm">🖨️</span> Imprimir Etiqueta</button>` : '';
-
                 const btnWhatsApp = esPagado ? `<button onclick="marcarEnviado(${p.id}, '${p.folio}', '${p.telefono}', '${p.cliente}')" class="text-[10px] font-bold text-white bg-emerald-500 px-4 py-2 rounded-lg shadow hover:bg-emerald-600 transition-colors uppercase tracking-wider flex items-center gap-1 mt-2 w-full justify-center"><span class="text-sm">💬</span> Notificar Envío por WA</button>` : '';
 
                 grid.innerHTML += `
@@ -175,7 +184,6 @@
         }
 
         function generarTicketPDF(folio, cliente, direccion, referencias, ropaStr) {
-            // Diseño en HTML que se convertirá en un PDF estilo Ticket de envío (80mm)
             const htmlContent = `
                 <div style="width: 280px; padding: 20px; font-family: 'Courier New', Courier, monospace; color: black; background: white;">
                     <div style="text-align: center; border-bottom: 2px dashed black; padding-bottom: 15px; margin-bottom: 15px;">
@@ -183,118 +191,75 @@
                         <p style="margin: 5px 0 0; font-size: 14px; font-weight: bold; text-transform: uppercase;">Guía de Envío</p>
                         <p style="margin: 10px 0 0; font-size: 18px; font-weight: black; background: black; color: white; padding: 5px; border-radius: 4px;">${folio}</p>
                     </div>
-                    
                     <div style="margin-bottom: 20px;">
                         <p style="font-size: 12px; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid black; display: inline-block;">DESTINATARIO:</p>
                         <p style="margin: 5px 0 0; font-size: 16px; font-weight: bold; text-transform: uppercase;">${cliente}</p>
                     </div>
-                    
                     <div style="margin-bottom: 20px;">
                         <p style="font-size: 12px; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid black; display: inline-block;">DIRECCIÓN DE ENTREGA:</p>
                         <p style="margin: 5px 0 0; font-size: 14px; line-height: 1.4;">${direccion}</p>
                         <p style="margin: 5px 0 0; font-size: 12px; font-style: italic;">Ref: ${referencias || 'N/A'}</p>
                     </div>
-                    
                     <div style="border-top: 2px dashed black; padding-top: 15px; margin-top: 15px;">
                         <p style="font-size: 10px; font-weight: bold; margin-bottom: 5px;">CONTENIDO DEL PAQUETE:</p>
                         <p style="font-size: 10px; line-height: 1.5; margin:0;">${ropaStr}</p>
                     </div>
-                    
-                    <div style="margin-top: 20px; text-align: center;">
-                        <p style="font-size: 10px; margin: 0;">¡Gracias por tu compra!</p>
-                        <p style="font-size: 10px; margin: 2px 0 0;">surprisejeanysk.com</p>
-                    </div>
                 </div>
             `;
-
             const opt = {
-                margin: 0,
-                filename: `Envio_${folio}.pdf`,
-                image: { type: 'jpeg', quality: 1.0 },
-                html2canvas: { scale: 3 }, // Alta resolución para impresoras térmicas
-                jsPDF: { unit: 'mm', format: [80, 180], orientation: 'portrait' } // Formato de ticket 80mm
+                margin: 0, filename: `Envio_${folio}.pdf`, image: { type: 'jpeg', quality: 1.0 },
+                html2canvas: { scale: 3 }, jsPDF: { unit: 'mm', format: [80, 180], orientation: 'portrait' }
             };
-
-            // Notificación elegante
-            Swal.fire({ title: 'Generando Etiqueta...', text: 'Descargando PDF listo para imprimir', timer: 1500, showConfirmButton: false, icon: 'info' });
-            
-            // Magia
+            Swal.fire({ title: 'Generando Etiqueta...', text: 'Descargando PDF', timer: 1500, showConfirmButton: false, icon: 'info' });
             html2pdf().set(opt).from(htmlContent).save();
         }
 
+        async function marcarEnviado(id, folio, telefono, cliente) {
+            const { value: guia } = await Swal.fire({
+                title: 'Confirmar Envío', text: 'Ingresa el número de guía o paquetería (Opcional):',
+                input: 'text', showCancelButton: true, confirmButtonText: 'Notificar y Enviar', confirmButtonColor: '#10b981'
+            });
+
+            if (guia !== undefined) {
+                Swal.fire({ title: 'Procesando...', allowOutsideClick: false, showConfirmButton: false });
+                Swal.showLoading();
+
+                try {
+                    const res = await fetch(`${API_URL}/pedidos/${id}/enviar`, {
+                        method: 'PATCH', headers: { 'Authorization': `Bearer ${tokenPrivado}` }
+                    });
+
+                    if (res.ok) {
+                        let telLimpio = telefono.replace(/\D/g, '');
+                        if (telLimpio.length === 10) telLimpio = '52' + telLimpio;
+
+                        let texto = `¡Hola ${cliente}! 👋 Somos de *Surprise Jeans*.\n\nTe avisamos que tu pedido *${folio}* ya va en camino hacia ti 🚀.\n\n`;
+                        if (guia.trim() !== "") texto += `📦 Tu número de rastreo es: *${guia}*\n\n`;
+                        texto += `¡Gracias por tu compra!`;
+
+                        const urlWA = `https://api.whatsapp.com/send?phone=${telLimpio}&text=${encodeURIComponent(texto)}`;
+                        Swal.fire({ icon: 'success', title: '¡Enviado!', text: 'Abriendo WhatsApp...', timer: 1500, showConfirmButton: false });
+
+                        setTimeout(() => { window.open(urlWA, '_blank'); cargarPedidos(); }, 1500);
+                    }
+                } catch (e) { Swal.fire({icon: 'error', title: 'Error', text: 'Error de conexión.'}); }
+            }
+        }
+
         // ==========================================
-        // MÓDULO 2: CONTROL RÁPIDO DE INVENTARIO
+        // CONTROL RÁPIDO DE INVENTARIO
         // ==========================================
         async function cargarInventario() {
             try {
                 const res = await fetch(`${API_URL}/pantalones`);
                 const pantalones = await res.json();
-                
-                // Ordenar para que los agotados queden hasta abajo
                 pantalones.sort((a, b) => {
                     if (a.stock === 0 && b.stock > 0) return 1;
                     if (a.stock > 0 && b.stock === 0) return -1;
                     return 0; 
                 });
-                
                 renderizarInventario(pantalones);
             } catch (error) { console.error(error); }
-        }
-
-        async function marcarEnviado(id, folio, telefono, cliente) {
-            // 1. Pedimos el número de guía
-            const { value: guia } = await Swal.fire({
-                title: 'Confirmar Envío',
-                text: 'Ingresa el número de guía o paquetería (Opcional):',
-                input: 'text',
-                inputPlaceholder: 'Ej. Estafeta 123456789',
-                showCancelButton: true,
-                confirmButtonText: 'Notificar y Enviar',
-                cancelButtonText: 'Cancelar',
-                confirmButtonColor: '#10b981'
-            });
-
-            if (guia !== undefined) {
-                // Bloqueamos pantalla
-                Swal.fire({ title: 'Procesando...', allowOutsideClick: false, showConfirmButton: false });
-                Swal.showLoading();
-
-                try {
-                    // 2. Le avisamos a la base de datos
-                    const res = await fetch(`${API_URL}/pedidos/${id}/enviar`, {
-                        method: 'PATCH',
-                        headers: { 'Authorization': `Bearer ${tokenPrivado}` }
-                    });
-
-                    if (res.ok) {
-                        // 3. Limpiamos el teléfono del cliente y le agregamos la lada de México (+52)
-                        let telLimpio = telefono.replace(/\D/g, '');
-                        if (telLimpio.length === 10) telLimpio = '52' + telLimpio;
-
-                        // 4. Redactamos el mensaje automático
-                        let texto = `¡Hola ${cliente}! 👋 Somos de *Surprise Jeans*.\n\nTe avisamos que tu pedido *${folio}* ya va en camino hacia ti 🚀.\n\n`;
-                        if (guia.trim() !== "") {
-                            texto += `📦 Tu número de rastreo/paquetería es: *${guia}*\n\n`;
-                        }
-                        texto += `¡Gracias por tu compra! Si tienes dudas, escríbenos por aquí.`;
-
-                        // 5. Generamos el link universal
-                        const urlWA = `https://api.whatsapp.com/send?phone=${telLimpio}&text=${encodeURIComponent(texto)}`;
-                        
-                        Swal.fire({ icon: 'success', title: '¡Pedido Enviado!', text: 'Abriendo WhatsApp...', timer: 1500, showConfirmButton: false });
-
-                        // 6. Abrimos la pestaña y recargamos la lista
-                        setTimeout(() => {
-                            window.open(urlWA, '_blank');
-                            cargarPedidos(); 
-                        }, 1500);
-                    } else {
-                        Swal.fire({icon: 'error', title: 'Error', text: 'Tu sesión expiró o hubo un problema.'});
-                    }
-                } catch (error) {
-                    Swal.fire({icon: 'error', title: 'Error', text: 'No se pudo conectar con el servidor.'});
-                }
-            }
         }
 
         function renderizarInventario(pantalones) {
@@ -348,15 +313,10 @@
                 });
                 
                 if(res.ok) {
-                    Swal.fire({
-                        icon: 'success', title: 'Inventario Actualizado', 
-                        toast: true, position: 'top-end', showConfirmButton: false, timer: 1500
-                    });
-                    cargarInventario(); // Recargamos para actualizar los colores si llegó a cero
+                    Swal.fire({ icon: 'success', title: 'Inventario Actualizado', toast: true, position: 'top-end', showConfirmButton: false, timer: 1500 });
+                    cargarInventario();
                 }
-            } catch(e) { 
-                Swal.fire({icon: 'error', title: 'Error', text: 'No se guardaron los cambios'}); 
-            }
+            } catch(e) { Swal.fire({icon: 'error', title: 'Error', text: 'No se guardaron los cambios'}); }
         }
 
         function marcarAgotado(id) {
