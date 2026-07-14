@@ -44,6 +44,7 @@ class InfoEnvio(BaseModel):
 class PedidoSeguro(BaseModel):
     envio: InfoEnvio
     items: List[ItemCarrito]
+    cupon: Optional[str] = None
 
 # ==========================================
 # ESQUEMAS DE CLIENTES
@@ -66,3 +67,6 @@ class ClienteRegistro(BaseModel):
 class CambioPasswordReq(BaseModel):
     password_actual: str
     password_nueva: str
+
+class ValidarCuponReq(BaseModel):
+    codigo: str

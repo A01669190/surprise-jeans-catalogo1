@@ -146,24 +146,6 @@ def verificar_token_cliente(token: str = Depends(oauth2_scheme)):
     except:
         raise HTTPException(status_code=401, detail="Token expirado o inválido")
 
-@app.get("/mis-pedidos")
-def obtener_mis_pedidos(correo: str = Depends(verificar_token_cliente), db: Session = Depends(get_db)):
-    cliente = db.query(models.Cliente).filter(models.Cliente.correo == correo).first()
-    if not cliente:
-        raise HTTPException(status_code=404, detail="Cliente no encontrado")
-    
-    # Buscamos los pedidos que coincidan con el celular del cliente registrado
-    pedidos = db.query(models.Pedido).filter(models.Pedido.telefono == cliente.telefono).order_by(models.Pedido.fecha.desc()).all()
-    
-    resultado = []
-    for p in pedidos:
-        resultado.append({
-            "folio": f"SJ-{p.id:04d}",
-            "fecha": p.fecha.strftime("%d/%m/%Y"),
-            "total": p.total,
-            "estatus": p.estatus
-        })
-    return resultado
 
 @app.post("/recuperar-password")
 async def recuperar_password(request: Request, db: Session = Depends(get_db)):
@@ -228,6 +210,51 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
 def inicio():
     return {"mensaje": "Servidor Seguro de Surprise Jeans Operativo 🔒"}
 
+@app.get("/mis-pedidos")
+def obtener_mis_pedidos(correo: str = Depends(verificar_token_cliente), db: Session = Depends(get_db)):
+    cliente = db.query(models.Cliente).filter(models.Cliente.correo == correo).first()
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    
+    # Buscamos los pedidos que coincidan con el celular del cliente registrado
+    pedidos = db.query(models.Pedido).filter(models.Pedido.telefono == cliente.telefono).order_by(models.Pedido.fecha.desc()).all()
+    
+    resultado = []
+    for p in pedidos:
+        resultado.append({
+            "folio": f"SJ-{p.id:04d}",
+            "fecha": p.fecha.strftime("%d/%m/%Y"),
+            "total": p.total,
+            "estatus": p.estatus
+        })
+    return resultado
+
+# ==========================================
+# RUTAS DE CUPONES Y PERFIL
+# ==========================================
+@app.get("/mi-perfil")
+def obtener_perfil(correo: str = Depends(verificar_token_cliente), db: Session = Depends(get_db)):
+    cliente = db.query(models.Cliente).filter(models.Cliente.correo == correo).first()
+    return cliente
+
+@app.post("/validar-cupon")
+def validar_cupon(datos: schemas.ValidarCuponReq, db: Session = Depends(get_db)):
+    cupon = db.query(models.Cupon).filter(models.Cupon.codigo == datos.codigo.upper(), models.Cupon.activo == 1).first()
+    if not cupon:
+        raise HTTPException(status_code=404, detail="Cupón inválido o expirado.")
+    return {"codigo": cupon.codigo, "porcentaje": cupon.porcentaje}
+
+@app.get("/generar-cupon-prueba")
+def generar_cupon_prueba(db: Session = Depends(get_db)):
+    # Ejecuta esta ruta en tu navegador una sola vez para crear tu cupón
+    existe = db.query(models.Cupon).filter(models.Cupon.codigo == "BIENVENIDA10").first()
+    if not existe:
+        nuevo = models.Cupon(codigo="BIENVENIDA10", porcentaje=10.0, activo=1)
+        db.add(nuevo)
+        db.commit()
+        return {"mensaje": "¡Cupón BIENVENIDA10 (10% de descuento) creado y listo para usar!"}
+    return {"mensaje": "El cupón ya existía."}
+
 # ==========================================
 # 4. RUTAS PÚBLICAS
 # ==========================================
@@ -252,50 +279,72 @@ def obtener_pantalones(
 # 5. EL CEREBRO FINANCIERO (WEBHOOKS) 🧠
 # ==========================================
 @app.post("/crear-pago-seguro")
-def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, db: Session = Depends(get_db)):
+def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, db: Session = Depends(get_db)):
     total_pedido = 0
     items_para_banco = []
     
+    # 1. VERIFICAR CUPÓN Y DESCUENTO
+    descuento_porc = 0.0
+    if pedido_req.cupon:
+        cupon_db = db.query(models.Cupon).filter(models.Cupon.codigo == pedido_req.cupon.upper(), models.Cupon.activo == 1).first()
+        if cupon_db:
+            descuento_porc = cupon_db.porcentaje
+
     for item in pedido_req.items:
-        # Escudo de Inventario Real
         pantalon_db = db.query(models.Pantalon).filter(models.Pantalon.id == item.id).first()
         if not pantalon_db or pantalon_db.stock < item.cantidad:
             raise HTTPException(status_code=400, detail=f"Alguien acaba de comprar el último {item.nombre}")
         
-        total_pedido += (item.precio * item.cantidad)
+        # Aplicamos el descuento unitario para Mercado Pago
+        precio_con_descuento = float(item.precio) * (1.0 - (descuento_porc / 100.0))
+        total_pedido += (precio_con_descuento * item.cantidad)
+        
         items_para_banco.append({
             "title": f"[{item.codigo}] {item.nombre}",
             "quantity": item.cantidad,
-            "unit_price": float(item.precio),
+            "unit_price": round(precio_con_descuento, 2),
             "currency_id": "MXN"
         })
 
-    # Guardar en bóveda como PENDIENTE
-    # Guardar en bóveda como PENDIENTE
+    # 2. AUTO-GUARDADO DE DIRECCIÓN (Si el cliente tiene sesión iniciada)
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            cliente = db.query(models.Cliente).filter(models.Cliente.correo == payload.get("sub")).first()
+            if cliente:
+                cliente.telefono = pedido_req.envio.telefono
+                cliente.calle_numero = pedido_req.envio.calle_numero
+                cliente.colonia = pedido_req.envio.colonia
+                cliente.ciudad = pedido_req.envio.ciudad
+                cliente.estado = pedido_req.envio.estado
+                cliente.codigo_postal = pedido_req.envio.cp
+                cliente.referencias_domicilio = pedido_req.envio.referencias
+                db.commit()
+        except:
+            pass # Si es invitado o el token falló, la venta sigue normal
+
+    # 3. CREAR PEDIDO
     nuevo_pedido = models.Pedido(
-        nombre_cliente=pedido_req.envio.nombre,
-        telefono=pedido_req.envio.telefono,
-        calle_numero=pedido_req.envio.calle_numero,
-        colonia=pedido_req.envio.colonia,
-        ciudad=pedido_req.envio.ciudad,
-        estado=pedido_req.envio.estado,
-        codigo_postal=pedido_req.envio.cp,
-        referencias=pedido_req.envio.referencias,
-        total=total_pedido,
-        estatus="PENDIENTE"
+        nombre_cliente=pedido_req.envio.nombre, telefono=pedido_req.envio.telefono,
+        calle_numero=pedido_req.envio.calle_numero, colonia=pedido_req.envio.colonia,
+        ciudad=pedido_req.envio.ciudad, estado=pedido_req.envio.estado,
+        codigo_postal=pedido_req.envio.cp, referencias=pedido_req.envio.referencias,
+        total=total_pedido, estatus="PENDIENTE"
     )
     db.add(nuevo_pedido)
     db.commit()
     db.refresh(nuevo_pedido)
 
     for item in pedido_req.items:
+        precio_final = float(item.precio) * (1.0 - (descuento_porc / 100.0))
         db.add(models.DetallePedido(
             pedido_id=nuevo_pedido.id, pantalon_id=item.id, 
-            cantidad=item.cantidad, precio_unitario=item.precio
+            cantidad=item.cantidad, precio_unitario=round(precio_final, 2)
         ))
     db.commit()
 
-    # Generar Ticket con Rastreador Secreto (Metadata)
     preference_data = {
         "items": items_para_banco,
         "metadata": {"pedido_interno_id": nuevo_pedido.id}, 
@@ -310,15 +359,10 @@ def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, db: Session = Depends(ge
         "statement_descriptor": "SURPRISE JEANS" 
     }
 
-   # 5. Enviar a Mercado Pago
     respuesta = sdk.preference().create(preference_data)
-
-        # ESCUDO: Verificamos si Mercado Pago rechazó la creación del link
     if respuesta["status"] != 201:
-            print("❌ ERROR INTERNO DE MERCADO PAGO:", respuesta)
-            raise HTTPException(status_code=400, detail="Mercado Pago bloqueó la solicitud. Revisa tu Token.")
+        raise HTTPException(status_code=400, detail="Mercado Pago bloqueó la solicitud.")
 
-        # Si todo salió bien, extraemos el link y lo mandamos al Frontend
     return {"link_pago": respuesta["response"]["init_point"]}
 
 @app.post("/webhook/mercadopago")

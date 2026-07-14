@@ -281,13 +281,24 @@
         <!-- Columna Derecha: Resumen de Pedido (Gris) -->
         <div class="w-full md:w-2/5 h-full overflow-y-auto bg-gray-50 border-l border-gray-200 p-6 md:p-12 lg:px-16 hidden md:block">
             <div class="max-w-md w-full">
-                <!-- Lista de productos (Se llena con JS) -->
                 <div id="checkout-lista" class="space-y-4 mb-6"></div>
                 
-                <div class="border-t border-gray-200 pt-4 space-y-3 text-sm text-gray-600">
+                <div class="border-t border-gray-200 py-6">
+                    <div class="flex gap-2 mb-2">
+                        <input type="text" id="chk-cupon-input" placeholder="Código de descuento" class="flex-1 p-3 rounded-md border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-600 outline-none uppercase font-bold text-gray-700">
+                        <button onclick="aplicarCupon()" id="btn-aplicar-cupon" class="bg-gray-900 hover:bg-black text-white font-bold px-6 rounded-md text-sm transition-colors shadow-sm">Aplicar</button>
+                    </div>
+                    <p id="msg-cupon" class="text-xs font-bold hidden"></p>
+                </div>
+
+                <div class="border-t border-gray-200 pt-6 space-y-3 text-sm text-gray-600">
                     <div class="flex justify-between">
                         <span>Subtotal</span>
                         <span id="chk-subtotal" class="font-medium"></span>
+                    </div>
+                    <div id="fila-descuento" class="flex justify-between hidden text-emerald-600 font-bold">
+                        <span>Descuento</span>
+                        <span id="chk-descuento-monto">-$0.00</span>
                     </div>
                     <div class="flex justify-between">
                         <span>Envío</span>
@@ -952,23 +963,54 @@
         // ==========================================
         // LA BÓVEDA DE PAGO
         // ==========================================
-        // ==========================================
-        // LÓGICA DE CHECKOUT Y PASARELA DE PAGO
-        // ==========================================
-        function abrirCheckout() {
-            if (carrito.length === 0) {
-                alert("Tu carrito está vacío."); return;
-            }
+       let cuponActivo = null; // Guardamos el cupón en memoria
+
+        async function abrirCheckout() {
+            if (carrito.length === 0) { alert("Tu carrito está vacío."); return; }
             
-            // Llenamos el resumen visual en la columna derecha
+            // Limpiamos los cupones viejos al abrir
+            cuponActivo = null;
+            document.getElementById('chk-cupon-input').value = '';
+            document.getElementById('chk-cupon-input').disabled = false;
+            document.getElementById('btn-aplicar-cupon').disabled = false;
+            document.getElementById('msg-cupon').classList.add('hidden');
+            document.getElementById('fila-descuento').classList.add('hidden');
+
+            renderizarResumenCheckout();
+
+            // 📍 AUTOCOMPLETADO MÁGICO
+            const token = localStorage.getItem('token_cliente_sj');
+            if (token) {
+                try {
+                    const res = await fetch(`${API_URL}/mi-perfil`, { headers: { 'Authorization': `Bearer ${token}` } });
+                    if(res.ok) {
+                        const perfil = await res.json();
+                        // Si ya tiene datos guardados, llenamos el formulario automáticamente
+                        if(perfil.nombre_completo && !document.getElementById('chk-nombre').value) document.getElementById('chk-nombre').value = perfil.nombre_completo;
+                        if(perfil.telefono) document.getElementById('chk-telefono').value = perfil.telefono;
+                        if(perfil.calle_numero) document.getElementById('chk-calle').value = perfil.calle_numero;
+                        if(perfil.colonia) document.getElementById('chk-colonia').value = perfil.colonia;
+                        if(perfil.ciudad) document.getElementById('chk-ciudad').value = perfil.ciudad;
+                        if(perfil.estado) document.getElementById('chk-estado').value = perfil.estado;
+                        if(perfil.codigo_postal) document.getElementById('chk-cp').value = perfil.codigo_postal;
+                        if(perfil.referencias_domicilio) document.getElementById('chk-referencias').value = perfil.referencias_domicilio;
+                    }
+                } catch(e) { console.log(e); }
+            }
+
+            cerrarCarrito();
+            document.getElementById('modal-checkout').classList.remove('hidden');
+            document.getElementById('modal-checkout').classList.add('flex');
+        }
+
+        function renderizarResumenCheckout() {
             const contenedorCheckout = document.getElementById('checkout-lista');
             contenedorCheckout.innerHTML = '';
-            let total = 0;
+            let subtotal = 0;
 
             carrito.forEach(item => {
-                const subtotal = item.precio * item.cantidad;
-                total += subtotal;
-
+                const totalItem = item.precio * item.cantidad;
+                subtotal += totalItem;
                 contenedorCheckout.innerHTML += `
                     <div class="flex items-center gap-4">
                         <div class="relative">
@@ -979,18 +1021,58 @@
                             <p class="font-bold text-sm text-gray-800 leading-tight">${item.nombre}</p>
                             <p class="text-[10px] text-gray-500">${item.codigo}</p>
                         </div>
-                        <span class="font-medium text-sm text-gray-900">$${subtotal.toFixed(2)}</span>
+                        <span class="font-medium text-sm text-gray-900">$${totalItem.toFixed(2)}</span>
                     </div>
                 `;
             });
 
-            document.getElementById('chk-subtotal').innerText = `$${total.toFixed(2)}`;
-            document.getElementById('chk-total').innerText = `$${total.toFixed(2)}`;
+            document.getElementById('chk-subtotal').innerText = `$${subtotal.toFixed(2)}`;
+            
+            // Aplicar cálculos de descuento en tiempo real
+            let totalFinal = subtotal;
+            if (cuponActivo) {
+                const descuentoMonto = subtotal * (cuponActivo.porcentaje / 100);
+                totalFinal = subtotal - descuentoMonto;
+                document.getElementById('chk-descuento-monto').innerText = `-$${descuentoMonto.toFixed(2)}`;
+                document.getElementById('fila-descuento').classList.remove('hidden');
+            }
 
-            // Ocultamos el carrito pequeño y mostramos la pantalla completa
-            cerrarCarrito();
-            document.getElementById('modal-checkout').classList.remove('hidden');
-            document.getElementById('modal-checkout').classList.add('flex');
+            document.getElementById('chk-total').innerText = `$${totalFinal.toFixed(2)}`;
+        }
+
+        async function aplicarCupon() {
+            const codigo = document.getElementById('chk-cupon-input').value.trim();
+            const msg = document.getElementById('msg-cupon');
+            
+            if(!codigo) return;
+
+            msg.classList.remove('hidden');
+            msg.className = "text-xs font-bold mt-2 text-indigo-500";
+            msg.innerText = "Verificando cupón...";
+
+            try {
+                const respuesta = await fetch(`${API_URL}/validar-cupon`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ codigo })
+                });
+
+                if (respuesta.ok) {
+                    cuponActivo = await respuesta.json();
+                    msg.className = "text-xs font-bold mt-2 text-emerald-500";
+                    msg.innerText = `¡Cupón de ${cuponActivo.porcentaje}% aplicado con éxito! 🎉`;
+                    
+                    document.getElementById('chk-cupon-input').disabled = true;
+                    document.getElementById('btn-aplicar-cupon').disabled = true;
+                    
+                    renderizarResumenCheckout(); // Recalculamos los totales visualmente
+                } else {
+                    msg.className = "text-xs font-bold mt-2 text-rose-500";
+                    msg.innerText = "Cupón inválido o expirado.";
+                }
+            } catch(e) {
+                msg.innerText = "Error de conexión.";
+            }
         }
 
         function cerrarCheckout() {
@@ -1176,26 +1258,26 @@
             btnPagar.disabled = true;
 
             try {
-                // 2. Empaquetamos todo
                 const pedidoSeguro = {
-                    envio: { 
-                        nombre, telefono, calle_numero, colonia, ciudad, estado, cp, referencias 
-                    },
+                    envio: { nombre, telefono, calle_numero, colonia, ciudad, estado, cp, referencias },
                     items: carrito.map(item => ({
-                        id: item.id,
-                        codigo: item.codigo || "S/C",
-                        nombre: item.nombre,
-                        precio: parseFloat(item.precio),
-                        cantidad: parseInt(item.cantidad)
-                    }))
+                        id: item.id, codigo: item.codigo || "S/C", nombre: item.nombre, 
+                        precio: parseFloat(item.precio), cantidad: parseInt(item.cantidad)
+                    })),
+                    cupon: cuponActivo ? cuponActivo.codigo : null // MANDAMOS EL CUPÓN SI EXISTE
                 };
                 
-                // 3. Enviamos al servidor
+                // Preparar cabeceras y mandar la llave si hay sesión iniciada para el auto-guardado
+                const headers = { 'Content-Type': 'application/json' };
+                const token = localStorage.getItem('token_cliente_sj');
+                if(token) headers['Authorization'] = `Bearer ${token}`;
+
                 const respuesta = await fetch(`${API_URL}/crear-pago-seguro`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: headers,
                     body: JSON.stringify(pedidoSeguro)
                 });
+                // ... el resto de la función sigue igual ...
 
                 if (respuesta.ok) {
                     const data = await respuesta.json();

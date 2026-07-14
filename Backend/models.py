@@ -69,3 +69,13 @@ class Cliente(Base):
     referencias_domicilio = Column(String, nullable=True)
     
     fecha_registro = Column(DateTime, default=datetime.datetime.utcnow)
+
+    # ==========================================
+# TABLA DE CUPONES DE DESCUENTO
+# ==========================================
+class Cupon(Base):
+    __tablename__ = "cupones"
+    id = Column(Integer, primary_key=True, index=True)
+    codigo = Column(String, unique=True, index=True)
+    porcentaje = Column(Float) # Ej. 10.0 significa 10% de descuento
+    activo = Column(Integer, default=1) # 1 es activo, 0 es desactivado
