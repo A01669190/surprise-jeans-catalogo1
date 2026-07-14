@@ -284,6 +284,17 @@
                 <div id="checkout-lista" class="space-y-4 mb-6"></div>
                 
                 <div class="border-t border-gray-200 py-6">
+                    <!-- SISTEMA DE PUNTOS -->
+                    <div id="caja-surprise-points" class="hidden mt-4 bg-amber-50 border border-amber-200 p-3 rounded-lg flex justify-between items-center">
+                        <div>
+                            <p class="text-xs font-black text-amber-600 uppercase tracking-wider">🌟 Surprise Points</p>
+                            <p class="text-[10px] text-amber-700 font-medium">Tienes <span id="chk-puntos-disponibles" class="font-bold"></span> para descontar.</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="chk-usar-puntos" onchange="renderizarResumenCheckout()" class="sr-only peer">
+                            <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                        </label>
+                    </div>
                     <div class="flex gap-2 mb-2">
                         <input type="text" id="chk-cupon-input" placeholder="Código de descuento" class="flex-1 p-3 rounded-md border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-600 outline-none uppercase font-bold text-gray-700">
                         <button onclick="aplicarCupon()" id="btn-aplicar-cupon" class="bg-gray-900 hover:bg-black text-white font-bold px-6 rounded-md text-sm transition-colors shadow-sm">Aplicar</button>
@@ -979,21 +990,27 @@
             renderizarResumenCheckout();
 
             // 📍 AUTOCOMPLETADO MÁGICO
+            // 📍 AUTOCOMPLETADO MÁGICO Y PUNTOS
             const token = localStorage.getItem('token_cliente_sj');
             if (token) {
                 try {
                     const res = await fetch(`${API_URL}/mi-perfil`, { headers: { 'Authorization': `Bearer ${token}` } });
                     if(res.ok) {
                         const perfil = await res.json();
-                        // Si ya tiene datos guardados, llenamos el formulario automáticamente
                         if(perfil.nombre_completo && !document.getElementById('chk-nombre').value) document.getElementById('chk-nombre').value = perfil.nombre_completo;
                         if(perfil.telefono) document.getElementById('chk-telefono').value = perfil.telefono;
-                        if(perfil.calle_numero) document.getElementById('chk-calle').value = perfil.calle_numero;
-                        if(perfil.colonia) document.getElementById('chk-colonia').value = perfil.colonia;
-                        if(perfil.ciudad) document.getElementById('chk-ciudad').value = perfil.ciudad;
-                        if(perfil.estado) document.getElementById('chk-estado').value = perfil.estado;
-                        if(perfil.codigo_postal) document.getElementById('chk-cp').value = perfil.codigo_postal;
-                        if(perfil.referencias_domicilio) document.getElementById('chk-referencias').value = perfil.referencias_domicilio;
+                        // ... (tus otras variables de calle, colonia, etc. se quedan igual) ...
+
+                        // Activar la caja de puntos si tiene más de 0
+                        if(perfil.puntos && perfil.puntos > 0) {
+                            document.getElementById('caja-surprise-points').classList.remove('hidden');
+                            document.getElementById('chk-puntos-disponibles').innerText = `$${perfil.puntos.toFixed(2)}`;
+                            document.getElementById('chk-usar-puntos').checked = false; // Resetear el switch
+                            window.puntosCliente = perfil.puntos; // Guardamos global para calcular
+                        } else {
+                            document.getElementById('caja-surprise-points').classList.add('hidden');
+                            window.puntosCliente = 0;
+                        }
                     }
                 } catch(e) { console.log(e); }
             }
@@ -1029,12 +1046,20 @@
             document.getElementById('chk-subtotal').innerText = `$${subtotal.toFixed(2)}`;
             
             // Aplicar cálculos de descuento en tiempo real
+            // Aplicar cálculos de descuento en tiempo real
             let totalFinal = subtotal;
             if (cuponActivo) {
                 const descuentoMonto = subtotal * (cuponActivo.porcentaje / 100);
                 totalFinal = subtotal - descuentoMonto;
                 document.getElementById('chk-descuento-monto').innerText = `-$${descuentoMonto.toFixed(2)}`;
                 document.getElementById('fila-descuento').classList.remove('hidden');
+            }
+
+            // Descuento extra por Surprise Points
+            const switchPuntos = document.getElementById('chk-usar-puntos');
+            if(switchPuntos && switchPuntos.checked && window.puntosCliente > 0) {
+                totalFinal = totalFinal - window.puntosCliente;
+                if(totalFinal < 0) totalFinal = 0;
             }
 
             document.getElementById('chk-total').innerText = `$${totalFinal.toFixed(2)}`;
@@ -1245,6 +1270,15 @@
             const ciudad = document.getElementById('chk-ciudad').value;
             const estado = document.getElementById('chk-estado').value;
             const referencias = document.getElementById('chk-referencias').value;
+            const pedidoSeguro = {
+                    envio: { nombre, telefono, calle_numero, colonia, ciudad, estado, cp, referencias },
+                    items: carrito.map(item => ({
+                        id: item.id, codigo: item.codigo || "S/C", nombre: item.nombre, 
+                        precio: parseFloat(item.precio), cantidad: parseInt(item.cantidad)
+                    })),
+                    cupon: cuponActivo ? cuponActivo.codigo : null,
+                    usar_puntos: document.getElementById('chk-usar-puntos') ? document.getElementById('chk-usar-puntos').checked : false // ENVIAMOS EL SWITCH
+                };
 
             // Validación estricta
             if(!nombre || !telefono || !calle_numero || !colonia || !cp || !ciudad || !estado) {
@@ -1277,7 +1311,6 @@
                     headers: headers,
                     body: JSON.stringify(pedidoSeguro)
                 });
-                // ... el resto de la función sigue igual ...
 
                 if (respuesta.ok) {
                     const data = await respuesta.json();

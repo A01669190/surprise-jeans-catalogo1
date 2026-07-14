@@ -45,6 +45,7 @@ class PedidoSeguro(BaseModel):
     envio: InfoEnvio
     items: List[ItemCarrito]
     cupon: Optional[str] = None
+    usar_puntos: Optional[bool] = False  # NUEVO: ¿Quiere gastar sus puntos?
 
 # ==========================================
 # ESQUEMAS DE CLIENTES

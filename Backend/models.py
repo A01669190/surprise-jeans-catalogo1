@@ -59,6 +59,13 @@ class Cliente(Base):
     correo = Column(String, unique=True, index=True)
     password_hash = Column(String)  # Contraseña encriptada (Seguridad Nivel Bancario)
     telefono = Column(String, nullable=True)
+    # ... (tus otras columnas)
+    codigo_postal = Column(String, nullable=True)
+    referencias_domicilio = Column(String, nullable=True)
+    
+    puntos = Column(Float, default=0.0) # NUEVO: Bóveda de Surprise Points
+    
+    fecha_registro = Column(DateTime, default=datetime.datetime.utcnow)
     
     # Direcciones guardadas para autocompletar el Checkout
     calle_numero = Column(String, nullable=True)

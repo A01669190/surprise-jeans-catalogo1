@@ -283,7 +283,7 @@ def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, db: Se
     total_pedido = 0
     items_para_banco = []
     
-    # 1. VERIFICAR CUPÓN Y DESCUENTO
+    # 1. VERIFICAR CUPÓN
     descuento_porc = 0.0
     if pedido_req.cupon:
         cupon_db = db.query(models.Cupon).filter(models.Cupon.codigo == pedido_req.cupon.upper(), models.Cupon.activo == 1).first()
@@ -295,7 +295,6 @@ def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, db: Se
         if not pantalon_db or pantalon_db.stock < item.cantidad:
             raise HTTPException(status_code=400, detail=f"Alguien acaba de comprar el último {item.nombre}")
         
-        # Aplicamos el descuento unitario para Mercado Pago
         precio_con_descuento = float(item.precio) * (1.0 - (descuento_porc / 100.0))
         total_pedido += (precio_con_descuento * item.cantidad)
         
@@ -306,32 +305,55 @@ def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, db: Se
             "currency_id": "MXN"
         })
 
-    # 2. AUTO-GUARDADO DE DIRECCIÓN (Si el cliente tiene sesión iniciada)
+    # 2. SISTEMA DE USUARIOS (Auto-guardado y Surprise Points)
     auth_header = request.headers.get("Authorization")
+    cliente_db = None
+    puntos_a_descontar = 0.0
+
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.split(" ")[1]
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            cliente = db.query(models.Cliente).filter(models.Cliente.correo == payload.get("sub")).first()
-            if cliente:
-                cliente.telefono = pedido_req.envio.telefono
-                cliente.calle_numero = pedido_req.envio.calle_numero
-                cliente.colonia = pedido_req.envio.colonia
-                cliente.ciudad = pedido_req.envio.ciudad
-                cliente.estado = pedido_req.envio.estado
-                cliente.codigo_postal = pedido_req.envio.cp
-                cliente.referencias_domicilio = pedido_req.envio.referencias
+            cliente_db = db.query(models.Cliente).filter(models.Cliente.correo == payload.get("sub")).first()
+            if cliente_db:
+                # Guardamos su dirección
+                cliente_db.telefono = pedido_req.envio.telefono
+                cliente_db.calle_numero = pedido_req.envio.calle_numero
+                cliente_db.colonia = pedido_req.envio.colonia
+                cliente_db.ciudad = pedido_req.envio.ciudad
+                cliente_db.estado = pedido_req.envio.estado
+                cliente_db.codigo_postal = pedido_req.envio.cp
+                cliente_db.referencias_domicilio = pedido_req.envio.referencias
+                
+                # Descontamos puntos si lo solicitó
+                if pedido_req.usar_puntos and cliente_db.puntos > 0:
+                    puntos_a_descontar = cliente_db.puntos
+                    cliente_db.puntos = 0.0 # Se vacía la bóveda de puntos al usarlos
+                
                 db.commit()
         except:
-            pass # Si es invitado o el token falló, la venta sigue normal
+            pass
 
-    # 3. CREAR PEDIDO
+    # 3. APLICAR DESCUENTO DE PUNTOS AL TOTAL
+    total_final = total_pedido - puntos_a_descontar
+    if total_final < 0: total_final = 0
+
+    # Si hay descuento por puntos, lo metemos como un "item negativo" para Mercado Pago
+    if puntos_a_descontar > 0:
+        items_para_banco.append({
+            "title": "Descuento Surprise Points",
+            "quantity": 1,
+            "unit_price": round(-puntos_a_descontar, 2),
+            "currency_id": "MXN"
+        })
+
+    # 4. CREAR PEDIDO
     nuevo_pedido = models.Pedido(
         nombre_cliente=pedido_req.envio.nombre, telefono=pedido_req.envio.telefono,
         calle_numero=pedido_req.envio.calle_numero, colonia=pedido_req.envio.colonia,
         ciudad=pedido_req.envio.ciudad, estado=pedido_req.envio.estado,
         codigo_postal=pedido_req.envio.cp, referencias=pedido_req.envio.referencias,
-        total=total_pedido, estatus="PENDIENTE"
+        total=total_final, estatus="PENDIENTE"
     )
     db.add(nuevo_pedido)
     db.commit()
@@ -343,7 +365,12 @@ def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, db: Se
             pedido_id=nuevo_pedido.id, pantalon_id=item.id, 
             cantidad=item.cantidad, precio_unitario=round(precio_final, 2)
         ))
-    db.commit()
+    
+    # 5. REGALAR NUEVOS PUNTOS (5% del total pagado)
+    if cliente_db:
+        puntos_ganados = total_final * 0.05
+        cliente_db.puntos += puntos_ganados
+        db.commit()
 
     preference_data = {
         "items": items_para_banco,
