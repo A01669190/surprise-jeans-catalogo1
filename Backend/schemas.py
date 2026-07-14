@@ -23,7 +23,6 @@ class PantalonRespuesta(BaseModel):
 
 # ==========================================
 # ESQUEMAS PARA LA BÓVEDA FINANCIERA
-# ==========================================
 class ItemCarrito(BaseModel):
     id: int
     nombre: str
@@ -45,20 +44,13 @@ class PedidoSeguro(BaseModel):
     envio: InfoEnvio
     items: List[ItemCarrito]
     cupon: Optional[str] = None
-    usar_puntos: Optional[bool] = False  # NUEVO: ¿Quiere gastar sus puntos?
+    usar_puntos: Optional[bool] = False
+
+class ValidarCuponReq(BaseModel):
+    codigo: str
 
 # ==========================================
-# ESQUEMAS DE CLIENTES
-# ==========================================
-class ClienteRegistro(BaseModel):
-    nombre_completo: str
-    correo: str
-    password: str
-    telefono: str
-
-# ==========================================
-# ESQUEMAS DE CLIENTES
-# ==========================================
+# ESQUEMAS DE CLIENTES Y ADMIN
 class ClienteRegistro(BaseModel):
     nombre_completo: str
     correo: str
@@ -68,9 +60,6 @@ class ClienteRegistro(BaseModel):
 class CambioPasswordReq(BaseModel):
     password_actual: str
     password_nueva: str
-
-class ValidarCuponReq(BaseModel):
-    codigo: str
 
 class PantalonUpdateRapido(BaseModel):
     precio: Optional[float] = None

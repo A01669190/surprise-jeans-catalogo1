@@ -23,7 +23,6 @@ class Pantalon(Base):
 
 # ==========================================
 # TABLAS DE SEGURIDAD (PEDIDOS)
-
 class Pedido(Base):
     __tablename__ = "pedidos"
     id = Column(Integer, primary_key=True, index=True)
@@ -51,23 +50,14 @@ class DetallePedido(Base):
 
 # ==========================================
 # TABLA DE CLIENTES (USUARIOS REGISTRADOS)
-# ==========================================
 class Cliente(Base):
     __tablename__ = "clientes"
     id = Column(Integer, primary_key=True, index=True)
     nombre_completo = Column(String)
     correo = Column(String, unique=True, index=True)
-    password_hash = Column(String)  # Contraseña encriptada (Seguridad Nivel Bancario)
+    password_hash = Column(String)
     telefono = Column(String, nullable=True)
-    # ... (tus otras columnas)
-    codigo_postal = Column(String, nullable=True)
-    referencias_domicilio = Column(String, nullable=True)
     
-    puntos = Column(Float, default=0.0) # NUEVO: Bóveda de Surprise Points
-    
-    fecha_registro = Column(DateTime, default=datetime.datetime.utcnow)
-    
-    # Direcciones guardadas para autocompletar el Checkout
     calle_numero = Column(String, nullable=True)
     colonia = Column(String, nullable=True)
     ciudad = Column(String, nullable=True)
@@ -75,14 +65,15 @@ class Cliente(Base):
     codigo_postal = Column(String, nullable=True)
     referencias_domicilio = Column(String, nullable=True)
     
+    puntos = Column(Float, default=0.0) # Bóveda de Surprise Points
+    
     fecha_registro = Column(DateTime, default=datetime.datetime.utcnow)
 
-    # ==========================================
-# TABLA DE CUPONES DE DESCUENTO
 # ==========================================
+# TABLA DE CUPONES DE DESCUENTO
 class Cupon(Base):
     __tablename__ = "cupones"
     id = Column(Integer, primary_key=True, index=True)
     codigo = Column(String, unique=True, index=True)
-    porcentaje = Column(Float) # Ej. 10.0 significa 10% de descuento
-    activo = Column(Integer, default=1) # 1 es activo, 0 es desactivado
+    porcentaje = Column(Float)
+    activo = Column(Integer, default=1)
