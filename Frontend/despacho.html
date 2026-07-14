@@ -131,19 +131,28 @@
             grid.innerHTML = '';
 
             if(pedidos.length === 0) {
-                grid.innerHTML = '<p class="text-gray-500 col-span-full text-center py-10">Aún no hay pedidos registrados.</p>'; return;
+                grid.innerHTML = '<p class="text-gray-500 col-span-full text-center py-10">Aún no hay pedidos registrados.</p>'; 
+                return;
             }
 
             pedidos.forEach(p => {
                 const esPagado = p.estatus === "PAGADO";
-                const colorBadge = esPagado ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-amber-100 text-amber-700 border-amber-200";
+                
+                // Sistema inteligente de colores para el Estatus
+                let colorBadge = "bg-gray-100 text-gray-700 border-gray-200";
+                if (p.estatus === "PAGADO") colorBadge = "bg-emerald-100 text-emerald-700 border-emerald-200";
+                if (p.estatus === "PENDIENTE") colorBadge = "bg-amber-100 text-amber-700 border-amber-200";
+                if (p.estatus === "ENVIADO") colorBadge = "bg-indigo-100 text-indigo-700 border-indigo-200";
                 
                 let listaRopa = p.detalles.map(d => `<li class="text-xs text-gray-600 border-b border-gray-50 pb-1 mt-1 font-medium">• ${d.cantidad}x [${d.codigo}] ${d.nombre}</li>`).join('');
                 
                 // Limpiamos los datos para mandarlos al generador PDF
                 const stringRopa = p.detalles.map(d => `${d.cantidad}x [${d.codigo}] ${d.nombre}`).join('<br>');
-// Botón de Notificar Envío (Solo si está pagado)
+                
+                const btnPDF = esPagado ? `<button onclick="generarTicketPDF('${p.folio}', '${p.cliente}', '${p.direccion_completa}', '${p.referencias || ''}', '${stringRopa}')" class="text-[10px] font-bold text-white bg-indigo-600 px-4 py-2 rounded-lg shadow hover:bg-indigo-700 transition-colors uppercase tracking-wider flex items-center gap-1 w-full justify-center"><span class="text-sm">🖨️</span> Imprimir Etiqueta</button>` : '';
+
                 const btnWhatsApp = esPagado ? `<button onclick="marcarEnviado(${p.id}, '${p.folio}', '${p.telefono}', '${p.cliente}')" class="text-[10px] font-bold text-white bg-emerald-500 px-4 py-2 rounded-lg shadow hover:bg-emerald-600 transition-colors uppercase tracking-wider flex items-center gap-1 mt-2 w-full justify-center"><span class="text-sm">💬</span> Notificar Envío por WA</button>` : '';
+
                 grid.innerHTML += `
                     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
                         <div class="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
@@ -152,10 +161,10 @@
                         </div>
                         <div class="p-5 flex-1">
                             <p class="text-sm font-bold text-gray-800 mb-1">${p.cliente} <span class="text-xs font-normal text-gray-400">(${p.telefono})</span></p>
-                            <div class="bg-indigo-50 p-3 rounded-lg mb-4 mt-3 flex flex-col gap-2">
-                                <p class="text-xs text-indigo-900 leading-relaxed font-medium">${p.direccion_completa}<br><span class="text-indigo-400 italic">Ref: ${p.referencias || 'Ninguna'}</span></p>
+                            <div class="bg-indigo-50 p-3 rounded-lg mb-4 mt-3 flex flex-col">
+                                <p class="text-xs text-indigo-900 leading-relaxed font-medium mb-3">${p.direccion_completa}<br><span class="text-indigo-400 italic">Ref: ${p.referencias || 'Ninguna'}</span></p>
                                 ${btnPDF}
-                                ${btnWhatsApp} <!-- AQUÍ VA EL NUEVO BOTÓN -->
+                                ${btnWhatsApp}
                             </div>
                             <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Artículos comprados:</p>
                             <ul class="mb-2">${listaRopa}</ul>
@@ -287,7 +296,7 @@
                 }
             }
         }
-        
+
         function renderizarInventario(pantalones) {
             const tbody = document.getElementById('tbody-inventario');
             tbody.innerHTML = '';
