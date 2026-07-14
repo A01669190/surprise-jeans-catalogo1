@@ -430,6 +430,8 @@
             </div>
 
             <div class="p-8">
+                
+                <!-- FORMULARIO DE LOGIN -->
                 <div id="form-login" class="space-y-4">
                     <div>
                         <label class="block text-xs font-bold text-gray-500 mb-1">Correo Electrónico</label>
@@ -439,14 +441,18 @@
                         <label class="block text-xs font-bold text-gray-500 mb-1">Contraseña</label>
                         <input type="password" id="login-pass" class="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-600 outline-none text-sm">
                     </div>
-                    <button onclick="procesarLoginCliente()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3.5 rounded-lg shadow-md transition-all mt-4">
-                        Entrar
+                    
+                    <!-- Botón de Olvidé mi contraseña alineado a la derecha -->
                     <div class="flex justify-end mt-1 mb-4">
                         <button onclick="recuperarPassword()" type="button" class="text-xs text-indigo-600 font-bold hover:underline">¿Olvidaste tu contraseña?</button>
                     </div>
+
+                    <button onclick="procesarLoginCliente()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3.5 rounded-lg shadow-md transition-all mt-4">
+                        Entrar
                     </button>
                 </div>
 
+                <!-- FORMULARIO DE REGISTRO -->
                 <div id="form-registro" class="space-y-4 hidden">
                     <div>
                         <label class="block text-xs font-bold text-gray-500 mb-1">Nombre Completo</label>
@@ -471,6 +477,7 @@
                     </button>
                 </div>
                 
+                <!-- ÁREA DE SESIÓN ACTIVA Y COMPRAS -->
                 <div id="area-sesion-activa" class="hidden py-2">
                     <div class="text-center mb-6">
                         <div class="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-2">
@@ -487,6 +494,7 @@
                 </div>
 
             </div>
+
         </div>
     </div>
 
