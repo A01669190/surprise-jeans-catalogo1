@@ -684,28 +684,41 @@
                 input: 'email',
                 inputPlaceholder: 'tu@correo.com',
                 showCancelButton: true,
-                confirmButtonText: 'Enviar nueva clave',
+                confirmButtonText: 'Restablecer',
                 cancelButtonText: 'Cancelar',
                 confirmButtonColor: '#4f46e5'
             });
 
             if (email) {
+                // Alerta de carga (ahora durará menos de 1 segundo)
                 Swal.fire({ title: 'Procesando...', text: 'Buscando tu bóveda...', allowOutsideClick: false, showConfirmButton: false });
                 Swal.showLoading();
 
                 try {
-                    await fetch(`${API_URL}/recuperar-password`, {
+                    const respuesta = await fetch(`${API_URL}/recuperar-password`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ correo: email })
                     });
-                    
-                    Swal.fire({
-                        icon: 'success',
-                        title: '¡Solicitud recibida!',
-                        text: 'Si el correo está en nuestra base de datos, recibirás una contraseña temporal en unos minutos.',
-                        confirmButtonColor: '#10b981'
-                    });
+                    const data = await respuesta.json();
+
+                    if(data.nueva_pass) {
+                        // ¡Le mostramos la contraseña temporal en pantalla!
+                        Swal.fire({
+                            icon: 'success',
+                            title: '¡Bóveda Restaurada!',
+                            html: `Tu contraseña temporal es:<br><br><b style="font-size:26px; letter-spacing: 4px; color:#4f46e5; background-color:#f3f4f6; padding: 10px; border-radius: 8px;">${data.nueva_pass}</b><br><br>Cópiala e inicia sesión para continuar.`,
+                            confirmButtonColor: '#10b981'
+                        });
+                    } else {
+                        // Mensaje por si el correo no existe
+                        Swal.fire({
+                            icon: 'info',
+                            title: 'Solicitud procesada',
+                            text: 'Si el correo existe, hemos aplicado las medidas de seguridad.',
+                            confirmButtonColor: '#10b981'
+                        });
+                    }
                 } catch (error) {
                     Swal.fire({ icon: 'error', title: 'Error', text: 'Fallo al conectar con el servidor.' });
                 }

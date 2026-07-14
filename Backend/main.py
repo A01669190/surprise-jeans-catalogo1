@@ -89,15 +89,15 @@ def verificar_password(plain_password: str, hashed_password: str):
 # ==========================================
 @app.post("/registro")
 def registrar_cliente(cliente: schemas.ClienteRegistro, db: Session = Depends(get_db)):
-    # 1. Verificamos que el correo no esté duplicado
+    # 1. Verificación
     db_cliente = db.query(models.Cliente).filter(models.Cliente.correo == cliente.correo).first()
     if db_cliente:
         raise HTTPException(status_code=400, detail="Este correo ya está registrado.")
     
-    # 2. Encriptamos la contraseña
+    # 2. Encriptación
     password_encriptada = obtener_hash_password(cliente.password)
     
-    # 3. Guardamos en la bóveda
+    # 3. Guardado en Bóveda
     nuevo_cliente = models.Cliente(
         nombre_completo=cliente.nombre_completo,
         correo=cliente.correo,
@@ -107,48 +107,7 @@ def registrar_cliente(cliente: schemas.ClienteRegistro, db: Session = Depends(ge
     db.add(nuevo_cliente)
     db.commit()
 
-    # ==========================================
-    # 4. ENVÍO DE CORREO DE BIENVENIDA
-    # ==========================================
-    try:
-        # Configuración del remitente
-        remitente = GMAIL_USER 
-        password_app = GMAIL_PASSWORD
-        # Armado del mensaje profesional
-        mensaje = MIMEMultipart("alternative")
-        mensaje["Subject"] = "¡Bienvenido a Surprise Jeans! 🎉"
-        mensaje["From"] = f"Surprise Jeans <{remitente}>"
-        mensaje["To"] = cliente.correo
-
-        html = f"""
-        <html>
-          <body style="font-family: Arial, sans-serif; color: #333;">
-            <div style="max-w: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-                <h2 style="color: #4f46e5; font-style: italic;">Surprise Jeans</h2>
-                <h3>¡Hola {cliente.nombre_completo}!</h3>
-                <p>Gracias por crear tu cuenta con nosotros. Tu información de envío está segura en nuestra plataforma.</p>
-                <p>A partir de ahora, realizar tus compras de mayoreo y menudeo será mucho más rápido.</p>
-                <br>
-                <p>Cualquier duda, estamos a tus órdenes en nuestro WhatsApp de soporte.</p>
-                <p><strong>El equipo de Surprise Jeans</strong></p>
-            </div>
-          </body>
-        </html>
-        """
-        mensaje.attach(MIMEText(html, "html"))
-
-        # Conexión al servidor de Gmail y envío
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()
-        server.login(remitente, password_app)
-        server.sendmail(remitente, cliente.correo, mensaje.as_string())
-        server.quit()
-        
-    except Exception as e:
-        print("Error al enviar correo:", e)
-        # No detenemos el registro si falla el correo, solo lo imprimimos en consola
-        pass 
-
+    # NOTA: Motor de correo desactivado para evitar el bloqueo del puerto 587 en Render Gratuito.
     return {"mensaje": "Cuenta creada con éxito."}
 
 @app.post("/login-cliente")
@@ -212,54 +171,20 @@ async def recuperar_password(request: Request, db: Session = Depends(get_db)):
     correo = data.get("correo")
     cliente = db.query(models.Cliente).filter(models.Cliente.correo == correo).first()
     
-    # Por seguridad, si el correo no existe, igual decimos que se envió (para evitar hackeos de rastreo)
+    # Seguridad anti-rastreo
     if not cliente:
-        return {"mensaje": "Proceso completado."}
+        return {"mensaje": "Proceso completado.", "nueva_pass": None}
     
-    # 1. Generamos contraseña temporal de 8 letras/números
+    # 1. Generamos contraseña temporal
     caracteres = string.ascii_letters + string.digits
     nueva_pass = ''.join(random.choice(caracteres) for i in range(8))
     
-    # 2. La encriptamos y la guardamos en la bóveda
+    # 2. Guardamos en la bóveda
     cliente.password_hash = obtener_hash_password(nueva_pass)
     db.commit()
 
-    # 3. Se la enviamos por correo al cliente
-    try:
-        remitente = GMAIL_USER 
-        password_app = GMAIL_PASSWORD
-        mensaje = MIMEMultipart("alternative")
-        mensaje["Subject"] = "🔐 Recuperación de Contraseña - Surprise Jeans"
-        mensaje["From"] = f"Surprise Jeans <{remitente}>"
-        mensaje["To"] = cliente.correo
-
-        html = f"""
-        <html>
-          <body style="font-family: Arial, sans-serif; color: #333;">
-            <div style="max-w: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-                <h2 style="color: #4f46e5; font-style: italic;">Surprise Jeans</h2>
-                <h3>¡Hola {cliente.nombre_completo}!</h3>
-                <p>Solicitaste restablecer tu contraseña. Tu nueva <strong>contraseña temporal</strong> es:</p>
-                <div style="background-color: #f3f4f6; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 3px; border-radius: 8px;">
-                    {nueva_pass}
-                </div>
-                <p>Te recomendamos iniciar sesión con esta contraseña. Tu bóveda sigue segura.</p>
-                <br>
-                <p><strong>El equipo de Surprise Jeans</strong></p>
-            </div>
-          </body>
-        </html>
-        """
-        mensaje.attach(MIMEText(html, "html"))
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()
-        server.login(remitente, password_app)
-        server.sendmail(remitente, cliente.correo, mensaje.as_string())
-        server.quit()
-    except Exception as e:
-        print("Error al enviar correo de recuperación:", e)
-
-    return {"mensaje": "Proceso completado."}
+    # 3. Devolvemos la clave a la página web directamente
+    return {"mensaje": "Proceso completado.", "nueva_pass": nueva_pass}
 
 @app.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
