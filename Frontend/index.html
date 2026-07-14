@@ -725,43 +725,87 @@
             }
         }
 
-        async function cargarMisPedidos() {
+       async function cargarMisPedidos() {
             const token = localStorage.getItem('token_cliente_sj');
             if(!token) return;
             
             try {
-                const respuesta = await fetch(`${API_URL}/mis-pedidos`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                
+                const respuesta = await fetch(`${API_URL}/mis-pedidos`, { headers: { 'Authorization': `Bearer ${token}` }});
                 const listaDiv = document.getElementById('lista-mis-pedidos');
+                
                 if(respuesta.ok) {
                     const pedidos = await respuesta.json();
                     if(pedidos.length === 0) {
                         listaDiv.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">Aún no tienes compras registradas.</p>';
                     } else {
                         listaDiv.innerHTML = pedidos.map(p => `
-                            <div class="bg-gray-50 p-3 rounded-lg flex justify-between items-center border border-gray-100">
-                                <div>
-                                    <p class="font-bold text-sm text-indigo-900">${p.folio}</p>
-                                    <p class="text-[10px] text-gray-500">${p.fecha}</p>
-                                </div>
-                                <div class="text-right">
+                            <div class="bg-gray-50 p-3 rounded-lg border border-gray-100 mb-3">
+                                <div class="flex justify-between items-center border-b border-gray-200 pb-2 mb-2">
+                                    <div>
+                                        <p class="font-bold text-sm text-indigo-900">${p.folio}</p>
+                                        <p class="text-[10px] font-bold ${p.estatus === 'PAGADO' || p.estatus === 'ENVIADO' ? 'text-emerald-500' : 'text-amber-500'}">${p.estatus}</p>
+                                    </div>
                                     <p class="font-black text-gray-900">$${p.total.toFixed(2)}</p>
-                                    <p class="text-[10px] font-bold ${p.estatus === 'PAGADO' ? 'text-emerald-500' : 'text-amber-500'}">${p.estatus}</p>
+                                </div>
+                                <div class="space-y-2">
+                                    ${p.ropa.map(ropa => `
+                                        <div class="flex justify-between items-center text-xs">
+                                            <span class="text-gray-600 truncate max-w-[150px]">${ropa.nombre}</span>
+                                            ${(p.estatus === 'PAGADO' || p.estatus === 'ENVIADO') ? `<button onclick="abrirModalResena(${ropa.id}, '${ropa.nombre}')" class="text-[10px] bg-indigo-100 text-indigo-600 font-bold px-2 py-1 rounded hover:bg-indigo-600 hover:text-white transition-colors">⭐ Calificar</button>` : ''}
+                                        </div>
+                                    `).join('')}
                                 </div>
                             </div>
                         `).join('');
                     }
-                } else {
-                    listaDiv.innerHTML = '<p class="text-xs text-rose-400 text-center py-4">Tu sesión expiró.</p>';
-                    cerrarSesionCliente();
-                }
-            } catch(error) {
-                document.getElementById('lista-mis-pedidos').innerHTML = '<p class="text-xs text-rose-400 text-center py-4">Error al cargar historial.</p>';
-            }
+                } else { cerrarSesionCliente(); }
+            } catch(error) { console.log("Error al cargar historial."); }
         }
 
+        async function abrirModalResena(pantalonId, nombrePantalon) {
+            const token = localStorage.getItem('token_cliente_sj');
+            const { value: formValues } = await Swal.fire({
+                title: `Calificar producto`,
+                html: `
+                    <p class="text-sm text-gray-600 font-bold mb-4">${nombrePantalon}</p>
+                    <div class="mb-4">
+                        <select id="swal-estrellas" class="w-full p-3 border border-gray-300 rounded-lg text-sm text-center outline-none focus:ring-2 focus:ring-indigo-600">
+                            <option value="5">⭐⭐⭐⭐⭐ ¡Me encantó!</option>
+                            <option value="4">⭐⭐⭐⭐ Muy bueno</option>
+                            <option value="3">⭐⭐⭐ Normal</option>
+                            <option value="2">⭐⭐ No me convenció</option>
+                            <option value="1">⭐ Malo</option>
+                        </select>
+                    </div>
+                    <textarea id="swal-comentario" placeholder="¿Qué te pareció el fit, la tela, la talla? (Opcional)" class="w-full p-3 border border-gray-300 rounded-lg text-sm h-24 resize-none outline-none focus:ring-2 focus:ring-indigo-600"></textarea>
+                `,
+                focusConfirm: false, showCancelButton: true, confirmButtonText: 'Publicar Reseña', cancelButtonText: 'Cancelar', confirmButtonColor: '#4f46e5',
+                preConfirm: () => {
+                    return {
+                        calificacion: parseInt(document.getElementById('swal-estrellas').value),
+                        comentario: document.getElementById('swal-comentario').value
+                    }
+                }
+            });
+
+            if (formValues) {
+                Swal.fire({ title: 'Enviando...', allowOutsideClick: false, showConfirmButton: false }); Swal.showLoading();
+                try {
+                    const res = await fetch(`${API_URL}/pantalones/${pantalonId}/resenas`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify(formValues)
+                    });
+                    const data = await res.json();
+                    if(res.ok) {
+                        Swal.fire({ icon: 'success', title: '¡Gracias!', text: data.mensaje, confirmButtonColor: '#10b981' });
+                        cargarCatalogo(); // Recargamos para que aparezcan las estrellas en la página
+                    } else {
+                        Swal.fire({ icon: 'warning', title: 'Oops...', text: data.detail, confirmButtonColor: '#4f46e5' });
+                    }
+                } catch(e) { Swal.fire({ icon: 'error', title: 'Error', text: 'Problema de conexión' }); }
+            }
+        }
         async function recuperarPassword() {
             const { value: email } = await Swal.fire({
                 title: 'Recuperar contraseña',
@@ -843,12 +887,18 @@
                 grid.innerHTML = '<p class="text-center col-span-full text-stone-500 py-10">No encontramos modelos con esa búsqueda.</p>';
                 return;
             }
-
-            listaPantalones.forEach(p => {
+listaPantalones.forEach(p => {
                 const estaAgotado = p.stock === 0;
                 const filtroImagen = estaAgotado ? 'grayscale opacity-50' : 'transform group-hover:scale-105 transition-transform duration-500';
                 const etiquetaAgotado = estaAgotado ? '<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-600 text-white text-lg font-black px-6 py-2 rounded-xl shadow-2xl tracking-widest z-20 -rotate-12 border-2 border-white">AGOTADO</div>' : '';
                 
+                // ⚡ LÓGICA DE ESTRELLAS
+                const ratingDOM = p.promedio_estrellas > 0 
+                    ? `<div class="flex items-center gap-1 text-xs text-amber-400 font-black mb-1">
+                        ${'⭐'.repeat(Math.round(p.promedio_estrellas))} <span class="text-gray-400 font-medium">(${p.total_resenas})</span>
+                       </div>`
+                    : `<p class="text-[10px] text-gray-400 italic mb-1">Nuevo modelo</p>`;
+
                 const botonAccion = estaAgotado
                     ? `<button disabled class="w-full bg-gray-200 text-gray-400 font-bold py-3 rounded-xl cursor-not-allowed text-sm uppercase tracking-wider">Sin existencias</button>`
                     : `<button onclick="agregarAlCarrito(${p.id})" class="w-full bg-stone-100 hover:bg-stone-900 text-stone-900 hover:text-white font-bold py-3 rounded-xl transition-colors text-sm shadow-sm">Añadir a la bolsa</button>`;
@@ -865,6 +915,7 @@
                         </div>
                     </div>
                     <div class="p-5">
+                        ${ratingDOM}
                         <h3 class="font-bold text-stone-800 text-lg uppercase leading-tight mb-2 truncate" title="${p.nombre}">${p.nombre}</h3>
                         <div class="flex justify-between items-end mb-4">
                             <p class="text-2xl font-black text-stone-900">$${p.precio}</p>

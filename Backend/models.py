@@ -19,7 +19,33 @@ class Pantalon(Base):
     stock = Column(Integer, default=0)
     imagen_url = Column(String)
     categoria_id = Column(Integer, ForeignKey("categorias.id"))
+    
     categoria = relationship("Categoria", back_populates="pantalones")
+    # ⚡ CONECTAMOS LAS RESEÑAS
+    resenas = relationship("Resena", back_populates="pantalon", cascade="all, delete-orphan")
+    detalles = relationship("DetallePedido", back_populates="pantalon")
+
+    # ⚡ CALCULADORA AUTOMÁTICA DE ESTRELLAS
+    @property
+    def promedio_estrellas(self):
+        if not self.resenas: return 0.0
+        return sum(r.calificacion for r in self.resenas) / len(self.resenas)
+
+    @property
+    def total_resenas(self):
+        return len(self.resenas)
+
+class Resena(Base):
+    __tablename__ = "resenas"
+    id = Column(Integer, primary_key=True, index=True)
+    pantalon_id = Column(Integer, ForeignKey("pantalones.id"))
+    cliente_id = Column(Integer, ForeignKey("clientes.id"))
+    calificacion = Column(Integer) # Del 1 al 5
+    comentario = Column(String, nullable=True)
+    fecha = Column(DateTime, default=datetime.datetime.utcnow)
+
+    pantalon = relationship("Pantalon", back_populates="resenas")
+    cliente = relationship("Cliente")
 
 # ==========================================
 # TABLAS DE SEGURIDAD (PEDIDOS)
@@ -46,10 +72,12 @@ class DetallePedido(Base):
     pantalon_id = Column(Integer, ForeignKey("pantalones.id"))
     cantidad = Column(Integer)
     precio_unitario = Column(Float)
+    
     pedido = relationship("Pedido", back_populates="detalles")
+    pantalon = relationship("Pantalon", back_populates="detalles")
 
 # ==========================================
-# TABLA DE CLIENTES (USUARIOS REGISTRADOS)
+# TABLA DE CLIENTES Y CUPONES (Sin cambios)
 class Cliente(Base):
     __tablename__ = "clientes"
     id = Column(Integer, primary_key=True, index=True)
@@ -57,20 +85,15 @@ class Cliente(Base):
     correo = Column(String, unique=True, index=True)
     password_hash = Column(String)
     telefono = Column(String, nullable=True)
-    
     calle_numero = Column(String, nullable=True)
     colonia = Column(String, nullable=True)
     ciudad = Column(String, nullable=True)
     estado = Column(String, nullable=True)
     codigo_postal = Column(String, nullable=True)
     referencias_domicilio = Column(String, nullable=True)
-    
-    puntos = Column(Float, default=0.0) # Bóveda de Surprise Points
-    
+    puntos = Column(Float, default=0.0)
     fecha_registro = Column(DateTime, default=datetime.datetime.utcnow)
 
-# ==========================================
-# TABLA DE CUPONES DE DESCUENTO
 class Cupon(Base):
     __tablename__ = "cupones"
     id = Column(Integer, primary_key=True, index=True)

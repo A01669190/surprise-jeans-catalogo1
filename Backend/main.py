@@ -251,16 +251,17 @@ def obtener_mis_pedidos(correo: str = Depends(verificar_token_cliente), db: Sess
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
     
-    # Buscamos los pedidos que coincidan con el celular del cliente registrado
     pedidos = db.query(models.Pedido).filter(models.Pedido.telefono == cliente.telefono).order_by(models.Pedido.fecha.desc()).all()
     
     resultado = []
     for p in pedidos:
+        ropa_comprada = [{"id": d.pantalon_id, "nombre": d.pantalon.nombre if d.pantalon else "Modelo"} for d in p.detalles]
         resultado.append({
             "folio": f"SJ-{p.id:04d}",
             "fecha": p.fecha.strftime("%d/%m/%Y"),
             "total": p.total,
-            "estatus": p.estatus
+            "estatus": p.estatus,
+            "ropa": ropa_comprada
         })
     return resultado
 

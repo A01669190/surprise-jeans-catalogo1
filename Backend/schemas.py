@@ -18,11 +18,18 @@ class PantalonRespuesta(BaseModel):
     imagen_url: str
     categoria_id: int
     stock: int
+    promedio_estrellas: float = 0.0  # ⚡ NUEVO
+    total_resenas: int = 0          # ⚡ NUEVO
     class Config:
         from_attributes = True
 
+# ⚡ NUEVO: ESQUEMA DE RESEÑAS
+class ResenaCrear(BaseModel):
+    calificacion: int
+    comentario: Optional[str] = None
+
 # ==========================================
-# ESQUEMAS PARA LA BÓVEDA FINANCIERA
+# ESQUEMAS PARA LA BÓVEDA FINANCIERA Y CLIENTES (Sin cambios)
 class ItemCarrito(BaseModel):
     id: int
     nombre: str
@@ -49,8 +56,6 @@ class PedidoSeguro(BaseModel):
 class ValidarCuponReq(BaseModel):
     codigo: str
 
-# ==========================================
-# ESQUEMAS DE CLIENTES Y ADMIN
 class ClienteRegistro(BaseModel):
     nombre_completo: str
     correo: str
