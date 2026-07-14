@@ -262,6 +262,56 @@
                 } catch (e) { Swal.fire({icon: 'error', title: 'Error', text: 'Error de conexión.'}); }
             }
         }
+        async function marcarEnviado(id, folio, telefono, cliente) {
+            // 1. Pedimos el número de guía
+            const { value: guia } = await Swal.fire({
+                title: 'Confirmar Envío 📦', 
+                text: 'Ingresa el número de guía o paquetería (Opcional):',
+                input: 'text', 
+                showCancelButton: true, 
+                confirmButtonText: 'Notificar y Enviar', 
+                confirmButtonColor: '#10b981',
+                cancelButtonText: 'Cancelar'
+            });
+
+            if (guia !== undefined) {
+                Swal.fire({ title: 'Procesando...', allowOutsideClick: false, showConfirmButton: false });
+                Swal.showLoading();
+
+                try {
+                    // 2. Le avisamos a la Base de Datos que ya se envió
+                    const res = await fetch(`${API_URL}/pedidos/${id}/enviar`, {
+                        method: 'PATCH', 
+                        headers: { 'Authorization': `Bearer ${tokenPrivado}` }
+                    });
+
+                    if (res.ok) {
+                        // 3. Limpiamos el teléfono (quitamos espacios o guiones)
+                        let telLimpio = telefono.replace(/\D/g, '');
+                        if (telLimpio.length === 10) telLimpio = '52' + telLimpio; // Agregamos lada de México si no la tiene
+
+                        // 4. Armamos el mensaje automático
+                        let texto = `¡Hola ${cliente}! 👋 Somos de *Surprise Jeans*.\n\nTe avisamos que tu pedido *${folio}* ya va en camino hacia ti 🚀.\n\n`;
+                        if (guia.trim() !== "") texto += `📦 Tu número de rastreo es: *${guia}*\n\n`;
+                        texto += `¡Gracias por tu compra!`;
+
+                        const urlWA = `https://api.whatsapp.com/send?phone=${telLimpio}&text=${encodeURIComponent(texto)}`;
+                        
+                        Swal.fire({ icon: 'success', title: '¡Estatus Actualizado!', text: 'Abriendo WhatsApp...', timer: 1500, showConfirmButton: false });
+
+                        // 5. Truco para evitar que Chrome bloquee la pestaña de WhatsApp
+                        setTimeout(() => { 
+                            window.open(urlWA, '_blank'); 
+                            cargarPedidos(); // Recargamos las tarjetas para que se pinte de morado
+                        }, 1500);
+                    } else {
+                        Swal.fire({icon: 'error', title: 'Error', text: 'No se pudo actualizar el estatus.'}); 
+                    }
+                } catch (e) { 
+                    Swal.fire({icon: 'error', title: 'Error', text: 'Error de conexión con el servidor.'}); 
+                }
+            }
+        }
 
         // ==========================================
         // CONTROL RÁPIDO DE INVENTARIO
