@@ -619,24 +619,7 @@
             document.getElementById('overlay-menu').classList.add('hidden');
         }
 
-        // ==========================================
-        // UI: TOGGLE MAYOREO / MENUDEO (Opción A)
-        // ==========================================
-        function cambiarModo(modo) {
-            const btnMenudeo = document.getElementById('btn-menudeo');
-            const btnMayoreo = document.getElementById('btn-mayoreo');
 
-            if (modo === 'mayoreo') {
-                // Alerta al cliente y teletransporte a WhatsApp
-                alert("📦 ¡Venta de Mayoreo!\n\nEl mayoreo es a partir de 1 paquete cerrado (12 piezas con curva de tallas completa).\n\nSerás redirigido a nuestro WhatsApp oficial para verificar existencias y armar tu paquete.");
-                window.open("https://wa.me/525513220695?text=Hola,%20me%20interesa%20comprar%20por%20paquete%20cerrado%20(Mayoreo).", "_blank");
-
-                // Regresamos el botón visualmente a menudeo para no bloquear el catálogo
-                btnMenudeo.className = "px-6 py-1.5 rounded-md text-sm font-bold bg-white text-gray-900 shadow-sm transition-all";
-                btnMayoreo.className = "px-6 py-1.5 rounded-md text-sm font-bold text-gray-500 hover:text-gray-900 transition-all";
-            }
-        }
-        
         // (Opcional) Abrir el modal de login de cliente que construiremos después
         function abrirPerfilCliente() {
             alert("El área de clientes está en construcción. 🚧");
