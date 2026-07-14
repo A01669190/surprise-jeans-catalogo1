@@ -28,7 +28,7 @@ class Pantalon(Base):
     @property
     def promedio_estrellas(self):
         # 1. Filtramos en secreto: Solo tomamos en cuenta reseñas de 3, 4 o 5 estrellas
-        resenas_buenas = [r for r in self.resenas if r.calificacion >= 4]
+        resenas_buenas = [r for r in self.resenas if r.calificacion >= 3]
         
         if not resenas_buenas: return 0.0
         # 2. Calculamos el promedio solo usando las buenas
