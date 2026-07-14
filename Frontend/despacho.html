@@ -5,42 +5,69 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Centro de Despacho | Surprise Jeans</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Librerías de PDF y Alertas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans p-6">
 
-    <div class="max-w-5xl mx-auto">
-        <header class="flex justify-between items-center mb-8 bg-white p-6 rounded-2xl shadow-sm">
+    <div class="max-w-6xl mx-auto">
+        <header class="flex justify-between items-center mb-6 bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
             <div>
-                <h1 class="text-2xl font-black text-indigo-600">Centro de Despacho 📦</h1>
-                <p class="text-xs text-gray-500 mt-1">Gestión de envíos y paquetería</p>
+                <h1 class="text-2xl font-black text-indigo-600">Admin <span class="text-gray-900">Surprise Jeans</span> 📦</h1>
+                <p class="text-xs text-gray-500 mt-1">Gestión de envíos y control de inventario</p>
             </div>
-            <button onclick="cerrarSesion()" class="text-sm font-bold text-rose-500 hover:text-rose-700">Cerrar Sesión</button>
+            <div id="nav-botones" class="hidden flex gap-4">
+                <button onclick="cambiarPestana('pedidos')" id="tab-pedidos" class="bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg text-sm shadow">Pedidos</button>
+                <button onclick="cambiarPestana('inventario')" id="tab-inventario" class="bg-white text-gray-600 border border-gray-300 font-bold py-2 px-6 rounded-lg text-sm hover:bg-gray-50 transition-colors">Inventario</button>
+                <button onclick="cerrarSesion()" class="text-sm font-bold text-rose-500 hover:text-rose-700 ml-4">Salir</button>
+            </div>
         </header>
 
-        <div id="pantalla-login" class="bg-white p-8 rounded-2xl shadow-sm max-w-sm mx-auto mt-20 hidden">
+        <!-- LOGIN -->
+        <div id="pantalla-login" class="bg-white p-8 rounded-2xl shadow-sm border border-gray-200 max-w-sm mx-auto mt-20">
             <h2 class="text-xl font-bold text-center mb-6">Acceso a Almacén</h2>
-            <input type="text" id="user" value="admin" class="hidden">
-            <input type="password" id="pass" placeholder="Contraseña de Yessica" class="w-full p-3 border rounded-lg mb-4 outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
-            <button onclick="iniciarSesion()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700">Entrar</button>
+            <input type="password" id="pass" placeholder="Contraseña Maestra" class="w-full p-3 border rounded-lg mb-4 outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+            <button onclick="iniciarSesion()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 shadow-md">Entrar</button>
         </div>
 
+        <!-- PANEL DE PEDIDOS -->
         <div id="pantalla-pedidos" class="hidden">
             <div id="grid-pedidos" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                </div>
+                <!-- Se llena con JS -->
+            </div>
         </div>
+
+        <!-- PANEL DE INVENTARIO -->
+        <div id="pantalla-inventario" class="hidden">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                    <h3 class="font-bold text-gray-800">Control Rápido de Stock</h3>
+                    <p class="text-xs text-gray-500">Los cambios se guardan al instante en la base de datos.</p>
+                </div>
+                <div class="overflow-x-auto h-[600px] overflow-y-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-indigo-900 text-white sticky top-0 z-10 text-xs uppercase tracking-wider">
+                            <tr>
+                                <th class="p-4">Modelo</th>
+                                <th class="p-4 text-center">Precio ($)</th>
+                                <th class="p-4 text-center">Existencias</th>
+                                <th class="p-4 text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-inventario">
+                            <!-- Se llena con JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script>
         const API_URL = 'https://surprise-jeans-api-denz.onrender.com';
-        
-        // 🚨 LA BOVEDA VOLÁTIL: El token ahora vive solo en la memoria temporal
         let tokenPrivado = null; 
-
-        document.addEventListener('DOMContentLoaded', () => {
-            // Siempre que se abra o se recargue la página, exigimos contraseña
-            document.getElementById('pantalla-login').classList.remove('hidden');
-            document.getElementById('pantalla-pedidos').classList.add('hidden');
-        });
 
         async function iniciarSesion() {
             const pass = document.getElementById('pass').value;
@@ -49,114 +76,226 @@
             formData.append('password', pass);
 
             try {
-                const respuesta = await fetch(`${API_URL}/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: formData
-                });
-
-                if (respuesta.ok) {
-                    const data = await respuesta.json();
-                    
-                    // Guardamos la llave solo en la variable temporal, no en el navegador
+                const res = await fetch(`${API_URL}/login`, { method: 'POST', body: formData });
+                if (res.ok) {
+                    const data = await res.json();
                     tokenPrivado = data.access_token; 
                     
                     document.getElementById('pantalla-login').classList.add('hidden');
-                    document.getElementById('pass').value = ''; // Borramos lo que escribió por seguridad
+                    document.getElementById('nav-botones').classList.remove('hidden');
+                    document.getElementById('pass').value = ''; 
                     
-                    mostrarPanel(tokenPrivado);
+                    cambiarPestana('pedidos');
                 } else {
-                    alert("Contraseña incorrecta.");
+                    Swal.fire({icon: 'error', title: 'Acceso Denegado', text: 'Contraseña incorrecta'});
                 }
             } catch (error) {
-                alert("Error de conexión al servidor.");
+                Swal.fire({icon: 'error', title: 'Error', text: 'Fallo de conexión al servidor'});
             }
         }
 
-        function cerrarSesion() {
-            tokenPrivado = null; // Destruimos la llave
-            window.location.reload(); // Obligamos al reinicio de la página
-        }
+        function cerrarSesion() { window.location.reload(); }
 
-        async function mostrarPanel(token) {
-            document.getElementById('pantalla-pedidos').classList.remove('hidden');
+        function cambiarPestana(pestana) {
+            const btnPedidos = document.getElementById('tab-pedidos');
+            const btnInv = document.getElementById('tab-inventario');
             
-            try {
-                const respuesta = await fetch(`${API_URL}/pedidos-admin`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-
-                if (respuesta.ok) {
-                    const pedidos = await respuesta.json();
-                    renderizarPedidos(pedidos);
-                } else {
-                    cerrarSesion(); // Si expiró la sesión, lo expulsa
-                }
-            } catch (error) {
-                console.error("Error al obtener pedidos", error);
+            if(pestana === 'pedidos') {
+                btnPedidos.className = "bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg text-sm shadow transition-colors";
+                btnInv.className = "bg-white text-gray-600 border border-gray-300 font-bold py-2 px-6 rounded-lg text-sm hover:bg-gray-50 transition-colors";
+                document.getElementById('pantalla-pedidos').classList.remove('hidden');
+                document.getElementById('pantalla-inventario').classList.add('hidden');
+                cargarPedidos();
+            } else {
+                btnInv.className = "bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg text-sm shadow transition-colors";
+                btnPedidos.className = "bg-white text-gray-600 border border-gray-300 font-bold py-2 px-6 rounded-lg text-sm hover:bg-gray-50 transition-colors";
+                document.getElementById('pantalla-inventario').classList.remove('hidden');
+                document.getElementById('pantalla-pedidos').classList.add('hidden');
+                cargarInventario();
             }
         }
 
-        // ... (Tus funciones renderizarPedidos y copiarDireccion se quedan exactamente igual)
+        // ==========================================
+        // MÓDULO 1: PEDIDOS Y ETIQUETAS PDF
+        // ==========================================
+        async function cargarPedidos() {
+            try {
+                const res = await fetch(`${API_URL}/pedidos-admin`, { headers: { 'Authorization': `Bearer ${tokenPrivado}` } });
+                if (res.ok) renderizarPedidos(await res.json());
+                else cerrarSesion();
+            } catch (e) { console.error(e); }
+        }
+
         function renderizarPedidos(pedidos) {
             const grid = document.getElementById('grid-pedidos');
             grid.innerHTML = '';
 
             if(pedidos.length === 0) {
-                grid.innerHTML = '<p class="text-gray-500 col-span-2 text-center mt-10">Aún no hay pedidos registrados.</p>';
-                return;
+                grid.innerHTML = '<p class="text-gray-500 col-span-full text-center py-10">Aún no hay pedidos registrados.</p>'; return;
             }
 
             pedidos.forEach(p => {
                 const esPagado = p.estatus === "PAGADO";
                 const colorBadge = esPagado ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-amber-100 text-amber-700 border-amber-200";
-                const iconoAviso = esPagado ? "✅ LISTO PARA ENVÍO" : "⏳ ESPERANDO PAGO";
-
+                
                 let listaRopa = p.detalles.map(d => `<li class="text-xs text-gray-600 border-b border-gray-50 pb-1 mt-1 font-medium">• ${d.cantidad}x [${d.codigo}] ${d.nombre}</li>`).join('');
-
-                const textoParaCopiar = `NOMBRE: ${p.cliente}\nTELÉFONO: ${p.telefono}\nDIRECCIÓN: ${p.direccion_completa}\nREFERENCIAS: ${p.referencias}`;
+                
+                // Limpiamos los datos para mandarlos al generador PDF
+                const stringRopa = p.detalles.map(d => `${d.cantidad}x [${d.codigo}] ${d.nombre}`).join('<br>');
+                const btnPDF = esPagado ? `<button onclick="generarTicketPDF('${p.folio}', '${p.cliente}', '${p.direccion_completa}', '${p.referencias}', '${stringRopa}')" class="text-[10px] font-bold text-white bg-indigo-600 px-4 py-2 rounded-lg shadow hover:bg-indigo-700 transition-colors uppercase tracking-wider flex items-center gap-1"><span class="text-sm">🖨️</span> Imprimir Etiqueta</button>` : '';
 
                 grid.innerHTML += `
-                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
-                        <div class="p-4 border-b border-gray-50 flex justify-between items-center bg-gray-50">
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+                        <div class="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                             <span class="font-black text-indigo-900">${p.folio}</span>
-                            <span class="text-[10px] font-bold px-3 py-1 rounded-full border ${colorBadge}">${iconoAviso}</span>
+                            <span class="text-[10px] font-bold px-3 py-1 rounded-full border ${colorBadge}">${p.estatus}</span>
                         </div>
-                        
                         <div class="p-5 flex-1">
                             <p class="text-sm font-bold text-gray-800 mb-1">${p.cliente} <span class="text-xs font-normal text-gray-400">(${p.telefono})</span></p>
-                            
-                            <div class="bg-indigo-50 p-3 rounded-lg mb-4 mt-3">
-                                <p class="text-xs text-indigo-900 leading-relaxed font-medium" id="dir-${p.folio}">
-                                    ${p.direccion_completa}<br>
-                                    <span class="text-indigo-400 italic">Ref: ${p.referencias}</span>
-                                </p>
-                                <button onclick="copiarDireccion(\`${textoParaCopiar}\`)" class="mt-2 text-[10px] font-bold text-indigo-600 bg-white px-3 py-1.5 rounded shadow-sm hover:bg-indigo-600 hover:text-white transition-colors uppercase tracking-wider">
-                                    Copiar para Guía
-                                </button>
+                            <div class="bg-indigo-50 p-3 rounded-lg mb-4 mt-3 flex flex-col gap-3">
+                                <p class="text-xs text-indigo-900 leading-relaxed font-medium">${p.direccion_completa}<br><span class="text-indigo-400 italic">Ref: ${p.referencias || 'Ninguna'}</span></p>
+                                ${btnPDF}
                             </div>
-
                             <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Artículos comprados:</p>
-                            <ul class="mb-4">
-                                ${listaRopa}
-                            </ul>
-                        </div>
-                        
-                        <div class="p-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
-                            <span class="text-xs font-bold text-gray-400">Fecha: ${p.fecha}</span>
-                            <span class="text-lg font-black text-gray-900">$${p.total.toFixed(2)}</span>
+                            <ul class="mb-2">${listaRopa}</ul>
                         </div>
                     </div>
                 `;
             });
         }
 
-        function copiarDireccion(texto) {
-            navigator.clipboard.writeText(texto).then(() => {
-                alert("¡Dirección copiada! Ya puedes pegarla en la página de paquetería.");
-            }).catch(err => {
-                alert("Error al copiar: ", err);
+        function generarTicketPDF(folio, cliente, direccion, referencias, ropaStr) {
+            // Diseño en HTML que se convertirá en un PDF estilo Ticket de envío (80mm)
+            const htmlContent = `
+                <div style="width: 280px; padding: 20px; font-family: 'Courier New', Courier, monospace; color: black; background: white;">
+                    <div style="text-align: center; border-bottom: 2px dashed black; padding-bottom: 15px; margin-bottom: 15px;">
+                        <h2 style="margin: 0; font-size: 26px; font-weight: 900; font-style: italic;">Surprise Jeans</h2>
+                        <p style="margin: 5px 0 0; font-size: 14px; font-weight: bold; text-transform: uppercase;">Guía de Envío</p>
+                        <p style="margin: 10px 0 0; font-size: 18px; font-weight: black; background: black; color: white; padding: 5px; border-radius: 4px;">${folio}</p>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <p style="font-size: 12px; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid black; display: inline-block;">DESTINATARIO:</p>
+                        <p style="margin: 5px 0 0; font-size: 16px; font-weight: bold; text-transform: uppercase;">${cliente}</p>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <p style="font-size: 12px; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid black; display: inline-block;">DIRECCIÓN DE ENTREGA:</p>
+                        <p style="margin: 5px 0 0; font-size: 14px; line-height: 1.4;">${direccion}</p>
+                        <p style="margin: 5px 0 0; font-size: 12px; font-style: italic;">Ref: ${referencias || 'N/A'}</p>
+                    </div>
+                    
+                    <div style="border-top: 2px dashed black; padding-top: 15px; margin-top: 15px;">
+                        <p style="font-size: 10px; font-weight: bold; margin-bottom: 5px;">CONTENIDO DEL PAQUETE:</p>
+                        <p style="font-size: 10px; line-height: 1.5; margin:0;">${ropaStr}</p>
+                    </div>
+                    
+                    <div style="margin-top: 20px; text-align: center;">
+                        <p style="font-size: 10px; margin: 0;">¡Gracias por tu compra!</p>
+                        <p style="font-size: 10px; margin: 2px 0 0;">surprisejeanysk.com</p>
+                    </div>
+                </div>
+            `;
+
+            const opt = {
+                margin: 0,
+                filename: `Envio_${folio}.pdf`,
+                image: { type: 'jpeg', quality: 1.0 },
+                html2canvas: { scale: 3 }, // Alta resolución para impresoras térmicas
+                jsPDF: { unit: 'mm', format: [80, 180], orientation: 'portrait' } // Formato de ticket 80mm
+            };
+
+            // Notificación elegante
+            Swal.fire({ title: 'Generando Etiqueta...', text: 'Descargando PDF listo para imprimir', timer: 1500, showConfirmButton: false, icon: 'info' });
+            
+            // Magia
+            html2pdf().set(opt).from(htmlContent).save();
+        }
+
+        // ==========================================
+        // MÓDULO 2: CONTROL RÁPIDO DE INVENTARIO
+        // ==========================================
+        async function cargarInventario() {
+            try {
+                const res = await fetch(`${API_URL}/pantalones`);
+                const pantalones = await res.json();
+                
+                // Ordenar para que los agotados queden hasta abajo
+                pantalones.sort((a, b) => {
+                    if (a.stock === 0 && b.stock > 0) return 1;
+                    if (a.stock > 0 && b.stock === 0) return -1;
+                    return 0; 
+                });
+                
+                renderizarInventario(pantalones);
+            } catch (error) { console.error(error); }
+        }
+
+        function renderizarInventario(pantalones) {
+            const tbody = document.getElementById('tbody-inventario');
+            tbody.innerHTML = '';
+            
+            pantalones.forEach(p => {
+                const bgStock = p.stock === 0 ? 'bg-rose-50' : 'bg-white';
+                const colorTextoStock = p.stock === 0 ? 'text-rose-600' : 'text-emerald-600';
+                
+                tbody.innerHTML += `
+                    <tr class="${bgStock} border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                        <td class="p-4 flex items-center gap-3">
+                            <img src="${p.imagen_url}" class="w-12 h-12 object-cover rounded-md border border-gray-200 shadow-sm">
+                            <div>
+                                <p class="text-sm font-bold text-gray-800 uppercase leading-tight">${p.nombre}</p>
+                                <p class="text-[10px] text-gray-500 font-mono mt-0.5">[${p.codigo}]</p>
+                            </div>
+                        </td>
+                        <td class="p-4 text-center">
+                            <input type="number" id="precio-${p.id}" value="${p.precio}" step="0.01" class="w-24 p-2 text-sm border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-indigo-500 outline-none shadow-inner font-medium">
+                        </td>
+                        <td class="p-4 text-center">
+                            <input type="number" id="stock-${p.id}" value="${p.stock}" class="w-20 p-2 text-sm font-black ${colorTextoStock} border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-indigo-500 outline-none shadow-inner">
+                        </td>
+                        <td class="p-4 text-center">
+                            <div class="flex justify-center gap-2">
+                                <button onclick="guardarCambiosPantalon(${p.id})" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-md transition-transform active:scale-95 flex items-center gap-1">
+                                    <span>💾</span> Guardar
+                                </button>
+                                <button onclick="marcarAgotado(${p.id})" title="Marcar como agotado rápido" class="bg-rose-100 hover:bg-rose-200 text-rose-700 text-lg px-3 py-1.5 rounded-lg shadow-sm transition-transform active:scale-95">
+                                    ❌
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
             });
+        }
+        
+        async function guardarCambiosPantalon(id) {
+            if (!tokenPrivado) return;
+            const precio = document.getElementById(`precio-${id}`).value;
+            const stock = document.getElementById(`stock-${id}`).value;
+            
+            try {
+                const res = await fetch(`${API_URL}/pantalones/${id}/rapido`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tokenPrivado}` },
+                    body: JSON.stringify({ precio: parseFloat(precio), stock: parseInt(stock) })
+                });
+                
+                if(res.ok) {
+                    Swal.fire({
+                        icon: 'success', title: 'Inventario Actualizado', 
+                        toast: true, position: 'top-end', showConfirmButton: false, timer: 1500
+                    });
+                    cargarInventario(); // Recargamos para actualizar los colores si llegó a cero
+                }
+            } catch(e) { 
+                Swal.fire({icon: 'error', title: 'Error', text: 'No se guardaron los cambios'}); 
+            }
+        }
+
+        function marcarAgotado(id) {
+            document.getElementById(`stock-${id}`).value = 0;
+            guardarCambiosPantalon(id);
         }
     </script>
 </body>
