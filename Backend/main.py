@@ -264,6 +264,35 @@ def obtener_mis_pedidos(correo: str = Depends(verificar_token_cliente), db: Sess
             "ropa": ropa_comprada
         })
     return resultado
+@app.post("/pantalones/{pantalon_id}/resenas")
+def crear_resena(
+    pantalon_id: int, datos: schemas.ResenaCrear, 
+    correo: str = Depends(verificar_token_cliente), db: Session = Depends(get_db)
+):
+    cliente = db.query(models.Cliente).filter(models.Cliente.correo == correo).first()
+    
+    # 1. Verificar si realmente lo compró y ya se lo enviamos/cobramos
+    compro = db.query(models.DetallePedido).join(models.Pedido).filter(
+        models.Pedido.telefono == cliente.telefono,
+        models.DetallePedido.pantalon_id == pantalon_id,
+        models.Pedido.estatus.in_(["PAGADO", "ENVIADO"])
+    ).first()
+    
+    if not compro:
+        raise HTTPException(status_code=403, detail="Debes comprar este modelo primero para poder calificarlo.")
+        
+    # 2. Evitar spam (solo 1 reseña por cliente por modelo)
+    existe = db.query(models.Resena).filter(models.Resena.pantalon_id == pantalon_id, models.Resena.cliente_id == cliente.id).first()
+    if existe:
+        raise HTTPException(status_code=400, detail="Ya calificaste este modelo anteriormente.")
+        
+    nueva_resena = models.Resena(
+        pantalon_id=pantalon_id, cliente_id=cliente.id, 
+        calificacion=datos.calificacion, comentario=datos.comentario
+    )
+    db.add(nueva_resena)
+    db.commit()
+    return {"mensaje": "¡Reseña publicada con éxito!"}
 
 # ==========================================
 # RUTAS DE CUPONES Y PERFIL
