@@ -123,6 +123,40 @@ def enviar_correo_recibo(correo_destino, nombre, folio, total, lista_ropa, punto
     except Exception as e:
         print("Error al enviar el correo:", e)
 
+def enviar_correo_carrito_abandonado(correo_destino, nombre, folio):
+    try:
+        # Enlace directo para que regresen a tu tienda
+        link_tienda = "https://surprisejeanysk.com/"
+        
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff;">
+            <h2 style="color: #4f46e5; text-align: center; font-style: italic; font-size: 28px; margin-bottom: 5px;">Surprise Jeans</h2>
+            
+            <h3 style="color: #111827; text-align: center; margin-top: 30px;">¡Hola {nombre}! Dejaste algo en tu bolsa... 🛒</h3>
+            <p style="color: #4b5563; font-size: 15px; text-align: center; line-height: 1.5;">Notamos que estuviste a punto de comprar, pero no terminaste tu pedido <b>SJ-{folio}</b>.</p>
+            
+            <div style="text-align: center; margin: 30px 0; background-color: #f9fafb; padding: 20px; border-radius: 8px; border: 1px dashed #d1d5db;">
+                <p style="color: #374151; font-size: 14px; margin-bottom: 15px; font-weight: bold;">Para animarte, te regalamos un 10% de descuento extra válido por hoy:</p>
+                <span style="background-color: #ffffff; padding: 10px 20px; border-radius: 8px; font-weight: 900; color: #4f46e5; letter-spacing: 2px; border: 1px solid #e5e7eb; font-size: 18px;">REGRESA10</span>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px;">
+                <a href="{link_tienda}" style="background-color: #10b981; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; text-transform: uppercase;">Terminar mi compra</a>
+            </div>
+            
+            <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 40px;">Surprise Jeans © 2026. Este es un correo automático.</p>
+        </div>
+        """
+        
+        resend.Emails.send({
+            "from": "Surprise Jeans <onboarding@resend.dev>",
+            "to": correo_destino,
+            "subject": "🛒 ¡Olvidaste algo en tu carrito!",
+            "html": html_content
+        })
+    except Exception as e:
+        print("Error al enviar recordatorio:", e)
+
 # ==========================================
 # INFRAESTRUCTURA DE WEBSOCKETS (TIEMPO REAL)
 # ==========================================
@@ -682,7 +716,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
             if estado_pago == "approved" and pedido_id:
                 pedido_db = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
                 
-                if pedido_db and pedido_db.estatus == "PENDIENTE":
+                if pedido_db and pedido_db.estatus in ["PENDIENTE", "RECORDATORIO_ENVIADO"]:    
                     pedido_db.estatus = "PAGADO"
                     lista_ropa = []
                     
@@ -703,6 +737,30 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                         enviar_correo_recibo(cliente_db.correo, cliente_db.nombre_completo, f"{pedido_db.id:04d}", pedido_db.total, lista_ropa, puntos_ganados)
                     
     return {"status": "procesado"}
+
+@app.post("/admin/lanzar-recuperacion")
+def lanzar_recuperacion_carritos(db: Session = Depends(get_db), token: str = Depends(verificar_token)):
+    # 1. Calculamos la hora exacta de hace 1 hora
+    hace_una_hora = datetime.utcnow() - timedelta(minutes=1)
+    
+    # 2. Buscamos pedidos PENDIENTES, que tengan correo, y que sean viejos
+    pedidos_abandonados = db.query(models.Pedido).filter(
+        models.Pedido.estatus == "PENDIENTE",
+        models.Pedido.correo_cliente != None,
+        models.Pedido.fecha <= hace_una_hora
+    ).all()
+
+    correos_enviados = 0
+    for pedido in pedidos_abandonados:
+        # Disparamos el correo
+        enviar_correo_carrito_abandonado(pedido.correo_cliente, pedido.nombre_cliente, f"{pedido.id:04d}")
+        
+        # 3. Le cambiamos el estatus para no hacerle "Spam" y mandarle 100 correos
+        pedido.estatus = "RECORDATORIO_ENVIADO"
+        correos_enviados += 1
+        
+    db.commit()
+    return {"mensaje": f"Escaneo completo. Se enviaron {correos_enviados} correos de recuperación."}
 
 @app.get("/simular-din")
 async def simular_din():

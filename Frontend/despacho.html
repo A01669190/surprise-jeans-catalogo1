@@ -20,6 +20,7 @@
                 <button onclick="cambiarPestana('pedidos')" id="tab-pedidos" class="bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg text-sm shadow">Pedidos</button>
                 <button onclick="cambiarPestana('inventario')" id="tab-inventario" class="bg-white text-gray-600 border border-gray-300 font-bold py-2 px-6 rounded-lg text-sm hover:bg-gray-50 transition-colors">Inventario</button>
                 <button onclick="cerrarSesion()" class="text-sm font-bold text-rose-500 hover:text-rose-700 ml-4">Salir</button>
+                <button onclick="lanzarRecuperacion()" class="bg-amber-400 hover:bg-amber-500 text-stone-900 font-bold py-2 px-4 rounded-xl shadow-sm transition-colors text-sm ml-2">🛒 Recuperar Ventas</button>
             </div>
         </header>
 
@@ -98,6 +99,29 @@
                 console.log("El túnel se durmió. Reconectando...");
                 setTimeout(conectarTúnelEnVivo, 5000); 
             };
+        }
+        
+        async function lanzarRecuperacion() {
+            Swal.fire({ title: 'Escaneando carritos...', text: 'Buscando clientes que no terminaron su pago.', allowOutsideClick: false, showConfirmButton: false });
+            Swal.showLoading();
+
+            try {
+                const res = await fetch(`${API_URL}/admin/lanzar-recuperacion`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${tokenPrivado}` }
+                });
+                
+                const data = await res.json();
+                
+                if (res.ok) {
+                    Swal.fire({ icon: 'success', title: '¡Campaña Lanzada!', text: data.mensaje, confirmButtonColor: '#10b981' });
+                    cargarPedidos(); // Recargamos para ver si alguno cambió a RECORDATORIO_ENVIADO
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo lanzar la campaña.' });
+                }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Error', text: 'Fallo de conexión.' });
+            }
         }
 
         async function iniciarSesion() {
