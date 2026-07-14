@@ -1370,6 +1370,113 @@ listaPantalones.forEach(p => {
                 btnPagar.disabled = false;
             }
         }
+
+        // ==========================================
+        // PARCHE MAESTRO: PERFIL Y RESEÑAS
+        // ==========================================
+        function abrirPerfilCliente() {
+            document.getElementById('modal-perfil').classList.remove('hidden');
+            document.getElementById('modal-perfil').classList.add('flex');
+
+            const token = localStorage.getItem('token_cliente_sj');
+            const nombre = localStorage.getItem('nombre_cliente_sj');
+
+            if (token && nombre) {
+                document.getElementById('tab-login').parentElement.classList.add('hidden');
+                document.getElementById('form-login').classList.add('hidden');
+                document.getElementById('form-registro').classList.add('hidden');
+
+                document.getElementById('area-sesion-activa').classList.remove('hidden');
+                document.getElementById('nombre-cliente-bienvenida').innerText = `¡Hola, ${nombre}!`;
+
+                // ⚡ AQUÍ ESTÁ LA ORDEN QUE FALTABA
+                cargarMisPedidos();
+            }
+        }
+
+        async function cargarMisPedidos() {
+            const token = localStorage.getItem('token_cliente_sj');
+            if(!token) return;
+
+            try {
+                const respuesta = await fetch(`${API_URL}/mis-pedidos`, { headers: { 'Authorization': `Bearer ${token}` }});
+                const listaDiv = document.getElementById('lista-mis-pedidos');
+
+                if(respuesta.ok) {
+                    const pedidos = await respuesta.json();
+                    if(pedidos.length === 0) {
+                        listaDiv.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">Aún no tienes compras registradas.</p>';
+                    } else {
+                        listaDiv.innerHTML = pedidos.map(p => `
+                            <div class="bg-gray-50 p-3 rounded-lg border border-gray-100 mb-3">
+                                <div class="flex justify-between items-center border-b border-gray-200 pb-2 mb-2">
+                                    <div>
+                                        <p class="font-bold text-sm text-indigo-900">${p.folio}</p>
+                                        <p class="text-[10px] font-bold ${p.estatus === 'PAGADO' || p.estatus === 'ENVIADO' ? 'text-emerald-500' : 'text-amber-500'}">${p.estatus}</p>
+                                    </div>
+                                    <p class="font-black text-gray-900">$${p.total.toFixed(2)}</p>
+                                </div>
+                                <div class="space-y-2">
+                                    ${p.ropa.map(ropa => `
+                                        <div class="flex justify-between items-center text-xs">
+                                            <span class="text-gray-600 truncate max-w-[150px]">${ropa.nombre}</span>
+                                            ${(p.estatus === 'PAGADO' || p.estatus === 'ENVIADO') ? `<button onclick="abrirModalResena(${ropa.id}, '${ropa.nombre}')" class="text-[10px] bg-indigo-100 text-indigo-600 font-bold px-2 py-1 rounded hover:bg-indigo-600 hover:text-white transition-colors shadow-sm">⭐ Calificar</button>` : ''}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `).join('');
+                    }
+                } else { cerrarSesionCliente(); }
+            } catch(error) {
+                document.getElementById('lista-mis-pedidos').innerHTML = '<p class="text-xs text-rose-400 text-center py-4">Error de conexión.</p>';
+            }
+        }
+
+        async function abrirModalResena(pantalonId, nombrePantalon) {
+            const token = localStorage.getItem('token_cliente_sj');
+            const { value: formValues } = await Swal.fire({
+                title: 'Calificar producto',
+                html: `
+                    <p class="text-sm text-gray-600 font-bold mb-4">${nombrePantalon}</p>
+                    <div class="mb-4">
+                        <select id="swal-estrellas" class="w-full p-3 border border-gray-300 rounded-lg text-sm text-center outline-none focus:ring-2 focus:ring-indigo-600">
+                            <option value="5">⭐⭐⭐⭐⭐ ¡Me encantó!</option>
+                            <option value="4">⭐⭐⭐⭐ Muy bueno</option>
+                            <option value="3">⭐⭐⭐ Normal</option>
+                            <option value="2">⭐⭐ No me convenció</option>
+                            <option value="1">⭐ Malo</option>
+                        </select>
+                    </div>
+                    <textarea id="swal-comentario" placeholder="¿Qué te pareció el fit, la tela, la talla? (Opcional)" class="w-full p-3 border border-gray-300 rounded-lg text-sm h-24 resize-none outline-none focus:ring-2 focus:ring-indigo-600"></textarea>
+                `,
+                focusConfirm: false, showCancelButton: true, confirmButtonText: 'Publicar Reseña', cancelButtonText: 'Cancelar', confirmButtonColor: '#4f46e5',
+                preConfirm: () => {
+                    return {
+                        calificacion: parseInt(document.getElementById('swal-estrellas').value),
+                        comentario: document.getElementById('swal-comentario').value
+                    }
+                }
+            });
+
+            if (formValues) {
+                Swal.fire({ title: 'Enviando...', allowOutsideClick: false, showConfirmButton: false }); Swal.showLoading();
+                try {
+                    const res = await fetch(`${API_URL}/pantalones/${pantalonId}/resenas`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify(formValues)
+                    });
+                    const data = await res.json();
+                    if(res.ok) {
+                        Swal.fire({ icon: 'success', title: '¡Gracias!', text: data.mensaje, confirmButtonColor: '#10b981' });
+                        cargarCatalogo(); // Para que brillen las estrellas en la página
+                    } else {
+                        Swal.fire({ icon: 'warning', title: 'Oops...', text: data.detail, confirmButtonColor: '#4f46e5' });
+                    }
+                } catch(e) { Swal.fire({ icon: 'error', title: 'Error', text: 'Problema de conexión' }); }
+            }
+        }
     </script>
 </body>
 </html>
