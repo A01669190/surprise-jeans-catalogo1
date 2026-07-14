@@ -862,27 +862,25 @@
         }
 
         async function procesarRegistroCliente() {
-            // .trim() elimina los espacios en blanco accidentales al inicio y final
             const nombre_completo = document.getElementById('reg-nombre').value.trim();
             const telefono = document.getElementById('reg-tel').value.trim();
             const correo = document.getElementById('reg-correo').value.trim();
             const password = document.getElementById('reg-pass').value;
 
-            // 🛡️ REGLAS ESTRICTAS DE VALIDACIÓN
             const reglaCorreo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            const reglaTelefono = /^\d{10}$/; // Exactamente 10 números
+            const reglaTelefono = /^\d{10}$/; 
 
             if(!nombre_completo || !telefono || !correo || !password) {
-                alert("⚠️ Por favor llena todos los campos."); return;
+                Swal.fire({ icon: 'warning', title: 'Campos incompletos', text: 'Por favor llena todos los campos.' }); return;
             }
             if (!reglaTelefono.test(telefono)) {
-                alert("⚠️ El celular debe tener exactamente 10 dígitos (Sin espacios ni ladas)."); return;
+                Swal.fire({ icon: 'warning', title: 'Celular inválido', text: 'El celular debe tener exactamente 10 dígitos (Sin espacios ni ladas).' }); return;
             }
             if (!reglaCorreo.test(correo)) {
-                alert("⚠️ Por favor ingresa un correo electrónico válido (Ej. juan@gmail.com)."); return;
+                Swal.fire({ icon: 'warning', title: 'Correo inválido', text: 'Por favor ingresa un correo electrónico válido (Ej. juan@gmail.com).' }); return;
             }
             if (password.length < 6) {
-                alert("⚠️ La contraseña debe tener al menos 6 caracteres por seguridad."); return;
+                Swal.fire({ icon: 'warning', title: 'Contraseña muy corta', text: 'La contraseña debe tener al menos 6 caracteres por seguridad.' }); return;
             }
 
             try {
@@ -893,15 +891,21 @@
                 });
 
                 if (respuesta.ok) {
-                    alert("¡Cuenta creada exitosamente! Ahora puedes iniciar sesión.");
+                    Swal.fire({
+                        icon: 'success',
+                        title: '¡Cuenta creada con éxito!',
+                        text: 'Ahora puedes iniciar sesión para acceder a la bóveda segura.',
+                        confirmButtonColor: '#10b981'
+                    });
                     cambiarTabPerfil('login');
                     document.getElementById('login-correo').value = correo;
+                    document.getElementById('reg-pass').value = ''; 
                 } else {
                     const errorData = await respuesta.json();
-                    alert(`Error: ${errorData.detail}`);
+                    Swal.fire({ icon: 'error', title: 'Oops...', text: errorData.detail, confirmButtonColor: '#4f46e5' });
                 }
             } catch (error) {
-                alert("Error al conectar con el servidor.");
+                Swal.fire({ icon: 'error', title: 'Error de conexión', text: 'No pudimos conectar con el servidor.' });
             }
         }
 
@@ -910,7 +914,7 @@
             const password = document.getElementById('login-pass').value;
 
             if(!username || !password) {
-                alert("Ingresa correo y contraseña."); return;
+                Swal.fire({ icon: 'warning', title: 'Faltan datos', text: 'Ingresa tu correo y contraseña.', confirmButtonColor: '#4f46e5' }); return;
             }
 
             const formData = new URLSearchParams();
@@ -926,17 +930,28 @@
 
                 if (respuesta.ok) {
                     const data = await respuesta.json();
-                    // Guardamos el token en la memoria local del cliente
                     localStorage.setItem('token_cliente_sj', data.access_token);
                     localStorage.setItem('nombre_cliente_sj', data.nombre);
                     
-                    alert(`¡Bienvenido de vuelta, ${data.nombre}!`);
-                    cerrarPerfilCliente();
+                    Swal.fire({
+                        icon: 'success',
+                        title: `¡Bienvenido de vuelta, ${data.nombre}!`,
+                        text: 'Tu información de envío está protegida.',
+                        showConfirmButton: false,
+                        timer: 2000
+                    });
+                    
+                    // Cerramos la ventana y recargamos la página suavemente
+                    setTimeout(() => { 
+                        cerrarPerfilCliente(); 
+                        window.location.reload(); 
+                    }, 2000);
+
                 } else {
-                    alert("Correo o contraseña incorrectos.");
+                    Swal.fire({ icon: 'error', title: 'Acceso denegado', text: 'Correo o contraseña incorrectos.', confirmButtonColor: '#4f46e5' });
                 }
             } catch (error) {
-                alert("Error de conexión al servidor.");
+                Swal.fire({ icon: 'error', title: 'Error de conexión', text: 'No pudimos conectar con el servidor.' });
             }
         }
 
