@@ -73,118 +73,6 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 
 # ==========================================
-# 🚨 NUEVO MOTOR DE CORREOS GMAIL SMTP (SSL PUERTO 465) 🚨
-# ==========================================
-def enviar_correo_gmail(correo_destino, asunto, html_content):
-    gmail_user = os.getenv("GMAIL_USER", "denzellopezcabrera@gmail.com")
-    gmail_password = os.getenv("GMAIL_PASSWORD", "") # Tu Contraseña de Aplicación de 16 caracteres
-    
-    if not gmail_password:
-        print("Advertencia: GMAIL_PASSWORD no está configurada en las variables de entorno.")
-        return False
-
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = asunto
-    msg["From"] = f"Surprise Jeans <{gmail_user}>"
-    msg["To"] = correo_destino
-
-    msg.attach(MIMEText(html_content, "html"))
-
-    try:
-        # Usamos SSL directo en el puerto 465 (altamente recomendado para servidores en la nube)
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as servidor:
-            servidor.login(gmail_user, gmail_password)
-            servidor.sendmail(gmail_user, correo_destino, msg.as_string())
-        print(f"📧 Correo SMTP enviado con éxito a: {correo_destino}")
-        return True
-    except Exception as e:
-        print(f"❌ Error al enviar correo por SMTP de Gmail: {e}")
-        return False
-
-def enviar_correo_recibo(correo_destino, nombre, folio, total, lista_ropa, puntos_ganados):
-    try:
-        # Armamos la lista de la ropa en HTML
-        items_html = "".join([f"<li style='margin-bottom: 5px; color: #4b5563;'><b>{i['cantidad']}x</b> {i['nombre']} - ${i['precio']}</li>" for i in lista_ropa])
-        
-        html_content = f"""
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff;">
-            <h2 style="color: #4f46e5; text-align: center; font-style: italic; font-size: 28px; margin-bottom: 5px;">Surprise Jeans</h2>
-            <p style="text-align: center; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; margin-top: 0;">Recibo Oficial</p>
-            
-            <h3 style="color: #111827; text-align: center; margin-top: 30px;">¡Gracias por tu compra, {nombre}! 📦</h3>
-            <p style="color: #4b5563; font-size: 15px; text-align: center; line-height: 1.5;">Tu pago ha sido procesado con éxito y ya estamos preparando tu paquete en nuestro almacén.</p>
-            
-            <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 30px 0; border: 1px solid #f3f4f6;">
-                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 10px;">
-                    <span style="color: #6b7280; font-weight: bold;">Folio de Pedido:</span>
-                    <span style="color: #4f46e5; font-weight: 900;">SJ-{folio}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between;">
-                    <span style="color: #6b7280; font-weight: bold;">Total Pagado:</span>
-                    <span style="color: #10b981; font-weight: 900; font-size: 18px;">${total} MXN</span>
-                </div>
-            </div>
-            
-            <h4 style="color: #374151; font-size: 16px; margin-bottom: 15px; text-transform: uppercase;">Artículos en tu envío:</h4>
-            <ul style="padding-left: 20px; line-height: 1.6;">
-                {items_html}
-            </ul>
-            
-            <div style="background-color: #fffbeb; border: 1px solid #fde68a; padding: 15px; border-radius: 8px; margin: 30px 0; text-align: center;">
-                <p style="margin: 0; color: #d97706; font-weight: 900; text-transform: uppercase; font-size: 14px;">🌟 Surprise Points Ganados</p>
-                <p style="margin: 5px 0 0; color: #92400e; font-size: 14px; font-weight: bold;">Acabas de sumar ${round(puntos_ganados, 2)} a tu bóveda.</p>
-            </div>
-            
-            <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 40px;">Este correo se generó automáticamente. Surprise Jeans © 2026.</p>
-        </div>
-        """
-        
-        # Resend usa este correo temporal por defecto para cuentas en desarrollo
-        resend.Emails.send({
-            "from": "Surprise Jeans <onboarding@resend.dev>",
-            "to": correo_destino,
-            "subject": f"¡Tu pedido SJ-{folio} está confirmado! 🎉",
-            "html": html_content
-        })
-    except Exception as e:
-        print("Error al enviar el correo:", e)
-
-def enviar_correo_carrito_abandonado(correo_destino, nombre, folio):
-    try:
-        # Enlace directo para que regresen a tu tienda
-        link_tienda = "https://surprisejeanysk.com/"
-        
-        html_content = f"""
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff;">
-            <h2 style="color: #4f46e5; text-align: center; font-style: italic; font-size: 28px; margin-bottom: 5px;">Surprise Jeans</h2>
-            
-            <h3 style="color: #111827; text-align: center; margin-top: 30px;">¡Hola {nombre}! Dejaste algo en tu bolsa... 🛒</h3>
-            <p style="color: #4b5563; font-size: 15px; text-align: center; line-height: 1.5;">Notamos que estuviste a punto de comprar, pero no terminaste tu pedido <b>SJ-{folio}</b>.</p>
-            
-            <div style="text-align: center; margin: 30px 0; background-color: #f9fafb; padding: 20px; border-radius: 8px; border: 1px dashed #d1d5db;">
-                <p style="color: #374151; font-size: 14px; margin-bottom: 15px; font-weight: bold;">Para animarte, te regalamos un 10% de descuento extra válido por hoy:</p>
-                <span style="background-color: #ffffff; padding: 10px 20px; border-radius: 8px; font-weight: 900; color: #4f46e5; letter-spacing: 2px; border: 1px solid #e5e7eb; font-size: 18px;">REGRESA10</span>
-            </div>
-            
-            <div style="text-align: center; margin-top: 30px;">
-                <a href="{link_tienda}" style="background-color: #10b981; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; text-transform: uppercase;">Terminar mi compra</a>
-            </div>
-            
-            <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 40px;">Surprise Jeans © 2026. Este es un correo automático.</p>
-        </div>
-        """
-        
-        resend.Emails.send({
-            "from": "Surprise Jeans <onboarding@resend.dev>",
-            "to": correo_destino,
-            "subject": "🛒 ¡Olvidaste algo en tu carrito!",
-            "html": html_content
-        })
-    except Exception as e:
-        print("Error al enviar recordatorio:", e)
-
-
-# ==========================================
 # INFRAESTRUCTURA DE WEBSOCKETS (TIEMPO REAL)
 # ==========================================
 class ConnectionManager:
@@ -277,6 +165,90 @@ def login_cliente(form_data: OAuth2PasswordRequestForm = Depends(), db: Session 
         "token_type": "bearer", 
         "nombre": cliente.nombre_completo
     }
+
+# ==========================================
+# 🚨 MOTOR DE CORREOS GMAIL SMTP (SSL PUERTO 465) 🚨
+# ==========================================
+def enviar_correo_gmail(correo_destino, asunto, html_content):
+    gmail_user = os.getenv("GMAIL_USER", "denzellopezcabrera@gmail.com")
+    gmail_password = os.getenv("GMAIL_PASSWORD", "") 
+    
+    if not gmail_password:
+        print("Advertencia: GMAIL_PASSWORD no está configurada en las variables de entorno.")
+        return False
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = asunto
+    msg["From"] = f"Surprise Jeans <{gmail_user}>"
+    msg["To"] = correo_destino
+    msg.attach(MIMEText(html_content, "html"))
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as servidor:
+            servidor.login(gmail_user, gmail_password)
+            servidor.sendmail(gmail_user, correo_destino, msg.as_string())
+        print(f"📧 Correo SMTP enviado con éxito a: {correo_destino}")
+        return True
+    except Exception as e:
+        print(f"❌ Error al enviar correo por SMTP de Gmail: {e}")
+        return False
+
+def enviar_correo_recibo(correo_destino, nombre, folio, total, lista_ropa, puntos_ganados):
+    items_html = "".join([f"<li style='margin-bottom: 5px; color: #4b5563;'><b>{i['cantidad']}x</b> {i['nombre']} - ${i['precio']}</li>" for i in lista_ropa])
+    
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff;">
+        <h2 style="color: #4f46e5; text-align: center; font-style: italic; font-size: 28px; margin-bottom: 5px;">Surprise Jeans</h2>
+        <p style="text-align: center; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; margin-top: 0;">Recibo Oficial</p>
+        
+        <h3 style="color: #111827; text-align: center; margin-top: 30px;">¡Gracias por tu compra, {nombre}! 📦</h3>
+        <p style="color: #4b5563; font-size: 15px; text-align: center; line-height: 1.5;">Tu pago ha sido procesado con éxito y ya estamos preparando tu paquete en nuestro almacén.</p>
+        
+        <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 30px 0; border: 1px solid #f3f4f6;">
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 10px;">
+                <span style="color: #6b7280; font-weight: bold;">Folio de Pedido:</span>
+                <span style="color: #4f46e5; font-weight: 900;">SJ-{folio}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span style="color: #6b7280; font-weight: bold;">Total Pagado:</span>
+                <span style="color: #10b981; font-weight: 900; font-size: 18px;">${total} MXN</span>
+            </div>
+        </div>
+        
+        <h4 style="color: #374151; font-size: 16px; margin-bottom: 15px; text-transform: uppercase;">Artículos en tu envío:</h4>
+        <ul style="padding-left: 20px; line-height: 1.6;">
+            {items_html}
+        </ul>
+        
+        <div style="background-color: #fffbeb; border: 1px solid #fde68a; padding: 15px; border-radius: 8px; margin: 30px 0; text-align: center;">
+            <p style="margin: 0; color: #d97706; font-weight: 900; text-transform: uppercase; font-size: 14px;">🌟 Surprise Points Ganados</p>
+            <p style="margin: 5px 0 0; color: #92400e; font-size: 14px; font-weight: bold;">Acabas de sumar ${round(puntos_ganados, 2)} a tu bóveda de cliente.</p>
+        </div>
+    </div>
+    """
+    enviar_correo_gmail(correo_destino, f"¡Tu pedido SJ-{folio} está confirmado! 🎉", html_content)
+
+def enviar_correo_carrito_abandonado(correo_destino, nombre, folio):
+    link_tienda = "https://surprisejeanysk.com/"
+    
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff;">
+        <h2 style="color: #4f46e5; text-align: center; font-style: italic; font-size: 28px; margin-bottom: 5px;">Surprise Jeans</h2>
+        
+        <h3 style="color: #111827; text-align: center; margin-top: 30px;">¡Hola {nombre}! Dejaste algo en tu bolsa... 🛒</h3>
+        <p style="color: #4b5563; font-size: 15px; text-align: center; line-height: 1.5;">Notamos que estuviste a punto de comprar, pero no terminaste tu pedido <b>SJ-{folio}</b>.</p>
+        
+        <div style="text-align: center; margin: 30px 0; background-color: #f9fafb; padding: 20px; border-radius: 8px; border: 1px dashed #d1d5db;">
+            <p style="color: #374151; font-size: 14px; margin-bottom: 15px; font-weight: bold;">Para animarte, te regalamos un 10% de descuento extra válido por hoy:</p>
+            <span style="background-color: #ffffff; padding: 10px 20px; border-radius: 8px; font-weight: 900; color: #4f46e5; letter-spacing: 2px; border: 1px solid #e5e7eb; font-size: 18px;">REGRESA10</span>
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="{link_tienda}" style="background-color: #10b981; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; text-transform: uppercase;">Terminar mi compra</a>
+        </div>
+    </div>
+    """
+    enviar_correo_gmail(correo_destino, "🛒 ¡Olvidaste algo en tu carrito!", html_content)
 
 def verificar_token(token: str = Depends(oauth2_scheme)):
     try:
