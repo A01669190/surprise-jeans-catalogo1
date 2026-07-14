@@ -58,7 +58,14 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # ==========================================
 # 3. SISTEMA DE LOGIN (JSON Web Tokens)
 # ==========================================
-SECRET_KEY = "llave_secreta_del_catalogo_surprise"
+SECRET_KEY = os.getenv("JWT_SECRET", "llave_secreta_del_catalogo_surprise")
+# ==========================================
+# VARIABLES DE ENTORNO (SEGURIDAD)
+# ==========================================
+import os
+SECRET_KEY = os.getenv("JWT_SECRET", "llave_secreta_del_catalogo_surprise")
+GMAIL_USER = os.getenv("GMAIL_USER", "denzellopezcabrera@gmail.com")
+GMAIL_PASSWORD = os.getenv("GMAIL_PASSWORD", "")
 ALGORITHM = "HS256"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 # ==========================================
@@ -105,9 +112,8 @@ def registrar_cliente(cliente: schemas.ClienteRegistro, db: Session = Depends(ge
     # ==========================================
     try:
         # Configuración del remitente
-        remitente = "denzellopezcabrera@gmail.com" 
-        password_app = "ljuxzzxivxzxhdjz" # 🚨 Ojo con este dato (Lee abajo)
-
+        remitente = GMAIL_USER 
+        password_app = GMAIL_PASSWORD
         # Armado del mensaje profesional
         mensaje = MIMEMultipart("alternative")
         mensaje["Subject"] = "¡Bienvenido a Surprise Jeans! 🎉"
