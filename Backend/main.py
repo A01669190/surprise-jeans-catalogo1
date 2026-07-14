@@ -1,4 +1,9 @@
 import os
+import socket
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import os
 import shutil
 from fastapi import FastAPI, Depends, File, UploadFile, Form, Request, HTTPException, status, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -166,6 +171,19 @@ def login_cliente(form_data: OAuth2PasswordRequestForm = Depends(), db: Session 
         "nombre": cliente.nombre_completo
     }
 
+
+
+# ==========================================
+# 🚨 PARCHE DE RED PARA RENDER (Forzar IPv4) 🚨
+# Obliga al servidor a comunicarse con Google por IPv4 clásico
+# ==========================================
+old_getaddrinfo = socket.getaddrinfo
+def force_ipv4_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    if host == "smtp.gmail.com":
+        family = socket.AF_INET # El código AF_INET significa IPv4
+    return old_getaddrinfo(host, port, family, type, proto, flags)
+socket.getaddrinfo = force_ipv4_getaddrinfo
+
 # ==========================================
 # 🚨 MOTOR DE CORREOS GMAIL SMTP (SSL PUERTO 465) 🚨
 # ==========================================
@@ -174,7 +192,7 @@ def enviar_correo_gmail(correo_destino, asunto, html_content):
     gmail_password = os.getenv("GMAIL_PASSWORD", "") 
     
     if not gmail_password:
-        print("Advertencia: GMAIL_PASSWORD no está configurada en las variables de entorno.")
+        print("Advertencia: GMAIL_PASSWORD no está configurada.")
         return False
 
     msg = MIMEMultipart("alternative")
@@ -184,9 +202,11 @@ def enviar_correo_gmail(correo_destino, asunto, html_content):
     msg.attach(MIMEText(html_content, "html"))
 
     try:
+        # Hacemos la conexión usando nuestro túnel IPv4 forzado
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as servidor:
             servidor.login(gmail_user, gmail_password)
             servidor.sendmail(gmail_user, correo_destino, msg.as_string())
+        
         print(f"📧 Correo SMTP enviado con éxito a: {correo_destino}")
         return True
     except Exception as e:
