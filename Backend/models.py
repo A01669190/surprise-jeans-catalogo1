@@ -57,6 +57,7 @@ class Resena(Base):
 class Pedido(Base):
     __tablename__ = "pedidos"
     id = Column(Integer, primary_key=True, index=True)
+    correo_cliente = Column(String, index=True, nullable=True) # ⚡ NUEVO CANDADO DE SEGURIDAD
     nombre_cliente = Column(String)
     telefono = Column(String)
     calle_numero = Column(String)

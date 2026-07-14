@@ -304,7 +304,8 @@ def obtener_mis_pedidos(correo: str = Depends(verificar_token_cliente), db: Sess
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
     
-    pedidos = db.query(models.Pedido).filter(models.Pedido.telefono == cliente.telefono).order_by(models.Pedido.fecha.desc()).all()
+    # ⚡ LA SOLUCIÓN: Ahora buscamos exactamente por su correo, ignorando el teléfono
+    pedidos = db.query(models.Pedido).filter(models.Pedido.correo_cliente == cliente.correo).order_by(models.Pedido.fecha.desc()).all()
     
     resultado = []
     for p in pedidos:
@@ -317,6 +318,7 @@ def obtener_mis_pedidos(correo: str = Depends(verificar_token_cliente), db: Sess
             "ropa": ropa_comprada
         })
     return resultado
+
 @app.post("/pantalones/{pantalon_id}/resenas")
 def crear_resena(
     pantalon_id: int, datos: schemas.ResenaCrear, 
@@ -474,8 +476,9 @@ async def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, 
             "currency_id": "MXN"
         })
 
-    # 4. CREAR PEDIDO EN BASE DE DATOS
+    # 4. CREAR PEDIDO
     nuevo_pedido = models.Pedido(
+        correo_cliente=cliente_db.correo if cliente_db else None, # ⚡ GUARDAMOS EL CORREO DUEÑO
         nombre_cliente=pedido_req.envio.nombre, telefono=pedido_req.envio.telefono,
         calle_numero=pedido_req.envio.calle_numero, colonia=pedido_req.envio.colonia,
         ciudad=pedido_req.envio.ciudad, estado=pedido_req.envio.estado,
