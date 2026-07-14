@@ -629,3 +629,15 @@ def actualizar_pantalon_rapido(
         
     db.commit()
     return {"mensaje": "Inventario actualizado exitosamente"}
+
+@app.patch("/pedidos/{pedido_id}/enviar")
+def marcar_pedido_enviado(pedido_id: int, db: Session = Depends(get_db), token: str = Depends(verificar_token)):
+    pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido no encontrado")
+    
+    # Cambiamos el estatus
+    pedido.estatus = "ENVIADO"
+    db.commit()
+    
+    return {"mensaje": "Estatus actualizado a ENVIADO exitosamente"}
