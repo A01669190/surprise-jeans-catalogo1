@@ -1,4 +1,9 @@
 import os
+from sqlalchemy import func, text
+from fastapi.responses import Response
+from reportlab.pdfgen import canvas
+from reportlab.graphics.barcode import code128
+from reportlab.lib.units import mm
 import socket
 import smtplib
 from email.mime.text import MIMEText
@@ -458,6 +463,94 @@ def generar_cupon_100(db: Session = Depends(get_db)):
         db.commit()
         return {"mensaje": "¡Cupón GRATIS100 (100% de descuento) creado y listo para usar!"}
     return {"mensaje": "El cupón GRATIS100 ya existía."}
+
+# ==========================================
+# 🎯 MOTOR DE RECOMENDACIONES (CROSS-SELLING)
+# ==========================================
+@app.get("/pantalones/{pantalon_id}/recomendaciones")
+def recomendaciones_inteligentes(pantalon_id: int, db: Session = Depends(get_db)):
+    # 1. Buscamos en qué pedidos se ha comprado este pantalón
+    pedidos_con_este = db.query(models.DetallePedido.pedido_id).filter(
+        models.DetallePedido.pantalon_id == pantalon_id
+    ).subquery()
+
+    # 2. Buscamos qué OTRAS cosas compraron en esos mismos pedidos
+    otros_pantalones = db.query(
+        models.DetallePedido.pantalon_id,
+        func.count(models.DetallePedido.pantalon_id).label("frecuencia")
+    ).filter(
+        models.DetallePedido.pedido_id.in_(pedidos_con_este),
+        models.DetallePedido.pantalon_id != pantalon_id
+    ).group_by(models.DetallePedido.pantalon_id).order_by(text("frecuencia DESC")).limit(3).all()
+
+    ids_recomendados = [row.pantalon_id for row in otros_pantalones]
+
+    # 3. Si es un producto nuevo y no hay historial, recomendamos de la misma categoría
+    if len(ids_recomendados) < 3:
+        actual = db.query(models.Pantalon).filter(models.Pantalon.id == pantalon_id).first()
+        if actual:
+            relleno = db.query(models.Pantalon.id).filter(
+                models.Pantalon.categoria_id == actual.categoria_id,
+                models.Pantalon.id != pantalon_id,
+                models.Pantalon.id.notin_(ids_recomendados) if ids_recomendados else True
+            ).limit(3 - len(ids_recomendados)).all()
+            ids_recomendados.extend([r.id for r in relleno])
+
+    # 4. Formateamos la respuesta
+    recomendados = db.query(models.Pantalon).filter(models.Pantalon.id.in_(ids_recomendados)).all()
+    resultado = [{"id": p.id, "nombre": p.nombre, "precio": p.precio, "imagen_url": p.imagen_url} for p in recomendados]
+    
+    return resultado
+
+# ==========================================
+# 🖨️ GENERADOR DE ETIQUETAS TÉRMICAS PDF
+# ==========================================
+@app.get("/pedidos/{pedido_id}/etiqueta")
+def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_db)):
+    # 1. Verificamos que sea Yessica quien pide el PDF
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("sub") != "admin_yessica": raise Exception()
+    except:
+        raise HTTPException(status_code=401, detail="Pase VIP inválido para imprimir")
+
+    pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
+    if not pedido: raise HTTPException(status_code=404, detail="Pedido no encontrado")
+
+    # 2. Dibujamos el PDF en memoria (Formato Etiqueta 4x6 estándar)
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer, pagesize=(100*mm, 150*mm)) 
+    
+    # Encabezado
+    p.setFont("Helvetica-Bold", 18)
+    p.drawString(10*mm, 135*mm, "SURPRISE JEANS - ENVÍO OFICIAL")
+    p.setFont("Helvetica-Bold", 12)
+    p.drawString(10*mm, 125*mm, f"FOLIO: SJ-{pedido.id:04d}")
+    
+    # Datos del Cliente
+    p.setFont("Helvetica", 11)
+    p.drawString(10*mm, 110*mm, f"Entregar a: {pedido.nombre_cliente.upper()}")
+    p.drawString(10*mm, 100*mm, f"Teléfono: {pedido.telefono}")
+    
+    p.setFont("Helvetica-Bold", 11)
+    p.drawString(10*mm, 85*mm, "Dirección de Entrega:")
+    p.setFont("Helvetica", 10)
+    p.drawString(10*mm, 75*mm, f"{pedido.calle_numero}")
+    p.drawString(10*mm, 65*mm, f"Col. {pedido.colonia}, {pedido.ciudad}")
+    p.drawString(10*mm, 55*mm, f"{pedido.estado}, C.P. {pedido.codigo_postal}")
+    if pedido.referencias:
+        p.drawString(10*mm, 45*mm, f"Ref: {pedido.referencias[:50]}")
+
+    # Código de Barras
+    barcode = code128.Code128(f"SJ-{pedido.id:04d}", barHeight=15*mm, barWidth=1.5)
+    barcode.drawOn(p, 10*mm, 15*mm)
+
+    p.showPage()
+    p.save()
+    buffer.seek(0)
+    
+    # 3. Enviamos el archivo listo para imprimir
+    return Response(content=buffer.getvalue(), media_type="application/pdf")
 
 # ==========================================
 # 5. EL CEREBRO FINANCIERO (WEBHOOKS) 🧠

@@ -887,12 +887,12 @@
                 grid.innerHTML = '<p class="text-center col-span-full text-stone-500 py-10">No encontramos modelos con esa búsqueda.</p>';
                 return;
             }
-listaPantalones.forEach(p => {
+            
+            listaPantalones.forEach(p => {
                 const estaAgotado = p.stock === 0;
                 const filtroImagen = estaAgotado ? 'grayscale opacity-50' : 'transform group-hover:scale-105 transition-transform duration-500';
                 const etiquetaAgotado = estaAgotado ? '<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-600 text-white text-lg font-black px-6 py-2 rounded-xl shadow-2xl tracking-widest z-20 -rotate-12 border-2 border-white">AGOTADO</div>' : '';
                 
-                // ⚡ LÓGICA DE ESTRELLAS
                 const ratingDOM = p.promedio_estrellas > 0 
                     ? `<div class="flex items-center gap-1 text-xs text-amber-400 font-black mb-1">
                         ${'⭐'.repeat(Math.round(p.promedio_estrellas))} <span class="text-gray-400 font-medium">(${p.total_resenas})</span>
@@ -906,10 +906,11 @@ listaPantalones.forEach(p => {
                 const div = document.createElement('div');
                 div.className = 'bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 group relative';
                 
+                // ⚡ A LA IMAGEN LE AGREGAMOS EL CLIC PARA VER DETALLES Y RECOMENDACIONES ⚡
                 div.innerHTML = `
                     <div class="relative overflow-hidden aspect-[3/4] bg-gray-50">
                         ${etiquetaAgotado}
-                        <img src="${p.imagen_url}" alt="${p.nombre}" class="w-full h-full object-cover ${filtroImagen}">
+                        <img src="${p.imagen_url}" onclick="verDetalles(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', '${p.imagen_url}', ${p.precio})" alt="${p.nombre}" class="w-full h-full object-cover cursor-pointer ${filtroImagen}">
                         <div class="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-black text-indigo-600 shadow-sm">
                             [${p.codigo || 'S/C'}]
                         </div>

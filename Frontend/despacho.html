@@ -100,7 +100,7 @@
                 setTimeout(conectarTúnelEnVivo, 5000); 
             };
         }
-        
+
         async function lanzarRecuperacion() {
             Swal.fire({ title: 'Escaneando carritos...', text: 'Buscando clientes que no terminaron su pago.', allowOutsideClick: false, showConfirmButton: false });
             Swal.showLoading();
@@ -198,9 +198,10 @@
                 if (p.estatus === "ENVIADO") colorBadge = "bg-indigo-100 text-indigo-700 border-indigo-200";
                 
                 let listaRopa = p.detalles.map(d => `<li class="text-xs text-gray-600 border-b border-gray-50 pb-1 mt-1 font-medium">• ${d.cantidad}x [${d.codigo}] ${d.nombre}</li>`).join('');
-                const stringRopa = p.detalles.map(d => `${d.cantidad}x [${d.codigo}] ${d.nombre}`).join('<br>');
                 
-                const btnPDF = esPagado ? `<button onclick="generarTicketPDF('${p.folio}', '${p.cliente}', '${p.direccion_completa}', '${p.referencias || ''}', '${stringRopa}')" class="text-[10px] font-bold text-white bg-indigo-600 px-4 py-2 rounded-lg shadow hover:bg-indigo-700 transition-colors uppercase tracking-wider flex items-center gap-1 w-full justify-center"><span class="text-sm">🖨️</span> Imprimir Etiqueta</button>` : '';
+                // ⚡ AQUÍ INYECTAMOS EL NUEVO BOTÓN GENERADOR DE PDF ⚡
+                const btnPDF = esPagado ? `<button onclick="window.open('${API_URL}/pedidos/${p.id}/etiqueta?token=${tokenPrivado}', '_blank')" class="text-[10px] font-bold text-white bg-indigo-600 px-4 py-2 rounded-lg shadow hover:bg-indigo-700 transition-colors uppercase tracking-wider flex items-center gap-1 w-full justify-center"><span class="text-sm">🖨️</span> IMPRIMIR ETIQUETA OFICIAL</button>` : '';
+                
                 const btnWhatsApp = esPagado ? `<button onclick="marcarEnviado(${p.id}, '${p.folio}', '${p.telefono}', '${p.cliente}')" class="text-[10px] font-bold text-white bg-emerald-500 px-4 py-2 rounded-lg shadow hover:bg-emerald-600 transition-colors uppercase tracking-wider flex items-center gap-1 mt-2 w-full justify-center"><span class="text-sm">💬</span> Notificar Envío por WA</button>` : '';
 
                 grid.innerHTML += `
@@ -223,7 +224,6 @@
                 `;
             });
         }
-
         function generarTicketPDF(folio, cliente, direccion, referencias, ropaStr) {
             const htmlContent = `
                 <div style="width: 280px; padding: 20px; font-family: 'Courier New', Courier, monospace; color: black; background: white;">
