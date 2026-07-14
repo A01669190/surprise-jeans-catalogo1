@@ -14,7 +14,6 @@ from database import engine, get_db
 import json
 from fastapi.responses import FileResponse
 import mercadopago # <-- MOTOR BANCARIO
-import resend
 from sqlalchemy import text
 import bcrypt
 # Seguridad de Tráfico
@@ -71,9 +70,36 @@ GMAIL_PASSWORD = os.getenv("GMAIL_PASSWORD", "")
 ALGORITHM = "HS256"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
-# 🚨 MOTOR DE CORREOS PROFESIONAL (RESEND) 🚨
-RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-resend.api_key = RESEND_API_KEY
+
+
+# ==========================================
+# 🚨 NUEVO MOTOR DE CORREOS GMAIL SMTP (SSL PUERTO 465) 🚨
+# ==========================================
+def enviar_correo_gmail(correo_destino, asunto, html_content):
+    gmail_user = os.getenv("GMAIL_USER", "denzellopezcabrera@gmail.com")
+    gmail_password = os.getenv("GMAIL_PASSWORD", "") # Tu Contraseña de Aplicación de 16 caracteres
+    
+    if not gmail_password:
+        print("Advertencia: GMAIL_PASSWORD no está configurada en las variables de entorno.")
+        return False
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = asunto
+    msg["From"] = f"Surprise Jeans <{gmail_user}>"
+    msg["To"] = correo_destino
+
+    msg.attach(MIMEText(html_content, "html"))
+
+    try:
+        # Usamos SSL directo en el puerto 465 (altamente recomendado para servidores en la nube)
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as servidor:
+            servidor.login(gmail_user, gmail_password)
+            servidor.sendmail(gmail_user, correo_destino, msg.as_string())
+        print(f"📧 Correo SMTP enviado con éxito a: {correo_destino}")
+        return True
+    except Exception as e:
+        print(f"❌ Error al enviar correo por SMTP de Gmail: {e}")
+        return False
 
 def enviar_correo_recibo(correo_destino, nombre, folio, total, lista_ropa, puntos_ganados):
     try:
@@ -156,6 +182,7 @@ def enviar_correo_carrito_abandonado(correo_destino, nombre, folio):
         })
     except Exception as e:
         print("Error al enviar recordatorio:", e)
+
 
 # ==========================================
 # INFRAESTRUCTURA DE WEBSOCKETS (TIEMPO REAL)
@@ -499,140 +526,7 @@ async def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, 
 
     # 3. APLICAR DESCUENTO DE PUNTOS AL TOTAL
     total_final = total_pedido - puntos_a_descontar
-    if total_final <= 0: 
-        total_final = 0
-
-    if puntos_a_descontar > 0:
-        items_para_banco.append({
-            "title": "Descuento Surprise Points",
-            "quantity": 1,
-            "unit_price": round(-puntos_a_descontar, 2),
-            "currency_id": "MXN"
-        })
-
-    # 4. CREAR PEDIDO
-    nuevo_pedido = models.Pedido(
-        correo_cliente=cliente_db.correo if cliente_db else None, # ⚡ GUARDAMOS EL CORREO DUEÑO
-        nombre_cliente=pedido_req.envio.nombre, telefono=pedido_req.envio.telefono,
-        calle_numero=pedido_req.envio.calle_numero, colonia=pedido_req.envio.colonia,
-        ciudad=pedido_req.envio.ciudad, estado=pedido_req.envio.estado,
-        codigo_postal=pedido_req.envio.cp, referencias=pedido_req.envio.referencias,
-        total=total_final, estatus="PENDIENTE"
-    )
-    db.add(nuevo_pedido)
-    db.commit()
-    db.refresh(nuevo_pedido)
-
-    for item in pedido_req.items:
-        precio_final = float(item.precio) * (1.0 - (descuento_porc / 100.0))
-        db.add(models.DetallePedido(
-            pedido_id=nuevo_pedido.id, pantalon_id=item.id, 
-            cantidad=item.cantidad, precio_unitario=round(precio_final, 2)
-        ))
-    db.commit()
-    
-    if cliente_db:
-        puntos_ganados = total_final * 0.05
-        cliente_db.puntos += puntos_ganados
-        db.commit()
-
-    # 🚨 LA MAGIA: SI EL PEDIDO ES GRATIS, SALTAMOS A MERCADO PAGO 🚨
-    if total_final <= 0:
-        nuevo_pedido.estatus = "PAGADO"
-        lista_ropa = []
-        for detalle in nuevo_pedido.detalles:
-            pantalon_db = db.query(models.Pantalon).filter(models.Pantalon.id == detalle.pantalon_id).first()
-            if pantalon_db and pantalon_db.stock >= detalle.cantidad:
-                pantalon_db.stock -= detalle.cantidad
-            if pantalon_db:
-                lista_ropa.append({"cantidad": detalle.cantidad, "nombre": pantalon_db.nombre, "precio": detalle.precio_unitario})
-        db.commit()
-        
-        await manager.broadcast("NUEVO_PEDIDO")
-        
-        # 💌 DISPARO DEL CORREO (PAGO CERO)
-        if cliente_db:
-            enviar_correo_recibo(cliente_db.correo, cliente_db.nombre_completo, f"{nuevo_pedido.id:04d}", total_final, lista_ropa, puntos_ganados)
-            
-        return {"link_pago": f"https://surprisejeanysk.com/?pago=exito&payment_id=CUPON-GRATIS&external_reference={nuevo_pedido.id}"}
-    
-    # SI HAY QUE PAGAR ALGO, VAMOS AL BANCO NORMALMENTE
-    preference_data = {
-        "items": items_para_banco,
-        "metadata": {"pedido_interno_id": nuevo_pedido.id}, 
-        "external_reference": str(nuevo_pedido.id),
-        "back_urls": {
-            "success": "https://surprisejeanysk.com/?pago=exito",
-            "failure": "https://surprisejeanysk.com/?pago=fallo",
-            "pending": "https://surprisejeanysk.com/?pago=pendiente"
-        },
-        "auto_return": "approved",
-        "notification_url": "https://surprise-jeans-api-denz.onrender.com/webhook/mercadopago",
-        "statement_descriptor": "SURPRISE JEANS" 
-    }
-
-    respuesta = sdk.preference().create(preference_data)
-    if respuesta["status"] != 201:
-        raise HTTPException(status_code=400, detail="Mercado Pago bloqueó la solicitud.")
-
-    return {"link_pago": respuesta["response"]["init_point"]}
-@app.post("/crear-pago-seguro")
-async def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, db: Session = Depends(get_db)):
-    total_pedido = 0
-    items_para_banco = []
-    
-    # 1. VERIFICAR CUPÓN
-    descuento_porc = 0.0
-    if pedido_req.cupon:
-        cupon_db = db.query(models.Cupon).filter(models.Cupon.codigo == pedido_req.cupon.upper(), models.Cupon.activo == 1).first()
-        if cupon_db:
-            descuento_porc = cupon_db.porcentaje
-
-    for item in pedido_req.items:
-        pantalon_db = db.query(models.Pantalon).filter(models.Pantalon.id == item.id).first()
-        if not pantalon_db or pantalon_db.stock < item.cantidad:
-            raise HTTPException(status_code=400, detail=f"Alguien acaba de comprar el último {item.nombre}")
-        
-        precio_con_descuento = float(item.precio) * (1.0 - (descuento_porc / 100.0))
-        total_pedido += (precio_con_descuento * item.cantidad)
-        
-        items_para_banco.append({
-            "title": f"[{item.codigo}] {item.nombre}",
-            "quantity": item.cantidad,
-            "unit_price": round(precio_con_descuento, 2),
-            "currency_id": "MXN"
-        })
-
-    # 2. SISTEMA DE USUARIOS
-    auth_header = request.headers.get("Authorization")
-    cliente_db = None
-    puntos_a_descontar = 0.0
-
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header.split(" ")[1]
-        try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            cliente_db = db.query(models.Cliente).filter(models.Cliente.correo == payload.get("sub")).first()
-            if cliente_db:
-                cliente_db.telefono = pedido_req.envio.telefono
-                cliente_db.calle_numero = pedido_req.envio.calle_numero
-                cliente_db.colonia = pedido_req.envio.colonia
-                cliente_db.ciudad = pedido_req.envio.ciudad
-                cliente_db.estado = pedido_req.envio.estado
-                cliente_db.codigo_postal = pedido_req.envio.cp
-                cliente_db.referencias_domicilio = pedido_req.envio.referencias
-                
-                if pedido_req.usar_puntos and cliente_db.puntos > 0:
-                    puntos_a_descontar = cliente_db.puntos
-                    cliente_db.puntos = 0.0 
-                db.commit()
-        except:
-            pass
-
-    # 3. APLICAR DESCUENTO DE PUNTOS
-    total_final = total_pedido - puntos_a_descontar
-    if total_final <= 0: 
-        total_final = 0
+    if total_final < 0: total_final = 0
 
     if puntos_a_descontar > 0:
         items_para_banco.append({
@@ -644,6 +538,7 @@ async def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, 
 
     # 4. CREAR PEDIDO EN BASE DE DATOS
     nuevo_pedido = models.Pedido(
+        correo_cliente=cliente_db.correo if cliente_db else None,
         nombre_cliente=pedido_req.envio.nombre, telefono=pedido_req.envio.telefono,
         calle_numero=pedido_req.envio.calle_numero, colonia=pedido_req.envio.colonia,
         ciudad=pedido_req.envio.ciudad, estado=pedido_req.envio.estado,
@@ -654,20 +549,22 @@ async def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, 
     db.commit()
     db.refresh(nuevo_pedido)
 
+    lista_ropa = []
     for item in pedido_req.items:
         precio_final = float(item.precio) * (1.0 - (descuento_porc / 100.0))
         db.add(models.DetallePedido(
             pedido_id=nuevo_pedido.id, pantalon_id=item.id, 
             cantidad=item.cantidad, precio_unitario=round(precio_final, 2)
         ))
+        lista_ropa.append({"cantidad": item.cantidad, "nombre": item.nombre, "precio": round(precio_final, 2)})
     db.commit()
     
+    puntos_ganados = total_final * 0.05
     if cliente_db:
-        puntos_ganados = total_final * 0.05
         cliente_db.puntos += puntos_ganados
         db.commit()
 
-    # 🚨 LA MAGIA: SI EL PEDIDO ES GRATIS, SALTAMOS A MERCADO PAGO 🚨
+    # 🚨 LA MAGIA: SI EL PEDIDO ES GRATIS ($0), NOS SALTAMOS EL BANCO 🚨
     if total_final <= 0:
         nuevo_pedido.estatus = "PAGADO"
         for detalle in nuevo_pedido.detalles:
@@ -676,10 +573,16 @@ async def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, 
                 pantalon_db.stock -= detalle.cantidad
         db.commit()
         
+        # Avisamos al Centro de Despacho por WebSockets
         await manager.broadcast("NUEVO_PEDIDO")
         
+        # 📧 ENVIAR CORREO GMAIL (PAGO GRATUITO POR CUPÓN)
+        if cliente_db:
+            enviar_correo_recibo(cliente_db.correo, cliente_db.nombre_completo, f"{nuevo_pedido.id:04d}", total_final, lista_ropa, puntos_ganados)
+            
         return {"link_pago": f"https://surprisejeanysk.com/?pago=exito&payment_id=CUPON-GRATIS&external_reference={nuevo_pedido.id}"}
 
+    # PROCESO NORMAL HACIA EL BANCO SI HAY SALDO
     preference_data = {
         "items": items_para_banco,
         "metadata": {"pedido_interno_id": nuevo_pedido.id}, 
@@ -698,7 +601,7 @@ async def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, 
     if respuesta["status"] != 201:
         raise HTTPException(status_code=400, detail="Mercado Pago bloqueó la solicitud.")
 
-    return {"link_pago": respuesta["response"]["init_point"]}
+    return {"link_pago": respuesta["response"]["init_point"]} 
 
 @app.post("/webhook/mercadopago")
 async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
@@ -716,7 +619,8 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
             if estado_pago == "approved" and pedido_id:
                 pedido_db = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
                 
-                if pedido_db and pedido_db.estatus in ["PENDIENTE", "RECORDATORIO_ENVIADO"]:    
+                # Aceptamos pagos pendientes o recuperados
+                if pedido_db and pedido_db.estatus in ["PENDIENTE", "RECORDATORIO_ENVIADO"]:
                     pedido_db.estatus = "PAGADO"
                     lista_ropa = []
                     
@@ -728,10 +632,12 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                             lista_ropa.append({"cantidad": detalle.cantidad, "nombre": pantalon_db.nombre, "precio": detalle.precio_unitario})
                     
                     db.commit()
+                    
+                    # Sonido Din por WebSocket
                     await manager.broadcast("NUEVO_PEDIDO")
                     
-                    # 💌 DISPARO DEL CORREO (BANCO REAL)
-                    cliente_db = db.query(models.Cliente).filter(models.Cliente.telefono == pedido_db.telefono).first()
+                    # 📧 ENVIAR CORREO GMAIL (PAGO EN TIENDA REAL)
+                    cliente_db = db.query(models.Cliente).filter(models.Cliente.correo == pedido_db.correo_cliente).first()
                     if cliente_db:
                         puntos_ganados = pedido_db.total * 0.05
                         enviar_correo_recibo(cliente_db.correo, cliente_db.nombre_completo, f"{pedido_db.id:04d}", pedido_db.total, lista_ropa, puntos_ganados)
@@ -1013,3 +919,26 @@ def marcar_pedido_enviado(pedido_id: int, db: Session = Depends(get_db), token: 
     db.commit()
     
     return {"mensaje": "Estatus actualizado a ENVIADO exitosamente"}
+
+@app.post("/admin/lanzar-recuperacion")
+def lanzar_recuperacion_carritos(db: Session = Depends(get_db), token: str = Depends(verificar_token)):
+    # Buscamos pedidos abandonados de hace más de 1 hora
+    hace_una_hora = datetime.utcnow() - timedelta(hours=1)
+    
+    pedidos_abandonados = db.query(models.Pedido).filter(
+        models.Pedido.estatus == "PENDIENTE",
+        models.Pedido.correo_cliente != None,
+        models.Pedido.fecha <= hace_una_hora
+    ).all()
+
+    correos_enviados = 0
+    for pedido in pedidos_abandonados:
+        # Enviamos el correo con el cupón REGRESA10
+        enviar_correo_carrito_abandonado(pedido.correo_cliente, pedido.nombre_cliente, f"{pedido.id:04d}")
+        
+        # Cambiamos estatus para marcarlo como procesado
+        pedido.estatus = "RECORDATORIO_ENVIADO"
+        correos_enviados += 1
+        
+    db.commit()
+    return {"mensaje": f"Escaneo completo. Se enviaron {correos_enviados} correos de recuperación."}
