@@ -20,7 +20,6 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 
-</head>
 <body class="bg-gray-50 text-gray-800 font-sans relative pb-20">
 
     <div id="overlay-menu" onclick="cerrarMenuLateral()" class="fixed inset-0 bg-stone-900 bg-opacity-50 z-40 hidden transition-opacity"></div>
@@ -578,12 +577,15 @@
         // ==========================================
         let modoVenta = 'menudeo'; // Estado global
 
+        // ==========================================
+        // UI: TOGGLE MAYOREO / MENUDEO (Opción A)
+        // ==========================================
         function cambiarModo(modo) {
             const btnMenudeo = document.getElementById('btn-menudeo');
             const btnMayoreo = document.getElementById('btn-mayoreo');
 
             if (modo === 'mayoreo') {
-                // Notificación Premium con SweetAlert2
+                // Notificación Premium con SweetAlert2 (Reemplaza el viejo alert)
                 Swal.fire({
                     icon: 'info',
                     title: '📦 Venta de Mayoreo',
