@@ -25,7 +25,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import string
 import random
-
+from pydantic import BaseModel
 # Seguridad de Sesión (JWT)
 import jwt
 from datetime import datetime, timedelta
@@ -185,6 +185,36 @@ async def recuperar_password(request: Request, db: Session = Depends(get_db)):
 
     # 3. Devolvemos la clave a la página web directamente
     return {"mensaje": "Proceso completado.", "nueva_pass": nueva_pass}
+
+
+class CambioPasswordReq(BaseModel):
+    password_actual: str
+    password_nueva: str
+
+@app.post("/cambiar-password")
+def cambiar_password(
+    datos: schemas.CambioPasswordReq, 
+    correo: str = Depends(verificar_token_cliente), 
+    db: Session = Depends(get_db)
+):
+    # 1. Buscamos al cliente por el token de su sesión
+    cliente = db.query(models.Cliente).filter(models.Cliente.correo == correo).first()
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado.")
+    
+    # 2. Verificamos que sepa la contraseña actual (la temporal)
+    if not verificar_password(datos.password_actual, cliente.password_hash):
+        raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta.")
+    
+    # 3. Validamos que la nueva sea segura
+    if len(datos.password_nueva) < 6:
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe tener mínimo 6 caracteres.")
+    
+    # 4. Encriptamos y guardamos la nueva clave
+    cliente.password_hash = obtener_hash_password(datos.password_nueva)
+    db.commit()
+    
+    return {"mensaje": "Contraseña actualizada con éxito."}
 
 @app.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):

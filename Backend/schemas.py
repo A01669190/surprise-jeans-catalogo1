@@ -53,3 +53,16 @@ class ClienteRegistro(BaseModel):
     correo: str
     password: str
     telefono: str
+
+# ==========================================
+# ESQUEMAS DE CLIENTES
+# ==========================================
+class ClienteRegistro(BaseModel):
+    nombre_completo: str
+    correo: str
+    password: str
+    telefono: str
+
+class CambioPasswordReq(BaseModel):
+    password_actual: str
+    password_nueva: str

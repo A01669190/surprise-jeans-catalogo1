@@ -484,7 +484,11 @@
                             <span class="text-xl text-indigo-600 font-black">👋</span>
                         </div>
                         <h4 class="text-lg font-bold text-gray-900 mb-1" id="nombre-cliente-bienvenida">¡Hola!</h4>
-                        <button onclick="cerrarSesionCliente()" class="text-xs font-bold text-rose-500 hover:underline">Cerrar Sesión</button>
+                        <div class="flex justify-center gap-4 mt-2">
+                            <button onclick="iniciarCambioPassword()" class="text-xs font-bold text-indigo-500 hover:underline">Cambiar Contraseña</button>
+                            <span class="text-gray-300">|</span>
+                            <button onclick="cerrarSesionCliente()" class="text-xs font-bold text-rose-500 hover:underline">Cerrar Sesión</button>
+                        </div>
                     </div>
                     
                     <h5 class="font-bold text-gray-800 border-b border-gray-100 pb-2 mb-4">Mis Compras</h5>
@@ -544,7 +548,66 @@
                 document.getElementById('grid-pantalones').innerHTML = '<p class="text-center text-rose-500 col-span-full">Error al cargar la colección.</p>';
             }
         }
+        async function iniciarCambioPassword() {
+            const token = localStorage.getItem('token_cliente_sj');
+            if(!token) return;
 
+            // Ventana premium para pedir las dos contraseñas
+            const { value: formValues } = await Swal.fire({
+                title: 'Cambiar Contraseña',
+                html:
+                    '<input id="swal-pass-actual" type="password" placeholder="Contraseña actual (o temporal)" class="swal2-input text-sm">' +
+                    '<input id="swal-pass-nueva" type="password" placeholder="Nueva contraseña personal" class="swal2-input text-sm">',
+                focusConfirm: false,
+                showCancelButton: true,
+                confirmButtonText: 'Actualizar',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#4f46e5',
+                preConfirm: () => {
+                    return {
+                        actual: document.getElementById('swal-pass-actual').value,
+                        nueva: document.getElementById('swal-pass-nueva').value
+                    }
+                }
+            });
+
+            if (formValues) {
+                if(!formValues.actual || !formValues.nueva) {
+                    Swal.fire({icon: 'warning', title: 'Faltan datos', text: 'Llena ambos campos.'}); return;
+                }
+
+                Swal.fire({ title: 'Actualizando...', allowOutsideClick: false, showConfirmButton: false });
+                Swal.showLoading();
+
+                try {
+                    const respuesta = await fetch(`${API_URL}/cambiar-password`, {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}` 
+                        },
+                        body: JSON.stringify({ 
+                            password_actual: formValues.actual, 
+                            password_nueva: formValues.nueva 
+                        })
+                    });
+
+                    if (respuesta.ok) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: '¡Listo!',
+                            text: 'Tu contraseña personal ha sido guardada en la bóveda.',
+                            confirmButtonColor: '#10b981'
+                        });
+                    } else {
+                        const errorData = await respuesta.json();
+                        Swal.fire({ icon: 'error', title: 'Oops...', text: errorData.detail });
+                    }
+                } catch (error) {
+                    Swal.fire({ icon: 'error', title: 'Error', text: 'Fallo de conexión.' });
+                }
+            }
+        }
         // ==========================================
         // LÓGICA DE FILTROS RÁPIDOS
         // ==========================================
