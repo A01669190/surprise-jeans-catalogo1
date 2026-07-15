@@ -1,5 +1,6 @@
 import os
 from sqlalchemy import func, text
+import loyverse_sync
 from fastapi.responses import Response
 from reportlab.pdfgen import canvas
 from reportlab.graphics.barcode import code128
@@ -675,7 +676,7 @@ async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, 
             pantalon_db = db.query(models.Pantalon).filter(models.Pantalon.id == detalle.pantalon_id).first()
             if pantalon_db and pantalon_db.stock >= detalle.cantidad:
                 pantalon_db.stock -= detalle.cantidad
-                descontar_stock_loyverse(pantalon_db.codigo, pantalon_db.stock)    
+                loyverse_sync.descontar_stock_loyverse(pantalon_db.codigo, pantalon_db.stock)    
                 db.commit()
         
         await manager.broadcast("NUEVO_PEDIDO")
@@ -737,7 +738,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                             pantalon_db.stock -= detalle.cantidad
                             
                             # 2. ⚡ VÍA 2: Descuenta en Loyverse enviando el STOCK FINAL absoluto
-                            descontar_stock_loyverse(pantalon_db.codigo, pantalon_db.stock)
+                            loyverse_sync.descontar_stock_loyverse(pantalon_db.codigo, pantalon_db.stock)
                             
                         if pantalon_db:
                             lista_ropa.append({"cantidad": detalle.cantidad, "nombre": pantalon_db.nombre, "precio": detalle.precio_unitario})
@@ -787,38 +788,11 @@ def lanzar_recuperacion_carritos(db: Session = Depends(get_db), token: str = Dep
 async def webhook_loyverse(request: Request, db: Session = Depends(get_db)):
     try:
         datos = await request.json()
-        
-        # Loyverse agrupa las notificaciones en una lista de 'events'
         eventos = datos.get("events", [])
-        
-        for evento in eventos:
-            # Atrapamos cuando se cobra o actualiza un recibo en la tablet
-            if evento.get("type") == "receipts.update": # ⚡ CAMBIO AQUÍ TAMBIÉN
-                recibo = evento.get("data", {}).get("receipt", {})
-                line_items = recibo.get("line_items", [])
-                
-                # Revisamos toda la ropa que se vendió en ese ticket físico
-                for item in line_items:
-                    sku_loyverse = item.get("sku") # Este es el código clave
-                    cantidad_vendida = int(item.get("quantity", 1))
-                    
-                    if sku_loyverse:
-                        # 1. Buscamos el pantalón en nuestra base de datos web
-                        pantalon_db = db.query(models.Pantalon).filter(models.Pantalon.codigo == sku_loyverse).first()
-                        
-                        # 2. Si existe y tenemos stock, lo descontamos
-                        if pantalon_db and pantalon_db.stock >= cantidad_vendida:
-                            pantalon_db.stock -= cantidad_vendida
-                            db.commit()
-                            
-                            # 3. Avisamos a Yessica en el Despacho para que la tabla se actualice sola
-                            await manager.broadcast("NUEVO_PEDIDO")
-                            print(f"✅ Loyverse Sync: Se descontaron {cantidad_vendida} unidades del modelo [{sku_loyverse}]")
-                            
+        # Le mandamos el paquete entero a nuestro nuevo archivo especializado
+        await loyverse_sync.procesar_webhooks_loyverse(eventos, db, manager)
     except Exception as e:
-        print(f"❌ Error procesando el webhook de Loyverse: {e}")
-        
-    # Siempre debemos responderle "OK" a Loyverse para que sepa que recibimos el mensaje
+        print(f"❌ Error en webhook Loyverse: {e}")
     return {"status": "procesado"}
 
 @app.get("/simular-din")
@@ -1142,9 +1116,6 @@ def forzar_conexion_loyverse():
         return {"estado": "❌ Error al conectar", "detalle": error_msg}
     
 
-# ==========================================
-# 🔄 VÍA 2: LA WEB LE AVISA A LA TIENDA FÍSICA
-# ==========================================
 # ==========================================
 # 🔄 VÍA 2: LA WEB LE AVISA A LA TIENDA FÍSICA
 # ==========================================
