@@ -563,12 +563,12 @@
 
         async function cargarCatalogo() {
             try {
-                const respuesta = await fetch(`${API_URL}/pantalones`);
+                // ⚡ Agregamos el límite para que traiga el texto de todos, pero sin saturar las fotos
+                const respuesta = await fetch(`${API_URL}/pantalones?limit=1000`);
                 catalogoCompleto = await respuesta.json();
                 renderizarCatalogo(catalogoCompleto);
             } catch (error) {
-                document.getElementById('grid-pantalones').innerHTML = '<p class="text-center text-rose-500 col-span-full">Error al cargar la colección.</p>';
-            }
+                document.getElementById('grid-pantalones').innerHTML = '<p class="text-center text-rose-500 col-span-full">Error al cargar la colección.</p>';}
         }
         async function iniciarCambioPassword() {
             const token = localStorage.getItem('token_cliente_sj');
@@ -1020,7 +1020,7 @@
                 div.innerHTML = `
                     <div class="relative overflow-hidden aspect-[3/4] bg-gray-50">
                         ${etiquetaAgotado}
-                        <img src="${p.imagen_url}" onclick="verDetalles(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', '${p.imagen_url}', ${p.precio})" alt="${p.nombre}" class="w-full h-full object-cover cursor-pointer ${filtroImagen}">
+                        <img src="${p.imagen_url}" loading="lazy" onclick="verDetalles(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', '${p.imagen_url}', ${p.precio})" alt="${p.nombre}" class="w-full h-full object-cover cursor-pointer ${filtroImagen}">
                         <div class="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-black text-indigo-600 shadow-sm">
                             [${p.codigo || 'S/C'}]
                         </div>
