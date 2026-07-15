@@ -1093,7 +1093,7 @@ def forzar_conexion_loyverse():
     url = "https://api.loyverse.com/v1.0/webhooks"
     
     # 👇 Pega aquí adentro tu token larguísimo (el que se ve en tu captura de pantalla)
-    token = "PEGA_TU_TOKEN_AQUI" 
+    token = "b3dca41541684d0cb5dbcfeac1155736" 
     
     # El mensaje exacto que Loyverse nos pide
     payload = json.dumps({
