@@ -1096,9 +1096,11 @@ def forzar_conexion_loyverse():
     token = "b3dca41541684d0cb5dbcfeac1155736" 
     
     # El mensaje exacto que Loyverse nos pide
+# El mensaje exacto que Loyverse nos pide
     payload = json.dumps({
         "url": "https://surprise-jeans-api-denz.onrender.com/webhook/loyverse",
-        "event": "receipts.create"
+        "type": "receipts.create",
+        "status": "ENABLED"
     }).encode("utf-8")
     
     req = urllib.request.Request(url, data=payload)
