@@ -675,7 +675,8 @@ async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, 
             pantalon_db = db.query(models.Pantalon).filter(models.Pantalon.id == detalle.pantalon_id).first()
             if pantalon_db and pantalon_db.stock >= detalle.cantidad:
                 pantalon_db.stock -= detalle.cantidad
-                descontar_stock_loyverse(pantalon_db.codigo, pantalon_db.stock)        db.commit()
+                descontar_stock_loyverse(pantalon_db.codigo, pantalon_db.stock)    
+                db.commit()
         
         await manager.broadcast("NUEVO_PEDIDO")
         
@@ -741,6 +742,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                         if pantalon_db:
                             lista_ropa.append({"cantidad": detalle.cantidad, "nombre": pantalon_db.nombre, "precio": detalle.precio_unitario})
                     
+                    # AQUÍ ESTABA EL ERROR: db.commit() ya tiene su propio renglón nuevamente
                     db.commit()
                     
                     # Sonido Din por WebSocket
