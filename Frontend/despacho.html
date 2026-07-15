@@ -101,29 +101,31 @@
             };
         }
 
-        function marcarEntregado(id) {
-            Swal.fire({
+        async function marcarEntregado(id) {
+            const result = await Swal.fire({
                 title: '¿Marcar como Entregado?',
                 text: 'El ciclo de esta venta se cerrará y el cliente lo verá en su perfil.',
                 icon: 'question',
                 showCancelButton: true,
                 confirmButtonColor: '#0f766e',
                 confirmButtonText: 'Sí, finalizar'
-            }).then(async (result) => {
-                if (result.isConfirmed) {
-                    Swal.showLoading();
-                    try {
-                        const res = await fetch(`${API_URL}/pedidos/${id}/entregar`, {
-                            method: 'PATCH',
-                            headers: { 'Authorization': `Bearer ${tokenPrivado}` }
-                        });
-                        if (res.ok) {
-                            Swal.fire({ icon: 'success', title: '¡Entregado!', showConfirmButton: false, timer: 1500 });
-                            cargarPedidos();
-                        }
-                    } catch(e) { Swal.fire('Error', 'Fallo de conexión', 'error'); }
-                }
             });
+
+            if (result.isConfirmed) {
+                Swal.showLoading();
+                try {
+                    const res = await fetch(`${API_URL}/pedidos/${id}/entregar`, {
+                        method: 'PATCH',
+                        headers: { 'Authorization': `Bearer ${tokenPrivado}` }
+                    });
+                    if (res.ok) {
+                        Swal.fire({ icon: 'success', title: '¡Entregado!', showConfirmButton: false, timer: 1500 });
+                        cargarPedidos();
+                    }
+                } catch(e) { 
+                    Swal.fire('Error', 'Fallo de conexión', 'error'); 
+                }
+            }
         }
 
         async function lanzarRecuperacion() {
