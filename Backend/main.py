@@ -468,6 +468,17 @@ def generar_cupon_100(db: Session = Depends(get_db)):
         return {"mensaje": "¡Cupón GRATIS100 (100% de descuento) creado y listo para usar!"}
     return {"mensaje": "El cupón GRATIS100 ya existía."}
 
+@app.get("/generar-cupon-presencial")
+def generar_cupon_presencial(db: Session = Depends(get_db)):
+    # Crea el cupón maestro en la base de datos para ventas físicas
+    existe = db.query(models.Cupon).filter(models.Cupon.codigo == "VENTA-PRESENCIAL").first()
+    if not existe:
+        nuevo = models.Cupon(codigo="VENTA-PRESENCIAL", porcentaje=100.0, activo=1)
+        db.add(nuevo)
+        db.commit()
+        return {"mensaje": "✅ ¡Cupón VENTA-PRESENCIAL creado y listo para usar en la tienda!"}
+    return {"mensaje": "El cupón ya existía."}
+
 # ==========================================
 # 🎯 MOTOR DE RECOMENDACIONES (CROSS-SELLING)
 # ==========================================
