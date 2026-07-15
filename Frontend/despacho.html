@@ -62,7 +62,6 @@
         let tokenPrivado = null; 
         
         // ⚡ WEBSOCKETS: Sonido y Conexión
-        // ⚡ WEBSOCKETS: Sonido Blindado y Conexión
         const sonidoDin = new Audio('https://www.myinstants.com/media/sounds/ding-sound-effect_2.mp3');
         let socket = null;
 
@@ -70,7 +69,6 @@
             const wsUrl = API_URL.replace('https://', 'wss://').replace('http://', 'ws://') + '/ws/despacho';
             socket = new WebSocket(wsUrl);
 
-            // 1. RASTREADOR: Te avisará si el túnel se abrió correctamente
             socket.onopen = function(e) {
                 Swal.fire({
                     title: '📡 Túnel Conectado',
@@ -80,7 +78,6 @@
                 });
             };
 
-            // 2. RECEPCIÓN: Cuando el servidor dispara el "Din"
             socket.onmessage = function(event) {
                 if (event.data === "NUEVO_PEDIDO") {
                     sonidoDin.play().catch(e => console.log("El navegador bloqueó el sonido."));
@@ -90,11 +87,10 @@
                         icon: 'info', toast: true, position: 'top-end',
                         showConfirmButton: false, timer: 4000, timerProgressBar: true
                     });
-                    cargarPedidos(); // Recarga las tarjetas
+                    cargarPedidos(); 
                 }
             };
 
-            // 3. RECONEXIÓN
             socket.onclose = function() { 
                 console.log("El túnel se durmió. Reconectando...");
                 setTimeout(conectarTúnelEnVivo, 5000); 
@@ -142,7 +138,7 @@
                 
                 if (res.ok) {
                     Swal.fire({ icon: 'success', title: '¡Campaña Lanzada!', text: data.mensaje, confirmButtonColor: '#10b981' });
-                    cargarPedidos(); // Recargamos para ver si alguno cambió a RECORDATORIO_ENVIADO
+                    cargarPedidos(); 
                 } else {
                     Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo lanzar la campaña.' });
                 }
@@ -167,7 +163,7 @@
                     document.getElementById('nav-botones').classList.remove('hidden');
                     document.getElementById('pass').value = ''; 
                     
-                    conectarTúnelEnVivo(); // 👈 ABRIMOS EL TÚNEL AL ENTRAR
+                    conectarTúnelEnVivo(); 
                     cambiarPestana('pedidos');
                 } else {
                     Swal.fire({icon: 'error', title: 'Acceso Denegado', text: 'Contraseña incorrecta'});
@@ -233,7 +229,6 @@
                 const btnPDF = esPagado ? `<button onclick="window.open('${API_URL}/pedidos/${p.id}/etiqueta?token=${tokenPrivado}', '_blank')" class="text-[10px] font-bold text-white bg-indigo-600 px-4 py-2 rounded-lg shadow hover:bg-indigo-700 transition-colors uppercase tracking-wider flex items-center gap-1 w-full justify-center"><span class="text-sm">🖨️</span> Imprimir Etiqueta</button>` : '';
                 const btnWhatsApp = esPagado ? `<button onclick="marcarEnviado(${p.id}, '${p.folio}', '${p.telefono}', '${p.cliente}')" class="text-[10px] font-bold text-white bg-emerald-500 px-4 py-2 rounded-lg shadow hover:bg-emerald-600 transition-colors uppercase tracking-wider flex items-center gap-1 mt-2 w-full justify-center"><span class="text-sm">💬</span> Notificar Envío por WA</button>` : '';
                 
-                // ⚡ NUEVO BOTÓN: Solo aparece si el paquete ya está en camino (ENVIADO)
                 const btnEntregado = esEnviado ? `<button onclick="marcarEntregado(${p.id})" class="text-[10px] font-bold text-teal-700 bg-teal-100 border border-teal-200 px-4 py-2 rounded-lg shadow-sm hover:bg-teal-200 transition-colors uppercase tracking-wider flex items-center gap-1 mt-2 w-full justify-center"><span class="text-sm">🏁</span> Marcar como Entregado</button>` : '';
 
                 grid.innerHTML += `
@@ -300,14 +295,13 @@
                 Swal.showLoading();
 
                 try {
-                    // 2. Le avisamos a la Base de Datos y le mandamos la guía
                     const res = await fetch(`${API_URL}/pedidos/${id}/enviar`, {
                         method: 'PATCH', 
                         headers: { 
                             'Authorization': `Bearer ${tokenPrivado}`,
-                            'Content-Type': 'application/json' // ⚡ NUEVO FORMATO
+                            'Content-Type': 'application/json' 
                         },
-                        body: JSON.stringify({ guia: guia || "" }) // ⚡ ENVIAMOS LA GUÍA
+                        body: JSON.stringify({ guia: guia || "" }) 
                     });
 
                     if (res.ok) {
@@ -326,44 +320,6 @@
                 } catch (e) { Swal.fire({icon: 'error', title: 'Error', text: 'Error de conexión.'}); }
             }
         }
-
-            if (guia !== undefined) {
-                Swal.fire({ title: 'Procesando...', allowOutsideClick: false, showConfirmButton: false });
-                Swal.showLoading();
-
-                try {
-                    // 2. Le avisamos a la Base de Datos que ya se envió
-                    const res = await fetch(`${API_URL}/pedidos/${id}/enviar`, {
-                        method: 'PATCH', 
-                        headers: { 'Authorization': `Bearer ${tokenPrivado}` }
-                    });
-
-                    if (res.ok) {
-                        // 3. Limpiamos el teléfono (quitamos espacios o guiones)
-                        let telLimpio = telefono.replace(/\D/g, '');
-                        if (telLimpio.length === 10) telLimpio = '52' + telLimpio; // Agregamos lada de México si no la tiene
-
-                        // 4. Armamos el mensaje automático
-                        let texto = `¡Hola ${cliente}! 👋 Somos de *Surprise Jeans*.\n\nTe avisamos que tu pedido *${folio}* ya va en camino hacia ti 🚀.\n\n`;
-                        if (guia.trim() !== "") texto += `📦 Tu número de rastreo es: *${guia}*\n\n`;
-                        texto += `¡Gracias por tu compra!`;
-
-                        const urlWA = `https://api.whatsapp.com/send?phone=${telLimpio}&text=${encodeURIComponent(texto)}`;
-                        
-                        Swal.fire({ icon: 'success', title: '¡Estatus Actualizado!', text: 'Abriendo WhatsApp...', timer: 1500, showConfirmButton: false });
-
-                        // 5. Truco para evitar que Chrome bloquee la pestaña de WhatsApp
-                        setTimeout(() => { 
-                            window.open(urlWA, '_blank'); 
-                            cargarPedidos(); // Recargamos las tarjetas para que se pinte de morado
-                        }, 1500);
-                    } else {
-                        Swal.fire({icon: 'error', title: 'Error', text: 'No se pudo actualizar el estatus.'}); 
-                    }
-                } catch (e) { 
-                    Swal.fire({icon: 'error', title: 'Error', text: 'Error de conexión con el servidor.'}); 
-                }
-            }
 
         // ==========================================
         // CONTROL RÁPIDO DE INVENTARIO
