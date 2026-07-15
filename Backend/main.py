@@ -788,11 +788,16 @@ def lanzar_recuperacion_carritos(db: Session = Depends(get_db), token: str = Dep
 async def webhook_loyverse(request: Request, db: Session = Depends(get_db)):
     try:
         datos = await request.json()
-        eventos = datos.get("events", [])
-        # Le mandamos el paquete entero a nuestro nuevo archivo especializado
+        
+        # ⚡ EL FIX: Loyverse manda un evento suelto, no una lista. Lo envolvemos en corchetes [ ]
+        eventos = [datos] if "type" in datos else datos.get("events", [])
+        
+        # Ahora sí, se lo pasamos al archivo experto
         await loyverse_sync.procesar_webhooks_loyverse(eventos, db, manager)
+        
     except Exception as e:
         print(f"❌ Error en webhook Loyverse: {e}")
+        
     return {"status": "procesado"}
 
 @app.get("/simular-din")
