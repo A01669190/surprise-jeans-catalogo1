@@ -1084,9 +1084,6 @@ def marcar_pedido_entregado(pedido_id: int, db: Session = Depends(get_db), token
     return {"mensaje": "Pedido marcado como ENTREGADO exitosamente"}
 
 # ==========================================
-# 🚨 PUERTA SECRETA PARA VINCULAR LOYVERSE
-# ==========================================
-# ==========================================
 # 🚨 PUERTA SECRETA PARA VINCULAR LOYVERSE (MODO HACKER)
 # ==========================================
 @app.get("/vincular-loyverse")
@@ -1094,14 +1091,13 @@ def forzar_conexion_loyverse():
     url = "https://api.loyverse.com/v1.0/webhooks"
     token = "b3dca41541684d0cb5dbcfeac1155736" 
     
-    # ⚡ Los 3 superpoderes que necesitamos encender
     eventos_necesarios = ["receipts.update", "items.create", "items.update"]
     resultados = []
     
     for evento in eventos_necesarios:
         payload = json.dumps({
             "url": "https://surprise-jeans-api-denz.onrender.com/webhook/loyverse",
-            "event": evento, 
+            "type": evento, # ⚡ EL FIX: Cambiamos "event" por "type"
             "status": "ENABLED"
         }).encode("utf-8")
         
@@ -1114,7 +1110,6 @@ def forzar_conexion_loyverse():
             resultados.append({evento: "✅ Conectado con éxito"})
         except Exception as e:
             error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
-            # Si tira error 409 es porque ya existía, lo cual también es bueno
             resultados.append({evento: f"Info: {error_msg}"})
             
     return {"estado": "Operación Maestra Terminada 👾", "detalles": resultados}
