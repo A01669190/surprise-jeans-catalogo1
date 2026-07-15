@@ -373,6 +373,7 @@ def obtener_mis_pedidos(correo: str = Depends(verificar_token_cliente), db: Sess
             "fecha": p.fecha.strftime("%d/%m/%Y"),
             "total": p.total,
             "estatus": p.estatus,
+            "guia": p.guia_rastreo, # ⚡ MANDAMOS LA GUÍA AL FRONTEND
             "ropa": ropa_comprada
         })
     return resultado
@@ -994,13 +995,15 @@ def actualizar_pantalon_rapido(
     return {"mensaje": "Inventario actualizado exitosamente"}
 
 @app.patch("/pedidos/{pedido_id}/enviar")
-def marcar_pedido_enviado(pedido_id: int, db: Session = Depends(get_db), token: str = Depends(verificar_token)):
+async def marcar_pedido_enviado(pedido_id: int, request: Request, db: Session = Depends(get_db), token: str = Depends(verificar_token)):
+    datos = await request.json() # ⚡ RECIBIMOS LOS DATOS
+    
     pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido no encontrado")
     
-    # Cambiamos el estatus
     pedido.estatus = "ENVIADO"
+    pedido.guia_rastreo = datos.get("guia", "") # Guardamos la guía (o en blanco si no hay)
     db.commit()
     
     return {"mensaje": "Estatus actualizado a ENVIADO exitosamente"}

@@ -57,7 +57,7 @@ class Resena(Base):
 class Pedido(Base):
     __tablename__ = "pedidos"
     id = Column(Integer, primary_key=True, index=True)
-    correo_cliente = Column(String, index=True, nullable=True) # ⚡ NUEVO CANDADO DE SEGURIDAD
+    correo_cliente = Column(String, index=True, nullable=True)
     nombre_cliente = Column(String)
     telefono = Column(String)
     calle_numero = Column(String)
@@ -68,6 +68,7 @@ class Pedido(Base):
     referencias = Column(String, nullable=True)
     total = Column(Float)
     estatus = Column(String, default="PENDIENTE")
+    guia_rastreo = Column(String, nullable=True) # ⚡ NUEVA COLUMNA PARA EL RASTREO
     fecha = Column(DateTime, default=datetime.datetime.utcnow)
     detalles = relationship("DetallePedido", back_populates="pedido")
 

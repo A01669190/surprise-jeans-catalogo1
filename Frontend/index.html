@@ -738,25 +738,56 @@
                     if(pedidos.length === 0) {
                         listaDiv.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">Aún no tienes compras registradas.</p>';
                     } else {
-                        listaDiv.innerHTML = pedidos.map(p => `
-                            <div class="bg-gray-50 p-3 rounded-lg border border-gray-100 mb-3">
-                                <div class="flex justify-between items-center border-b border-gray-200 pb-2 mb-2">
-                                    <div>
-                                        <p class="font-bold text-sm text-indigo-900">${p.folio}</p>
-                                        <p class="text-[10px] font-bold ${p.estatus === 'PAGADO' || p.estatus === 'ENVIADO' ? 'text-emerald-500' : 'text-amber-500'}">${p.estatus}</p>
-                                    </div>
+                        listaDiv.innerHTML = pedidos.map(p => {
+                            // Lógica de la barra de progreso
+                            let porcentaje = 33;
+                            let colorBarra = 'bg-amber-400';
+                            let textoEstatus = 'Validando Pago';
+                            
+                            if (p.estatus === 'PAGADO' || p.estatus === 'RECORDATORIO_ENVIADO') {
+                                porcentaje = 66; colorBarra = 'bg-indigo-500'; textoEstatus = 'Preparando Paquete 📦';
+                            } else if (p.estatus === 'ENVIADO') {
+                                porcentaje = 100; colorBarra = 'bg-emerald-500'; textoEstatus = '¡En Camino! 🚀';
+                            }
+
+                            // Lógica del botón de Rastrear
+                            let htmlGuia = '';
+                            if (p.estatus === 'ENVIADO' && p.guia) {
+                                htmlGuia = `<div class="mt-4"><a href="https://www.google.com/search?q=rastrear+paquete+${p.guia}" target="_blank" class="block w-full text-center text-xs bg-gray-900 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-600 transition-colors shadow-sm">🚚 Rastrear: ${p.guia}</a></div>`;
+                            } else if (p.estatus === 'ENVIADO' && !p.guia) {
+                                htmlGuia = `<div class="mt-4 text-center"><span class="block w-full text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold py-2.5 rounded-lg">✅ Entrega Local Coordinada</span></div>`;
+                            }
+
+                            return `
+                            <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4 shadow-sm">
+                                <div class="flex justify-between items-center mb-3">
+                                    <p class="font-black text-sm text-indigo-900">${p.folio}</p>
                                     <p class="font-black text-gray-900">$${p.total.toFixed(2)}</p>
                                 </div>
-                                <div class="space-y-2">
+                                
+                                <!-- BARRA DE PROGRESO -->
+                                <div class="mb-4">
+                                    <div class="flex justify-between text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                                        <span>Estatus:</span>
+                                        <span class="${colorBarra.replace('bg-', 'text-')}">${textoEstatus}</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                                        <div class="${colorBarra} h-2.5 rounded-full transition-all duration-1000" style="width: ${porcentaje}%"></div>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-2 border-t border-gray-200 pt-3">
                                     ${p.ropa.map(ropa => `
                                         <div class="flex justify-between items-center text-xs">
-                                            <span class="text-gray-600 truncate max-w-[150px]">${ropa.nombre}</span>
-                                            ${(p.estatus === 'PAGADO' || p.estatus === 'ENVIADO') ? `<button onclick="abrirModalResena(${ropa.id}, '${ropa.nombre}')" class="text-[10px] bg-indigo-100 text-indigo-600 font-bold px-2 py-1 rounded hover:bg-indigo-600 hover:text-white transition-colors">⭐ Calificar</button>` : ''}
+                                            <span class="text-gray-600 truncate font-medium">${ropa.nombre}</span>
+                                            ${(p.estatus === 'PAGADO' || p.estatus === 'ENVIADO') ? `<button onclick="abrirModalResena(${ropa.id}, '${ropa.nombre}')" class="text-[10px] bg-indigo-50 text-indigo-600 border border-indigo-100 font-bold px-3 py-1.5 rounded-lg hover:bg-indigo-600 hover:text-white transition-colors shadow-sm">⭐ Calificar</button>` : ''}
                                         </div>
                                     `).join('')}
                                 </div>
+                                ${htmlGuia}
                             </div>
-                        `).join('');
+                            `;
+                        }).join('');
                     }
                 } else { cerrarSesionCliente(); }
             } catch(error) { console.log("Error al cargar historial."); }
@@ -1395,45 +1426,6 @@
             }
         }
 
-        async function cargarMisPedidos() {
-            const token = localStorage.getItem('token_cliente_sj');
-            if(!token) return;
-
-            try {
-                const respuesta = await fetch(`${API_URL}/mis-pedidos`, { headers: { 'Authorization': `Bearer ${token}` }});
-                const listaDiv = document.getElementById('lista-mis-pedidos');
-
-                if(respuesta.ok) {
-                    const pedidos = await respuesta.json();
-                    if(pedidos.length === 0) {
-                        listaDiv.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">Aún no tienes compras registradas.</p>';
-                    } else {
-                        listaDiv.innerHTML = pedidos.map(p => `
-                            <div class="bg-gray-50 p-3 rounded-lg border border-gray-100 mb-3">
-                                <div class="flex justify-between items-center border-b border-gray-200 pb-2 mb-2">
-                                    <div>
-                                        <p class="font-bold text-sm text-indigo-900">${p.folio}</p>
-                                        <p class="text-[10px] font-bold ${p.estatus === 'PAGADO' || p.estatus === 'ENVIADO' ? 'text-emerald-500' : 'text-amber-500'}">${p.estatus}</p>
-                                    </div>
-                                    <p class="font-black text-gray-900">$${p.total.toFixed(2)}</p>
-                                </div>
-                                <div class="space-y-2">
-                                    ${p.ropa.map(ropa => `
-                                        <div class="flex justify-between items-center text-xs">
-                                            <span class="text-gray-600 truncate max-w-[150px]">${ropa.nombre}</span>
-                                            ${(p.estatus === 'PAGADO' || p.estatus === 'ENVIADO') ? `<button onclick="abrirModalResena(${ropa.id}, '${ropa.nombre}')" class="text-[10px] bg-indigo-100 text-indigo-600 font-bold px-2 py-1 rounded hover:bg-indigo-600 hover:text-white transition-colors shadow-sm">⭐ Calificar</button>` : ''}
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
-                        `).join('');
-                    }
-                } else { cerrarSesionCliente(); }
-            } catch(error) {
-                document.getElementById('lista-mis-pedidos').innerHTML = '<p class="text-xs text-rose-400 text-center py-4">Error de conexión.</p>';
-            }
-        }
-
         async function abrirModalResena(pantalonId, nombrePantalon) {
             const token = localStorage.getItem('token_cliente_sj');
             const { value: formValues } = await Swal.fire({
@@ -1476,6 +1468,55 @@
                         Swal.fire({ icon: 'warning', title: 'Oops...', text: data.detail, confirmButtonColor: '#4f46e5' });
                     }
                 } catch(e) { Swal.fire({ icon: 'error', title: 'Error', text: 'Problema de conexión' }); }
+            }
+        }
+
+        async function verDetalles(id, nombre, img, precio) {
+            Swal.fire({ title: 'Analizando tendencias...', showConfirmButton: false });
+            Swal.showLoading();
+
+            try {
+                // Consultamos al motor qué más compra la gente
+                const res = await fetch(`${API_URL}/pantalones/${id}/recomendaciones`);
+                const recomendados = await res.json();
+
+                // Armamos la vitrina de sugerencias
+                let htmlRecomendados = '';
+                if(recomendados.length > 0) {
+                    htmlRecomendados = `<h4 class="text-xs font-black text-gray-500 uppercase tracking-widest mt-6 mb-3 border-t pt-4">Comprados juntos habitualmente</h4>
+                    <div class="flex gap-3 overflow-x-auto pb-2">`;
+                    recomendados.forEach(r => {
+                        htmlRecomendados += `
+                        <div class="min-w-[120px] bg-gray-50 border border-gray-100 rounded-xl p-2 text-center shadow-sm">
+                            <img src="${r.imagen_url}" class="w-full h-24 object-cover rounded-lg mb-2">
+                            <p class="text-[10px] font-bold text-gray-800 truncate" title="${r.nombre}">${r.nombre}</p>
+                            <p class="text-[11px] font-black text-indigo-600 mb-2">$${r.precio}</p>
+                            <button onclick="agregarAlCarrito(${r.id}); Swal.close();" class="text-[10px] bg-stone-900 text-white font-bold px-3 py-1.5 rounded-lg w-full hover:bg-indigo-600 transition-colors">Añadir</button>
+                        </div>`;
+                    });
+                    htmlRecomendados += `</div>`;
+                }
+
+                // Mostramos el producto principal + las sugerencias
+                Swal.fire({
+                    html: `
+                        <div class="text-left mt-2">
+                            <div class="relative rounded-2xl overflow-hidden mb-5 border border-gray-100 shadow-sm">
+                                <img src="${img}" class="w-full h-72 object-cover">
+                            </div>
+                            <h2 class="text-xl font-black text-stone-900 leading-tight">${nombre}</h2>
+                            <p class="text-3xl text-indigo-600 font-black my-2">$${precio}</p>
+                            <button onclick="agregarAlCarrito(${id}); Swal.close();" class="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-3.5 rounded-xl mt-2 shadow-lg transition-all">AÑADIR A LA BOLSA</button>
+                            ${htmlRecomendados}
+                        </div>
+                    `,
+                    showConfirmButton: false,
+                    showCloseButton: true,
+                    customClass: { popup: 'rounded-3xl' }
+                });
+            } catch(e) {
+                Swal.close();
+                console.error("Error al cargar recomendaciones");
             }
         }
     </script>
