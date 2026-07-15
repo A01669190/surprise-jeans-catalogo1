@@ -572,7 +572,7 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
 # ==========================================
 
 @app.post("/crear-pago-seguro")
-async def crear_pago_seguro(pedido_req: PedidoSchema, request: Request, db: Session = Depends(get_db)):
+async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSchema, db: Session = Depends(get_db)):
     # 1. CÁLCULO DE TOTALES Y APLICACIÓN DE CUPONES
     total_pedido = 0.0
     descuento_porc = 0.0
@@ -588,13 +588,13 @@ async def crear_pago_seguro(pedido_req: PedidoSchema, request: Request, db: Sess
     items_para_banco = []
     
     for item in pedido_req.items:
-        total_item = float(item.precio) * item.quantity
+        total_item = float(item.precio) * item.cantidad # ⚡ CORREGIDO A ESPAÑOL
         total_pedido += total_item
         
         precio_con_descuento = float(item.precio) * (1.0 - (descuento_porc / 100.0))
         items_para_banco.append({
             "title": f"[{item.codigo}] {item.nombre}",
-            "quantity": item.quantity,
+            "quantity": item.cantidad, # ⚡ CORREGIDO A ESPAÑOL
             "unit_price": round(precio_con_descuento, 2),
             "currency_id": "MXN"
         })
@@ -655,9 +655,10 @@ async def crear_pago_seguro(pedido_req: PedidoSchema, request: Request, db: Sess
         precio_final = float(item.precio) * (1.0 - (descuento_porc / 100.0))
         db.add(models.DetallePedido(
             pedido_id=nuevo_pedido.id, pantalon_id=item.id, 
-            cantidad=item.quantity, precio_unitario=round(precio_final, 2)
+            cantidad=item.cantidad, # ⚡ CORREGIDO A ESPAÑOL
+            precio_unitario=round(precio_final, 2)
         ))
-        lista_ropa.append({"cantidad": item.quantity, "nombre": item.nombre, "precio": round(precio_final, 2)})
+        lista_ropa.append({"cantidad": item.cantidad, "nombre": item.nombre, "precio": round(precio_final, 2)})
     db.commit()
     
     puntos_ganados = total_final * 0.05

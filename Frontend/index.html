@@ -1420,7 +1420,11 @@
             if(!nombre || !telefono || !calle_numero || !colonia || !cp || !ciudad || !estado) {
                 alert("⚠️ Por favor, llena todos los campos obligatorios de contacto y envío.");
                 return;
-            }
+            } else {
+            const errorData = await respuesta.json();
+            // ⚡ Lo convertimos a texto legible en lugar de [object Object]
+            alert(`Operación rechazada:\n${JSON.stringify(errorData.detail, null, 2)}`);
+        }
 
             const btnPagar = document.getElementById('btn-pagar');
             const textoOriginal = btnPagar.innerHTML;
