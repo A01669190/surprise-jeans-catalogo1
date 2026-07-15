@@ -675,7 +675,7 @@ async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, 
             pantalon_db = db.query(models.Pantalon).filter(models.Pantalon.id == detalle.pantalon_id).first()
             if pantalon_db and pantalon_db.stock >= detalle.cantidad:
                 pantalon_db.stock -= detalle.cantidad
-                descontar_stock_loyverse(pantalon_db.codigo, pantalon_db.stock)      
+                descontar_stock_loyverse(pantalon_db.codigo, pantalon_db.stock)        db.commit()
         
         await manager.broadcast("NUEVO_PEDIDO")
         
@@ -735,12 +735,11 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                             # 1. Descuenta en tu base de datos web
                             pantalon_db.stock -= detalle.cantidad
                             
-                            # 2. ⚡ VÍA 2: Descuenta en la tablet de Loyverse de la tienda física
-                            descontar_stock_loyverse(pantalon_db.codigo, detalle.cantidad)
+                            # 2. ⚡ VÍA 2: Descuenta en Loyverse enviando el STOCK FINAL absoluto
+                            descontar_stock_loyverse(pantalon_db.codigo, pantalon_db.stock)
                             
                         if pantalon_db:
                             lista_ropa.append({"cantidad": detalle.cantidad, "nombre": pantalon_db.nombre, "precio": detalle.precio_unitario})
-                    
                     db.commit()
                     
                     # Sonido Din por WebSocket
