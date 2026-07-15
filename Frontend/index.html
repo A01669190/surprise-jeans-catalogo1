@@ -725,6 +725,82 @@
             }
         }
 
+        async function cargarMisPedidos() {
+            const token = localStorage.getItem('token_cliente_sj');
+            if(!token) return;
+
+            try {
+                const respuesta = await fetch(`${API_URL}/mis-pedidos`, { headers: { 'Authorization': `Bearer ${token}` }});
+                const listaDiv = document.getElementById('lista-mis-pedidos');
+
+                if(respuesta.ok) {
+                    const pedidos = await respuesta.json();
+                    if(pedidos.length === 0) {
+                        listaDiv.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">Aún no tienes compras registradas.</p>';
+                    } else {
+                        listaDiv.innerHTML = pedidos.map(p => {
+                            // ⚡ RECALIBRACIÓN DE LA BARRA DE PROGRESO ⚡
+                            let porcentaje = 25;
+                            let colorBarra = 'bg-amber-400';
+                            let textoEstatus = 'Validando Pago ⏳';
+                            
+                            if (p.estatus === 'PAGADO' || p.estatus === 'RECORDATORIO_ENVIADO') {
+                                porcentaje = 50; colorBarra = 'bg-indigo-500'; textoEstatus = 'Preparando Paquete 📦';
+                            } else if (p.estatus === 'ENVIADO') {
+                                porcentaje = 80; colorBarra = 'bg-blue-500'; textoEstatus = '¡En Camino! 🚚';
+                            } else if (p.estatus === 'ENTREGADO') {
+                                porcentaje = 100; colorBarra = 'bg-emerald-500'; textoEstatus = 'Entregado ✅';
+                            }
+
+                            // Lógica del botón de Rastrear
+                            let htmlGuia = '';
+                            if (p.estatus === 'ENVIADO' || p.estatus === 'ENTREGADO') {
+                                if (p.guia) {
+                                    htmlGuia = `<div class="mt-4"><a href="https://www.google.com/search?q=rastrear+paquete+${p.guia}" target="_blank" class="block w-full text-center text-xs bg-gray-900 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-600 transition-colors shadow-sm">🚚 Rastrear: ${p.guia}</a></div>`;
+                                } else if (!p.guia && p.estatus === 'ENVIADO') {
+                                    htmlGuia = `<div class="mt-4 text-center"><span class="block w-full text-xs bg-blue-50 text-blue-700 border border-blue-200 font-bold py-2.5 rounded-lg">🚀 Entrega Local Coordinada</span></div>`;
+                                } else if (!p.guia && p.estatus === 'ENTREGADO') {
+                                    htmlGuia = `<div class="mt-4 text-center"><span class="block w-full text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold py-2.5 rounded-lg">🎉 Paquete en tus manos</span></div>`;
+                                }
+                            }
+
+                            return `
+                            <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4 shadow-sm">
+                                <div class="flex justify-between items-center mb-3">
+                                    <p class="font-black text-sm text-indigo-900">${p.folio}</p>
+                                    <p class="font-black text-gray-900">$${p.total.toFixed(2)}</p>
+                                </div>
+                                
+                                <!-- BARRA DE PROGRESO -->
+                                <div class="mb-4">
+                                    <div class="flex justify-between text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                                        <span>Estatus:</span>
+                                        <span class="${colorBarra.replace('bg-', 'text-')}">${textoEstatus}</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                                        <div class="${colorBarra} h-2.5 rounded-full transition-all duration-1000" style="width: ${porcentaje}%"></div>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-2 border-t border-gray-200 pt-3">
+                                    ${p.ropa.map(ropa => `
+                                        <div class="flex justify-between items-center text-xs">
+                                            <span class="text-gray-600 truncate font-medium">${ropa.nombre}</span>
+                                            ${(p.estatus === 'PAGADO' || p.estatus === 'ENVIADO') ? `<button onclick="abrirModalResena(${ropa.id}, '${ropa.nombre}')" class="text-[10px] bg-indigo-50 text-indigo-600 border border-indigo-100 font-bold px-3 py-1.5 rounded-lg hover:bg-indigo-600 hover:text-white transition-colors shadow-sm">⭐ Calificar</button>` : ''}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                ${htmlGuia}
+                            </div>
+                            `;
+                        }).join('');
+                    }
+                } else { cerrarSesionCliente(); }
+            } catch(error) {
+                document.getElementById('lista-mis-pedidos').innerHTML = '<p class="text-xs text-rose-400 text-center py-4">Error de conexión.</p>';
+            }
+        }
+
        async function cargarMisPedidos() {
             const token = localStorage.getItem('token_cliente_sj');
             if(!token) return;
@@ -906,11 +982,6 @@
             document.getElementById('overlay-menu').classList.add('hidden');
         }
 
-
-        // (Opcional) Abrir el modal de login de cliente que construiremos después
-        function abrirPerfilCliente() {
-            alert("El área de clientes está en construcción. 🚧");
-        }
 
         function renderizarCatalogo(listaPantalones) {
             const grid = document.getElementById('grid-pantalones');
