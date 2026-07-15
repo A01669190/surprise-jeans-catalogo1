@@ -754,6 +754,47 @@ def lanzar_recuperacion_carritos(db: Session = Depends(get_db), token: str = Dep
     db.commit()
     return {"mensaje": f"Escaneo completo. Se enviaron {correos_enviados} correos de recuperación."}
 
+# ==========================================
+# 🏪 WEBHOOK DE LOYVERSE POS (TIENDA FÍSICA)
+# ==========================================
+@app.post("/webhook/loyverse")
+async def webhook_loyverse(request: Request, db: Session = Depends(get_db)):
+    try:
+        datos = await request.json()
+        
+        # Loyverse agrupa las notificaciones en una lista de 'events'
+        eventos = datos.get("events", [])
+        
+        for evento in eventos:
+            # Solo nos importan los eventos de "Recibo Creado" (Una venta completada)
+            if evento.get("type") == "receipts.create":
+                recibo = evento.get("data", {}).get("receipt", {})
+                line_items = recibo.get("line_items", [])
+                
+                # Revisamos toda la ropa que se vendió en ese ticket físico
+                for item in line_items:
+                    sku_loyverse = item.get("sku") # Este es el código clave
+                    cantidad_vendida = int(item.get("quantity", 1))
+                    
+                    if sku_loyverse:
+                        # 1. Buscamos el pantalón en nuestra base de datos web
+                        pantalon_db = db.query(models.Pantalon).filter(models.Pantalon.codigo == sku_loyverse).first()
+                        
+                        # 2. Si existe y tenemos stock, lo descontamos
+                        if pantalon_db and pantalon_db.stock >= cantidad_vendida:
+                            pantalon_db.stock -= cantidad_vendida
+                            db.commit()
+                            
+                            # 3. Avisamos a Yessica en el Despacho para que la tabla se actualice sola
+                            await manager.broadcast("NUEVO_PEDIDO")
+                            print(f"✅ Loyverse Sync: Se descontaron {cantidad_vendida} unidades del modelo [{sku_loyverse}]")
+                            
+    except Exception as e:
+        print(f"❌ Error procesando el webhook de Loyverse: {e}")
+        
+    # Siempre debemos responderle "OK" a Loyverse para que sepa que recibimos el mensaje
+    return {"status": "procesado"}
+
 @app.get("/simular-din")
 async def simular_din():
     # Ruta secreta para que tú pruebes el sonido sin hacer una compra real
