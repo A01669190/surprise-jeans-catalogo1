@@ -768,8 +768,8 @@ async def webhook_loyverse(request: Request, db: Session = Depends(get_db)):
         eventos = datos.get("events", [])
         
         for evento in eventos:
-            # Solo nos importan los eventos de "Recibo Creado" (Una venta completada)
-            if evento.get("type") == "receipts.create":
+            # Atrapamos cuando se cobra o actualiza un recibo en la tablet
+            if evento.get("type") == "receipts.update": # ⚡ CAMBIO AQUÍ TAMBIÉN
                 recibo = evento.get("data", {}).get("receipt", {})
                 line_items = recibo.get("line_items", [])
                 
@@ -1096,10 +1096,9 @@ def forzar_conexion_loyverse():
     token = "b3dca41541684d0cb5dbcfeac1155736" 
     
     # El mensaje exacto que Loyverse nos pide
-# El mensaje exacto que Loyverse nos pide
     payload = json.dumps({
         "url": "https://surprise-jeans-api-denz.onrender.com/webhook/loyverse",
-        "type": "receipts.create",
+        "type": "receipts.update", # ⚡ CAMBIO AQUÍ: de create a update
         "status": "ENABLED"
     }).encode("utf-8")
     
