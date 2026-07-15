@@ -572,7 +572,7 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
 # ==========================================
 
 @app.post("/crear-pago-seguro")
-async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSchema, db: Session = Depends(get_db)):
+async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, db: Session = Depends(get_db)):
     # 1. CÁLCULO DE TOTALES Y APLICACIÓN DE CUPONES
     total_pedido = 0.0
     descuento_porc = 0.0
@@ -588,13 +588,14 @@ async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSchema, 
     items_para_banco = []
     
     for item in pedido_req.items:
-        total_item = float(item.precio) * item.cantidad # ⚡ CORREGIDO A ESPAÑOL
+        # ⚡ CORREGIDO: Usando item.cantidad como lo dicta tu schemas.py
+        total_item = float(item.precio) * item.cantidad 
         total_pedido += total_item
         
         precio_con_descuento = float(item.precio) * (1.0 - (descuento_porc / 100.0))
         items_para_banco.append({
             "title": f"[{item.codigo}] {item.nombre}",
-            "quantity": item.cantidad, # ⚡ CORREGIDO A ESPAÑOL
+            "quantity": item.cantidad, # La llave quantity se queda en inglés solo para Mercado Pago
             "unit_price": round(precio_con_descuento, 2),
             "currency_id": "MXN"
         })
@@ -655,7 +656,7 @@ async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSchema, 
         precio_final = float(item.precio) * (1.0 - (descuento_porc / 100.0))
         db.add(models.DetallePedido(
             pedido_id=nuevo_pedido.id, pantalon_id=item.id, 
-            cantidad=item.cantidad, # ⚡ CORREGIDO A ESPAÑOL
+            cantidad=item.cantidad, # ⚡ CORREGIDO
             precio_unitario=round(precio_final, 2)
         ))
         lista_ropa.append({"cantidad": item.cantidad, "nombre": item.nombre, "precio": round(precio_final, 2)})
