@@ -894,7 +894,6 @@ async def subir_excel(request: Request, archivo: UploadFile = File(...), db: Ses
 @app.get("/pedidos-admin")
 @limiter.limit("30/minute")
 def obtener_pedidos_admin(request: Request, db: Session = Depends(get_db), token: str = Depends(verificar_token)):
-    # Traemos todos los pedidos ordenados del más nuevo al más viejo
     pedidos = db.query(models.Pedido).order_by(models.Pedido.fecha.desc()).all()
     resultado = []
     
@@ -909,6 +908,7 @@ def obtener_pedidos_admin(request: Request, db: Session = Depends(get_db), token
             })
         
         resultado.append({
+            "id": p.id,  # ⚡ ¡ESTA ES LA LÍNEA MÁGICA QUE FALTABA! ⚡
             "folio": f"SJ-{p.id:04d}",
             "cliente": p.nombre_cliente,
             "telefono": p.telefono,
