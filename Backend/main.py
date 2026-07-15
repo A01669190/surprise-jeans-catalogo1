@@ -41,6 +41,8 @@ import jwt
 from datetime import datetime, timedelta
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi import WebSocket, WebSocketDisconnect
+import urllib.request
+import json
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="API Surprise Jeans - Fortificada")
@@ -1082,3 +1084,34 @@ def marcar_pedido_entregado(pedido_id: int, db: Session = Depends(get_db), token
     db.commit()
     
     return {"mensaje": "Pedido marcado como ENTREGADO exitosamente"}
+
+# ==========================================
+# 🚨 PUERTA SECRETA PARA VINCULAR LOYVERSE
+# ==========================================
+@app.get("/vincular-loyverse")
+def forzar_conexion_loyverse():
+    url = "https://api.loyverse.com/v1.0/webhooks"
+    
+    # 👇 Pega aquí adentro tu token larguísimo (el que se ve en tu captura de pantalla)
+    token = "PEGA_TU_TOKEN_AQUI" 
+    
+    # El mensaje exacto que Loyverse nos pide
+    payload = json.dumps({
+        "url": "https://surprise-jeans-api-denz.onrender.com/webhook/loyverse",
+        "event": "receipts.create"
+    }).encode("utf-8")
+    
+    req = urllib.request.Request(url, data=payload)
+    req.add_header("Authorization", f"Bearer {token}")
+    req.add_header("Content-Type", "application/json")
+    
+    try:
+        # Disparamos la orden
+        res = urllib.request.urlopen(req)
+        return {
+            "estado": "✅ ¡ÉXITO! Loyverse y tu página web ahora están conectados.",
+            "respuesta_servidor": json.loads(res.read().decode('utf-8'))
+        }
+    except Exception as e:
+        error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
+        return {"estado": "❌ Error al conectar", "detalle": error_msg}
