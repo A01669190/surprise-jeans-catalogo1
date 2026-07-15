@@ -1030,3 +1030,14 @@ def lanzar_recuperacion_carritos(db: Session = Depends(get_db), token: str = Dep
         
     db.commit()
     return {"mensaje": f"Escaneo completo. Se enviaron {correos_enviados} correos de recuperación."}
+
+@app.patch("/pedidos/{pedido_id}/entregar")
+def marcar_pedido_entregado(pedido_id: int, db: Session = Depends(get_db), token: str = Depends(verificar_token)):
+    pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido no encontrado")
+    
+    pedido.estatus = "ENTREGADO"
+    db.commit()
+    
+    return {"mensaje": "Pedido marcado como ENTREGADO exitosamente"}
