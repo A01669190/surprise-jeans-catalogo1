@@ -1086,34 +1086,38 @@ def marcar_pedido_entregado(pedido_id: int, db: Session = Depends(get_db), token
 # ==========================================
 # 🚨 PUERTA SECRETA PARA VINCULAR LOYVERSE
 # ==========================================
+# ==========================================
+# 🚨 PUERTA SECRETA PARA VINCULAR LOYVERSE (MODO HACKER)
+# ==========================================
 @app.get("/vincular-loyverse")
 def forzar_conexion_loyverse():
     url = "https://api.loyverse.com/v1.0/webhooks"
-    
-    # 👇 Pega aquí adentro tu token larguísimo (el que se ve en tu captura de pantalla)
     token = "b3dca41541684d0cb5dbcfeac1155736" 
     
-    # El mensaje exacto que Loyverse nos pide
-    payload = json.dumps({
-        "url": "https://surprise-jeans-api-denz.onrender.com/webhook/loyverse",
-        "type": "receipts.update", # ⚡ CAMBIO AQUÍ: de create a update
-        "status": "ENABLED"
-    }).encode("utf-8")
+    # ⚡ Los 3 superpoderes que necesitamos encender
+    eventos_necesarios = ["receipts.update", "items.create", "items.update"]
+    resultados = []
     
-    req = urllib.request.Request(url, data=payload)
-    req.add_header("Authorization", f"Bearer {token}")
-    req.add_header("Content-Type", "application/json")
-    
-    try:
-        # Disparamos la orden
-        res = urllib.request.urlopen(req)
-        return {
-            "estado": "✅ ¡ÉXITO! Loyverse y tu página web ahora están conectados.",
-            "respuesta_servidor": json.loads(res.read().decode('utf-8'))
-        }
-    except Exception as e:
-        error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
-        return {"estado": "❌ Error al conectar", "detalle": error_msg}
+    for evento in eventos_necesarios:
+        payload = json.dumps({
+            "url": "https://surprise-jeans-api-denz.onrender.com/webhook/loyverse",
+            "event": evento, 
+            "status": "ENABLED"
+        }).encode("utf-8")
+        
+        req = urllib.request.Request(url, data=payload)
+        req.add_header("Authorization", f"Bearer {token}")
+        req.add_header("Content-Type", "application/json")
+        
+        try:
+            res = urllib.request.urlopen(req)
+            resultados.append({evento: "✅ Conectado con éxito"})
+        except Exception as e:
+            error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
+            # Si tira error 409 es porque ya existía, lo cual también es bueno
+            resultados.append({evento: f"Info: {error_msg}"})
+            
+    return {"estado": "Operación Maestra Terminada 👾", "detalles": resultados}
     
 
 # ==========================================
