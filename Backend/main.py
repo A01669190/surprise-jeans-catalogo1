@@ -740,6 +740,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                             
                         if pantalon_db:
                             lista_ropa.append({"cantidad": detalle.cantidad, "nombre": pantalon_db.nombre, "precio": detalle.precio_unitario})
+                    
                     db.commit()
                     
                     # Sonido Din por WebSocket
