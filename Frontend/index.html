@@ -1405,69 +1405,67 @@
             window.location.reload();
         }
 
-        async function procesarPagoSeguro() {
-            // 1. Recolección completa de datos
-            const telefono = document.getElementById('chk-telefono').value;
-            const nombre = document.getElementById('chk-nombre').value;
-            const calle_numero = document.getElementById('chk-calle').value;
-            const colonia = document.getElementById('chk-colonia').value;
-            const cp = document.getElementById('chk-cp').value;
-            const ciudad = document.getElementById('chk-ciudad').value;
-            const estado = document.getElementById('chk-estado').value;
-            const referencias = document.getElementById('chk-referencias').value;
+       async function procesarPagoSeguro() {
+        // 1. Recolección completa de datos
+        const telefono = document.getElementById('chk-telefono').value;
+        const nombre = document.getElementById('chk-nombre').value;
+        const calle_numero = document.getElementById('chk-calle').value;
+        const colonia = document.getElementById('chk-colonia').value;
+        const cp = document.getElementById('chk-cp').value;
+        const ciudad = document.getElementById('chk-ciudad').value;
+        const estado = document.getElementById('chk-estado').value;
+        const referencias = document.getElementById('chk-referencias').value;
 
-            // Validación estricta
-            if(!nombre || !telefono || !calle_numero || !colonia || !cp || !ciudad || !estado) {
-                alert("⚠️ Por favor, llena todos los campos obligatorios de contacto y envío.");
-                return;
+        // Validación estricta (SIN EL ELSE ROTO AQUÍ)
+        if(!nombre || !telefono || !calle_numero || !colonia || !cp || !ciudad || !estado) {
+            alert("⚠️ Por favor, llena todos los campos obligatorios de contacto y envío.");
+            return;
+        }
+
+        const btnPagar = document.getElementById('btn-pagar');
+        const textoOriginal = btnPagar.innerHTML;
+        btnPagar.innerHTML = "Procesando de forma segura... ⏳";
+        btnPagar.disabled = true;
+
+        try {
+            // Objeto unificado y correcto
+            const pedidoSeguro = {
+                envio: { nombre, telefono, calle_numero, colonia, ciudad, estado, cp, referencias },
+                items: carrito.map(item => ({
+                    id: item.id, codigo: item.codigo || "S/C", nombre: item.nombre, 
+                    precio: parseFloat(item.precio), cantidad: parseInt(item.cantidad)
+                })),
+                cupon: cuponActivo ? cuponActivo.codigo : null,
+                usar_puntos: document.getElementById('chk-usar-puntos') ? document.getElementById('chk-usar-puntos').checked : false
+            };
+            
+            const headers = { 'Content-Type': 'application/json' };
+            const token = localStorage.getItem('token_cliente_sj');
+            if(token) headers['Authorization'] = `Bearer ${token}`;
+
+            const respuesta = await fetch(`${API_URL}/crear-pago-seguro`, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(pedidoSeguro)
+            });
+
+            if (respuesta.ok) {
+                const data = await respuesta.json();
+                window.location.href = data.link_pago; 
             } else {
-            const errorData = await respuesta.json();
-            // ⚡ Lo convertimos a texto legible en lugar de [object Object]
-            alert(`Operación rechazada:\n${JSON.stringify(errorData.detail, null, 2)}`);
-        }
-
-            const btnPagar = document.getElementById('btn-pagar');
-            const textoOriginal = btnPagar.innerHTML;
-            btnPagar.innerHTML = "Procesando de forma segura... ⏳";
-            btnPagar.disabled = true;
-
-            try {
-                // Objeto unificado y correcto
-                const pedidoSeguro = {
-                    envio: { nombre, telefono, calle_numero, colonia, ciudad, estado, cp, referencias },
-                    items: carrito.map(item => ({
-                        id: item.id, codigo: item.codigo || "S/C", nombre: item.nombre, 
-                        precio: parseFloat(item.precio), cantidad: parseInt(item.cantidad)
-                    })),
-                    cupon: cuponActivo ? cuponActivo.codigo : null,
-                    usar_puntos: document.getElementById('chk-usar-puntos') ? document.getElementById('chk-usar-puntos').checked : false
-                };
-                
-                const headers = { 'Content-Type': 'application/json' };
-                const token = localStorage.getItem('token_cliente_sj');
-                if(token) headers['Authorization'] = `Bearer ${token}`;
-
-                const respuesta = await fetch(`${API_URL}/crear-pago-seguro`, {
-                    method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify(pedidoSeguro)
-                });
-
-                if (respuesta.ok) {
-                    const data = await respuesta.json();
-                    window.location.href = data.link_pago; 
-                } else {
-                    const errorData = await respuesta.json();
-                    alert(`Operación rechazada: ${errorData.detail}`);
-                }
-            } catch (error) {
-                console.error(error);
-                alert("Fallo de conexión. El servidor de Mercado Pago puede estar tardando, intenta de nuevo.");
-            } finally {
-                btnPagar.innerHTML = textoOriginal;
-                btnPagar.disabled = false;
+                // ⚡ AQUÍ ES DONDE VA EL CÓDIGO DEL ERROR TRADUCIDO
+                const errorData = await respuesta.json();
+                console.error(errorData); // Lo mandamos a consola por si acaso
+                alert(`Operación rechazada:\n${JSON.stringify(errorData.detail || errorData, null, 2)}`);
             }
+        } catch (error) {
+            console.error(error);
+            alert("Fallo de conexión. El servidor de Mercado Pago puede estar tardando, intenta de nuevo.");
+        } finally {
+            btnPagar.innerHTML = textoOriginal;
+            btnPagar.disabled = false;
         }
+    }
 
         // ==========================================
         // PARCHE MAESTRO: PERFIL Y RESEÑAS
