@@ -581,8 +581,33 @@ async def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, 
         total_pedido += (precio_con_descuento * item.cantidad)
         
         items_para_banco.append({
+            "title": f"[{@app.post("/crear-pago-seguro")
+async def crear_pago_seguro(pedido_req: PedidoSchema, request: Request, db: Session = Depends(get_db)):
+    # 1. CÁLCULO DE TOTALES Y APLICACIÓN DE CUPONES
+    total_pedido = 0.0
+    descuento_porc = 0.0
+
+    # Verificamos si el cliente ingresó un cupón
+    if pedido_req.cupon:
+        cupon_db = db.query(models.Cupon).filter(models.Cupon.codigo == pedido_req.cupon).first()
+        if cupon_db and cupon_db.activo:
+            descuento_porc = cupon_db.porcentaje
+        
+        # Si es una venta en mostrador, forzamos el bypass simulando 100% de descuento web
+        if pedido_req.cupon == "VENTA-PRESENCIAL":
+            descuento_porc = 100.0
+
+    items_para_banco = []
+    
+    # Procesamos cada artículo del carrito para armar la lista del banco
+    for item in pedido_req.items:
+        total_item = float(item.precio) * item.quantity
+        total_pedido += total_item
+        
+        precio_con_descuento = float(item.precio) * (1.0 - (descuento_porc / 100.0))
+        items_para_banco.append({
             "title": f"[{item.codigo}] {item.nombre}",
-            "quantity": item.cantidad,
+            "quantity": item.quantity,
             "unit_price": round(precio_con_descuento, 2),
             "currency_id": "MXN"
         })
@@ -598,6 +623,7 @@ async def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, 
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             cliente_db = db.query(models.Cliente).filter(models.Cliente.correo == payload.get("sub")).first()
             if cliente_db:
+                # Actualizamos los datos de envío del cliente para su siguiente compra
                 cliente_db.telefono = pedido_req.envio.telefono
                 cliente_db.calle_numero = pedido_req.envio.calle_numero
                 cliente_db.colonia = pedido_req.envio.colonia
@@ -643,9 +669,9 @@ async def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, 
         precio_final = float(item.precio) * (1.0 - (descuento_porc / 100.0))
         db.add(models.DetallePedido(
             pedido_id=nuevo_pedido.id, pantalon_id=item.id, 
-            cantidad=item.cantidad, precio_unitario=round(precio_final, 2)
+            cantidad=item.quantity, precio_unitario=round(precio_final, 2)
         ))
-        lista_ropa.append({"cantidad": item.cantidad, "nombre": item.nombre, "precio": round(precio_final, 2)})
+        lista_ropa.append({"cantidad": item.quantity, "nombre": item.nombre, "precio": round(precio_final, 2)})
     db.commit()
     
     puntos_ganados = total_final * 0.05
@@ -653,25 +679,33 @@ async def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, 
         cliente_db.puntos += puntos_ganados
         db.commit()
 
-    # 🚨 LA MAGIA: SI EL PEDIDO ES GRATIS ($0), NOS SALTAMOS EL BANCO 🚨
-    if total_final <= 0:
+    # 🚨 LA MAGIA: SI EL PEDIDO ES GRATIS ($0) O VENTA PRESENCIAL, EVITAMOS MERCADO PAGO 🚨
+    if total_final <= 0 or pedido_req.cupon == "VENTA-PRESENCIAL":
         nuevo_pedido.estatus = "PAGADO"
+        
         for detalle in nuevo_pedido.detalles:
             pantalon_db = db.query(models.Pantalon).filter(models.Pantalon.id == detalle.pantalon_id).first()
             if pantalon_db and pantalon_db.stock >= detalle.cantidad:
+                # A) Descontamos de tu base de datos web
                 pantalon_db.stock -= detalle.cantidad
+                
+                # B) 🏪 VÍA 2: Descontamos en la tablet física de Loyverse al instante
+                descontar_stock_loyverse(pantalon_db.codigo, detalle.cantidad)
         db.commit()
         
-        # Avisamos al Centro de Despacho por WebSockets
+        # Avisamos al Centro de Despacho por WebSockets (Suena el ¡DIN!)
         await manager.broadcast("NUEVO_PEDIDO")
         
-        # 📧 ENVIAR CORREO GMAIL (PAGO GRATUITO POR CUPÓN)
+        # 📧 ENVIAR CORREO GMAIL DE CONFIRMACIÓN
         if cliente_db:
             enviar_correo_recibo(cliente_db.correo, cliente_db.nombre_completo, f"{nuevo_pedido.id:04d}", total_final, lista_ropa, puntos_ganados)
             
-        return {"link_pago": f"https://surprisejeanysk.com/?pago=exito&payment_id=CUPON-GRATIS&external_reference={nuevo_pedido.id}"}
+        # Definimos la etiqueta del recibo según el tipo de bypass
+        id_pago = "TIENDA-FISICA" if pedido_req.cupon == "VENTA-PRESENCIAL" else "CUPON-GRATIS"
+        
+        return {"link_pago": f"https://surprisejeanysk.com/?pago=exito&payment_id={id_pago}&external_reference={nuevo_pedido.id}"}
 
-    # PROCESO NORMAL HACIA EL BANCO SI HAY SALDO
+    # PROCESO NORMAL HACIA EL BANCO SI HAY SALDO POR PAGAR
     preference_data = {
         "items": items_para_banco,
         "metadata": {"pedido_interno_id": nuevo_pedido.id}, 
@@ -690,7 +724,7 @@ async def crear_pago_seguro(pedido_req: schemas.PedidoSeguro, request: Request, 
     if respuesta["status"] != 201:
         raise HTTPException(status_code=400, detail="Mercado Pago bloqueó la solicitud.")
 
-    return {"link_pago": respuesta["response"]["init_point"]} 
+    return {"link_pago": respuesta["response"]["init_point"]}
 
 @app.post("/webhook/mercadopago")
 async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
