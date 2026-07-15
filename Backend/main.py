@@ -675,8 +675,7 @@ async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, 
             pantalon_db = db.query(models.Pantalon).filter(models.Pantalon.id == detalle.pantalon_id).first()
             if pantalon_db and pantalon_db.stock >= detalle.cantidad:
                 pantalon_db.stock -= detalle.cantidad
-                descontar_stock_loyverse(pantalon_db.codigo, detalle.cantidad)
-        db.commit()
+                descontar_stock_loyverse(pantalon_db.codigo, pantalon_db.stock)      
         
         await manager.broadcast("NUEVO_PEDIDO")
         
@@ -1144,43 +1143,47 @@ def forzar_conexion_loyverse():
 # ==========================================
 # 🔄 VÍA 2: LA WEB LE AVISA A LA TIENDA FÍSICA
 # ==========================================
-def descontar_stock_loyverse(sku, cantidad_comprada_en_web):
+# ==========================================
+# 🔄 VÍA 2: LA WEB LE AVISA A LA TIENDA FÍSICA
+# ==========================================
+def descontar_stock_loyverse(sku, nuevo_stock):
     token = "b3dca41541684d0cb5dbcfeac1155736"
     
     try:
-        # 1. Obtener el ID de la tienda física de tus papás
+        # 1. Obtener el ID de la tienda física
         req_tienda = urllib.request.Request("https://api.loyverse.com/v1.0/stores")
         req_tienda.add_header("Authorization", f"Bearer {token}")
         res_tienda = urllib.request.urlopen(req_tienda)
         store_id = json.loads(res_tienda.read().decode('utf-8'))["stores"][0]["id"]
         
-        # 2. Buscar el pantalón en Loyverse por su SKU (Código)
+        # 2. Buscar el pantalón en Loyverse por su SKU
         req_item = urllib.request.Request(f"https://api.loyverse.com/v1.0/items?sku={sku}")
         req_item.add_header("Authorization", f"Bearer {token}")
         res_item = urllib.request.urlopen(req_item)
         items = json.loads(res_item.read().decode('utf-8')).get("items", [])
         
         if not items:
-            print(f"⚠️ El código {sku} no existe en Loyverse. No se pudo descontar.")
+            print(f"⚠️ El código {sku} no existe en Loyverse.")
             return
             
         variant_id = items[0]["variants"][0]["variant_id"]
         
-        # 3. Mandar la orden de ajuste de inventario (Restar la cantidad)
+        # 3. ⚡ MANDAR EL STOCK ABSOLUTO (stock_after)
         ajuste_payload = json.dumps({
-            "inventory_adjustments": [{
+            "inventory_levels": [{
                 "store_id": store_id,
                 "variant_id": variant_id,
-                "adjustment": -cantidad_comprada_en_web # El signo menos (-) resta el stock
+                "stock_after": nuevo_stock 
             }]
         }).encode("utf-8")
         
-        req_ajuste = urllib.request.Request("https://api.loyverse.com/v1.0/inventory/adjustments", data=ajuste_payload, method="POST")
+        req_ajuste = urllib.request.Request("https://api.loyverse.com/v1.0/inventory", data=ajuste_payload, method="POST")
         req_ajuste.add_header("Authorization", f"Bearer {token}")
         req_ajuste.add_header("Content-Type", "application/json")
         
         urllib.request.urlopen(req_ajuste)
-        print(f"✅ Omnicanal: Se restaron {cantidad_comprada_en_web} piezas del modelo {sku} en la tienda física.")
+        print(f"✅ Omnicanal: El modelo {sku} se actualizó a {nuevo_stock} piezas en Loyverse.")
         
     except Exception as e:
-        print(f"❌ Error de Omnicanalidad con Loyverse: {e}")
+        error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
+        print(f"❌ Error de Loyverse: {error_msg}")
