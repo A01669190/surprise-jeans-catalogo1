@@ -61,9 +61,7 @@ app = FastAPI(title="API Surprise Jeans - Fortificada")
 # ==========================================
 # ⚡ SISTEMA DE CACHÉ EN MEMORIA RAM
 # ==========================================
-MEMORIA_CACHE = {
-    "catalogo_pantalones": None
-}
+
 
 scheduler = AsyncIOScheduler()
 
@@ -557,21 +555,13 @@ def obtener_pantalones(
     busqueda: Optional[str] = None, categoria_id: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
-    if not busqueda and not categoria_id and skip == 0:
-        if MEMORIA_CACHE["catalogo_pantalones"] is not None:
-            print("⚡ CACHÉ: Catálogo servido desde la Memoria RAM (Respuesta en 1 milisegundo)")
-            return MEMORIA_CACHE["catalogo_pantalones"]
-
-    print("🗄️ BASE DE DATOS: Memoria vacía. Despertando a PostgreSQL para buscar pantalones...")
+    print("🗄️ BASE DE DATOS: Buscando catálogo directamente en PostgreSQL...")
     query = db.query(models.Pantalon)
+    
     if categoria_id: query = query.filter(models.Pantalon.categoria_id == categoria_id)
     if busqueda: query = query.filter(models.Pantalon.nombre.ilike(f"%{busqueda}%"))
-    resultados = query.order_by(models.Pantalon.id.desc()).offset(skip).limit(limit).all()
     
-    # 3. Guardamos el resultado en la RAM para los siguientes clientes
-    if not busqueda and not categoria_id and skip == 0:
-        MEMORIA_CACHE["catalogo_pantalones"] = resultados
-        
+    resultados = query.order_by(models.Pantalon.id.desc()).offset(skip).limit(limit).all()
     return resultados
 
 @app.get("/generar-cupon-100")
@@ -902,24 +892,21 @@ def lanzar_recuperacion_carritos(db: Session = Depends(get_db), token: str = Dep
 # ==========================================
 @app.post("/webhook/loyverse")
 async def webhook_loyverse(request: Request, db: Session = Depends(get_db)):
-    # ⚡ 1. SEGURIDAD CRIPTOGRÁFICA: Revisamos que el mensaje venga firmado por Loyverse
+    # ⚡ 1. SEGURIDAD CRIPTOGRÁFICA
     secreto_loyverse = os.getenv("LOYVERSE_WEBHOOK_SECRET", "")
     
     if secreto_loyverse:
         body_bytes = await request.body()
         firma_recibida = request.headers.get("Loyverse-Signature", "")
-        
-        # Calculamos nuestra propia firma usando la llave maestra
         firma_calculada = base64.b64encode(
             hmac.new(secreto_loyverse.encode('utf-8'), body_bytes, hashlib.sha256).digest()
         ).decode('utf-8')
         
-        # Si las firmas no son idénticas, es un ataque y cerramos la puerta
         if not hmac.compare_digest(firma_recibida, firma_calculada):
             print("🚨 INTENTO DE HACKEO BLOQUEADO EN WEBHOOK")
             raise HTTPException(status_code=403, detail="Firma criptográfica inválida")
 
-    # 2. Si pasó la seguridad, procesamos los datos
+    # 2. PROCESAMIENTO DIRECTO
     try:
         datos = await request.json()
         eventos = [datos] if "type" in datos else datos.get("events", [])
@@ -988,7 +975,6 @@ async def webhook_loyverse(request: Request, db: Session = Depends(get_db)):
         await loyverse_sync.procesar_webhooks_loyverse(eventos, db, manager)
         
         # ⚡ EL FIX: ¡Borramos la memoria RAM para que la página web se actualice con lo de Loyverse!
-        MEMORIA_CACHE["catalogo_pantalones"] = None
         
     except Exception as e:
         print(f"❌ Error en webhook Loyverse: {e}")
@@ -1022,7 +1008,6 @@ async def editar_pantalon(
     
     db.commit()
     # Vaciamos la RAM para que se refresque el catálogo
-    MEMORIA_CACHE["catalogo_pantalones"] = None
     return {"mensaje": "Pantalón actualizado correctamente"}
 
 @app.delete("/pantalones/{pantalon_id}")
@@ -1036,7 +1021,6 @@ def eliminar_pantalon(request: Request, pantalon_id: int, db: Session = Depends(
     db.delete(pantalon)
     db.commit()
     # Vaciamos la RAM para que se refresque el catálogo
-    MEMORIA_CACHE["catalogo_pantalones"] = None
     return {"mensaje": "Pantalón eliminado"}
 
 @app.post("/pantalones/excel")
