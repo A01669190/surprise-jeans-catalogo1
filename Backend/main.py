@@ -557,12 +557,12 @@ def obtener_pantalones(
     busqueda: Optional[str] = None, categoria_id: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
-    # 1. Si buscan el catálogo normal, revisamos primero la RAM
     if not busqueda and not categoria_id and skip == 0:
         if MEMORIA_CACHE["catalogo_pantalones"] is not None:
+            print("⚡ CACHÉ: Catálogo servido desde la Memoria RAM (Respuesta en 1 milisegundo)")
             return MEMORIA_CACHE["catalogo_pantalones"]
 
-    # 2. Si la RAM está vacía, hacemos la consulta pesada a la Base de Datos
+    print("🗄️ BASE DE DATOS: Memoria vacía. Despertando a PostgreSQL para buscar pantalones...")
     query = db.query(models.Pantalon)
     if categoria_id: query = query.filter(models.Pantalon.categoria_id == categoria_id)
     if busqueda: query = query.filter(models.Pantalon.nombre.ilike(f"%{busqueda}%"))
@@ -962,44 +962,38 @@ def eliminar_categoria(
     db.commit()
     return {"mensaje": "Categoría eliminada"}
 
-@app.post("/pantalones")
-@limiter.limit("20/minute")
-async def crear_pantalon(
-    request: Request, 
-    background_tasks: BackgroundTasks, # ⚡ NUEVO: Inyectamos el motor de segundo plano
-    codigo: str = Form(...), 
-    nombre: str = Form(...), 
-    precio: float = Form(...),
-    stock: int = Form(...), 
-    categoria_id: int = Form(...), 
-    foto: UploadFile = File(...),
-    db: Session = Depends(get_db), 
-    token: str = Depends(verificar_token)
-):
-    contenido = await foto.read()
-    imagen_base64 = base64.b64encode(contenido).decode("utf-8")
-    API_KEY = "967d4560b8e4d58a4f50db487013722f"
-    respuesta = requests.post("https://api.imgbb.com/1/upload", data={"key": API_KEY, "image": imagen_base64})
+@app.post("/webhook/loyverse")
+async def webhook_loyverse(request: Request, db: Session = Depends(get_db)):
+    # ⚡ 1. SEGURIDAD CRIPTOGRÁFICA: Revisamos que el mensaje venga firmado por Loyverse
+    secreto_loyverse = os.getenv("LOYVERSE_WEBHOOK_SECRET", "")
     
-    if respuesta.status_code == 200: 
-        url_permanente = respuesta.json()["data"]["url"]
-    else: 
-        return {"error": "Fallo la subida a ImgBB"}
+    if secreto_loyverse:
+        body_bytes = await request.body()
+        firma_recibida = request.headers.get("Loyverse-Signature", "")
+        
+        # Calculamos nuestra propia firma usando la llave maestra
+        firma_calculada = base64.b64encode(
+            hmac.new(secreto_loyverse.encode('utf-8'), body_bytes, hashlib.sha256).digest()
+        ).decode('utf-8')
+        
+        # Si las firmas no son idénticas, es un ataque y cerramos la puerta
+        if not hmac.compare_digest(firma_recibida, firma_calculada):
+            print("🚨 INTENTO DE HACKEO BLOQUEADO EN WEBHOOK")
+            raise HTTPException(status_code=403, detail="Firma criptográfica inválida")
 
-    nuevo_pantalon = models.Pantalon(codigo=codigo, nombre=nombre, precio=precio, stock=stock, categoria_id=categoria_id, imagen_url=url_permanente)
-    db.add(nuevo_pantalon)
-    db.commit()
-    
-    # ⚡ MAGIA ASÍNCRONA: El servidor delega la comunicación con Loyverse al fondo.
-    # Tu página responde al instante mientras el servidor trabaja en silencio.
-    background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre, codigo, precio)
-    
-    # Si pusiste stock inicial desde la web, mandamos la tarea al fondo también
-    if stock > 0:
-        background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, codigo, stock)
-    # Vaciamos la RAM para que se refresque el catálogo
-    MEMORIA_CACHE["catalogo_pantalones"] = None
-    return {"mensaje": "Pantalón subido con éxito, sincronizando con Loyverse en segundo plano...", "url": url_permanente}
+    # 2. Si pasó la seguridad, procesamos los datos
+    try:
+        datos = await request.json()
+        eventos = [datos] if "type" in datos else datos.get("events", [])
+        await loyverse_sync.procesar_webhooks_loyverse(eventos, db, manager)
+        
+        # ⚡ EL FIX: ¡Borramos la memoria RAM para que la página web se actualice con lo de Loyverse!
+        MEMORIA_CACHE["catalogo_pantalones"] = None
+        
+    except Exception as e:
+        print(f"❌ Error en webhook Loyverse: {e}")
+        
+    return {"status": "procesado"}
 
 @app.put("/pantalones/{pantalon_id}")
 @limiter.limit("20/minute")
@@ -1248,8 +1242,7 @@ def marcar_pedido_entregado(pedido_id: int, db: Session = Depends(get_db), token
 @app.get("/vincular-loyverse")
 def forzar_conexion_loyverse():
     url = "https://api.loyverse.com/v1.0/webhooks"
-    token = "b3dca41541684d0cb5dbcfeac1155736" 
-    
+    token = os.getenv("LOYVERSE_TOKEN", "")    
     eventos_necesarios = ["receipts.update", "items.create", "items.update"]
     resultados = []
     
@@ -1278,8 +1271,7 @@ def forzar_conexion_loyverse():
 # 🔄 VÍA 2: LA WEB LE AVISA A LA TIENDA FÍSICA
 # ==========================================
 def descontar_stock_loyverse(sku, nuevo_stock):
-    token = "b3dca41541684d0cb5dbcfeac1155736"
-    
+    token = os.getenv("LOYVERSE_TOKEN", "")    
     try:
         # 1. Obtener el ID de la tienda física
         req_tienda = urllib.request.Request("https://api.loyverse.com/v1.0/stores")
