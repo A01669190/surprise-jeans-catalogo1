@@ -9,6 +9,7 @@ import socket
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import os
 import shutil
 from fastapi import FastAPI, Depends, File, UploadFile, Form, Request, HTTPException, status, WebSocket, WebSocketDisconnect
@@ -48,6 +49,37 @@ import json
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="API Surprise Jeans - Fortificada")
+
+scheduler = AsyncIOScheduler()
+
+def cron_recuperar_carritos():
+    """ El robot revisará la base de datos automáticamente cada hora """
+    db = next(get_db())
+    try:
+        hace_una_hora = datetime.utcnow() - timedelta(hours=1)
+        pedidos_abandonados = db.query(models.Pedido).filter(
+            models.Pedido.estatus == "PENDIENTE",
+            models.Pedido.correo_cliente != None,
+            models.Pedido.fecha <= hace_una_hora
+        ).all()
+        
+        for pedido in pedidos_abandonados:
+            enviar_correo_carrito_abandonado(pedido.correo_cliente, pedido.nombre_cliente, f"{pedido.id:04d}")
+            pedido.estatus = "RECORDATORIO_ENVIADO"
+            
+        db.commit()
+        print("🤖 Robot Cron: Carritos abandonados escaneados y correos enviados en automático.")
+    except Exception as e:
+        print(f"❌ Error en Robot Cron: {e}")
+    finally:
+        db.close()
+
+@app.on_event("startup")
+def iniciar_programador_automatico():
+    # Se ejecuta cada 1 hora automáticamente
+    scheduler.add_job(cron_recuperar_carritos, 'interval', hours=1)
+    scheduler.start()
+    print("⏰ Robot de Carritos Abandonados (APScheduler) Activado y Corriendo.")
 
 # 1. ANTI-DDOS
 limiter = Limiter(key_func=get_remote_address)
@@ -157,6 +189,9 @@ def registrar_cliente(cliente: schemas.ClienteRegistro, db: Session = Depends(ge
     )
     db.add(nuevo_cliente)
     db.commit()
+
+    # ⚡ FIDELIDAD OMNICANAL: Guardamos al cliente en la tablet
+    loyverse_sync.crear_cliente_loyverse(cliente.nombre_completo, cliente.correo, cliente.telefono)
 
     # NOTA: Motor de correo desactivado para evitar el bloqueo del puerto 587 en Render Gratuito.
     return {"mensaje": "Cuenta creada con éxito."}
@@ -896,6 +931,9 @@ async def editar_pantalon(
 def eliminar_pantalon(request: Request, pantalon_id: int, db: Session = Depends(get_db), token: str = Depends(verificar_token)):
     pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == pantalon_id).first()
     if not pantalon: return {"error": "Pantalón no encontrado"}
+    # ⚡ SINCRONIZACIÓN DE ELIMINACIÓN: Lo borramos de la tablet física
+    if pantalon.codigo:
+        loyverse_sync.eliminar_articulo_loyverse(pantalon.codigo)
     db.delete(pantalon)
     db.commit()
     return {"mensaje": "Pantalón eliminado"}

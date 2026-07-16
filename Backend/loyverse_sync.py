@@ -92,6 +92,13 @@ async def procesar_webhooks_loyverse(eventos, db, manager):
                             print(f"🔄 Modelo actualizado desde Loyverse: {sku}")
                         
                         db.commit()
+        # 3. SI ELIMINAN UN PANTALÓN DESDE LA TABLET FÍSICA
+        elif tipo == "items.delete":
+            lista_items = evento.get("items", [])
+            for item_data in lista_items:
+                # Cuando Loyverse elimina, nos manda su ID. Buscamos variantes asociadas en la web.
+                # Nota: Es más seguro manejar el borrado maestro desde la Web, pero aquí capturamos la señal
+                print(f"🗑️ Alerta de eliminación recibida desde Loyverse para el ID: {item_data.get('id')}")
 
 async def procesar_webhooks_loyverse(eventos, db, manager):
     """ Función que escucha cuando crean un pantalón en la app o cobran en caja """
@@ -185,3 +192,42 @@ def crear_articulo_loyverse(nombre, sku, precio):
     except Exception as e:
         error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
         print(f"❌ Error al empujar a Loyverse: {error_msg}")
+
+def crear_cliente_loyverse(nombre, correo, telefono):
+    """ Sincroniza a un cliente recién registrado en la web con la tablet física """
+    try:
+        payload = json.dumps({
+            "name": nombre,
+            "email": correo,
+            "phone_number": telefono if telefono else ""
+        }).encode("utf-8")
+        
+        req = urllib.request.Request("https://api.loyverse.com/v1.0/customers", data=payload, method="POST")
+        req.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
+        req.add_header("Content-Type", "application/json")
+        urllib.request.urlopen(req)
+        print(f"👤 Sincronización de Cliente: {nombre} fue guardado en Loyverse.")
+    except Exception as e:
+        print(f"❌ Error al crear cliente en Loyverse: {e}")
+
+def eliminar_articulo_loyverse(sku):
+    """ Busca un artículo por su SKU en Loyverse y lo destruye para mantener limpio el catálogo """
+    try:
+        # 1. Buscamos el ID interno de Loyverse usando el SKU
+        req_item = urllib.request.Request(f"https://api.loyverse.com/v1.0/items?sku={sku}")
+        req_item.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
+        items = json.loads(urllib.request.urlopen(req_item).read().decode('utf-8')).get("items", [])
+        
+        if not items:
+            print(f"⚠️ No se encontró el SKU {sku} en Loyverse para eliminar.")
+            return
+            
+        item_id = items[0]["id"]
+        
+        # 2. Mandamos la orden de eliminación definitiva
+        req_delete = urllib.request.Request(f"https://api.loyverse.com/v1.0/items/{item_id}", method="DELETE")
+        req_delete.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
+        urllib.request.urlopen(req_delete)
+        print(f"🗑️ Sincronización de Eliminación: Modelo {sku} borrado de Loyverse.")
+    except Exception as e:
+        print(f"❌ Error al eliminar artículo en Loyverse: {e}")
