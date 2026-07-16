@@ -209,21 +209,23 @@ def crear_articulo_loyverse(nombre, sku, precio, nombre_categoria="General"):
 
         # 2. 📦 CREAR EL PANTALÓN ASIGNÁNDOLE LA CATEGORÍA
         # 2. 📦 CREAR EL PANTALÓN ASIGNÁNDOLE LA CATEGORÍA
-        # 2. 📦 CREAR EL PANTALÓN ASIGNÁNDOLE LA CATEGORÍA
         payload_dict = {
             "item_name": nombre,
             "category_id": cat_id,
             "option1_name": "Talla",
             "variants": [
-                {"sku": f"{sku}-3", "pricing_type": "FIXED", "default_price": precio, "option1_value": "3"},
-                {"sku": f"{sku}-5", "pricing_type": "FIXED", "default_price": precio, "option1_value": "5"},
-                {"sku": f"{sku}-7", "pricing_type": "FIXED", "default_price": precio, "option1_value": "7"},
-                {"sku": f"{sku}-9", "pricing_type": "FIXED", "default_price": precio, "option1_value": "9"},
-                {"sku": f"{sku}-11", "pricing_type": "FIXED", "default_price": precio, "option1_value": "11"},
-                {"sku": f"{sku}-13", "pricing_type": "FIXED", "default_price": precio, "option1_value": "13"},
-                {"sku": f"{sku}-15", "pricing_type": "FIXED", "default_price": precio, "option1_value": "15"}
+                {"sku": f"{sku}-3", "default_pricing_type": "FIXED", "default_price": precio, "option1_value": "3"},
+                {"sku": f"{sku}-5", "default_pricing_type": "FIXED", "default_price": precio, "option1_value": "5"},
+                {"sku": f"{sku}-7", "default_pricing_type": "FIXED", "default_price": precio, "option1_value": "7"},
+                {"sku": f"{sku}-9", "default_pricing_type": "FIXED", "default_price": precio, "option1_value": "9"},
+                {"sku": f"{sku}-11", "default_pricing_type": "FIXED", "default_price": precio, "option1_value": "11"},
+                {"sku": f"{sku}-13", "default_pricing_type": "FIXED", "default_price": precio, "option1_value": "13"},
+                {"sku": f"{sku}-15", "default_pricing_type": "FIXED", "default_price": precio, "option1_value": "15"}
             ]
         }
+        
+        # Empaquetamos correctamente usando json.dumps()
+        payload_final = json.dumps(payload_dict).encode("utf-8")
         
         # Empaquetamos correctamente usando json.dumps()
         payload_final = json.dumps(payload_dict).encode("utf-8")
