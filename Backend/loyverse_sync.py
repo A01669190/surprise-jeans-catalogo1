@@ -98,10 +98,6 @@ async def procesar_webhooks_loyverse(eventos, db, manager):
     for evento in eventos:
         tipo = evento.get("type")
         
-        print(f"📦 DEBUG LOYVERSE - Tipo de alerta recibida: {tipo}")
-        # 🚨 ESCÁNER ABSOLUTO: Imprime TODO el código crudo que manda Loyverse
-        print(f"🚨 PAQUETE COMPLETO: {evento}")
-        
         if tipo == "receipts.update":
             line_items = evento.get("data", {}).get("receipt", {}).get("line_items", [])
             for item in line_items:
@@ -116,33 +112,19 @@ async def procesar_webhooks_loyverse(eventos, db, manager):
                         print(f"✅ Venta física: Se restaron {cantidad} de {sku}")
 
         elif tipo in ["items.create", "items.update"]:
-            data_obj = evento.get("data", {})
-            
-            # ⚡ FIX MEGA BLINDADO: Extraemos el pantalón sin importar cómo venga empacado
-            lista_items = []
-            if isinstance(data_obj, list):
-                lista_items = data_obj
-            elif isinstance(data_obj, dict):
-                if "items" in data_obj:
-                    lista_items = data_obj["items"]
-                elif "item" in data_obj:
-                    lista_items = [data_obj["item"]]
-                else:
-                    # Si Loyverse lo manda completamente suelto y sin llave
-                    lista_items = [data_obj]
-                
-            print(f"🔍 DEBUG LOYVERSE - Pantalones encontrados en el paquete: {len(lista_items)}")
+            # ⚡ FIX FINAL: Loyverse no usa la carpeta "data" aquí, los tira en la raíz.
+            lista_items = evento.get("items", [])
             
             for item_data in lista_items:
+                # Extraemos el nombre exacto que vimos en tus Rayos X
                 nombre = item_data.get("item_name", "Sin Nombre")
                 variantes = item_data.get("variants", [])
                 
                 if variantes:
                     sku = variantes[0].get("sku")
-                    precio_crudo = variantes[0].get("price", 0.0)
+                    # ⚡ FIX FINAL 2: Loyverse le llama 'default_price', no 'price'
+                    precio_crudo = variantes[0].get("default_price", 0.0)
                     precio = float(precio_crudo) if precio_crudo is not None else 0.0
-                    
-                    print(f"🔍 DEBUG LOYVERSE - Leyendo Pantalón: Nombre='{nombre}', SKU='{sku}', Precio={precio}")
                     
                     if sku:
                         pantalon_db = db.query(models.Pantalon).filter(models.Pantalon.codigo == sku).first()
@@ -160,14 +142,14 @@ async def procesar_webhooks_loyverse(eventos, db, manager):
                                 imagen_url="https://dummyimage.com/400x500/e0e7ff/3730a3&text=FOTO+PENDIENTE"
                             )
                             db.add(nuevo)
-                            print(f"🌟 Nuevo modelo sincronizado desde Loyverse: {sku}")
+                            print(f"🌟 Nuevo modelo sincronizado desde Loyverse: {sku} - {nombre}")
                         else:
                             pantalon_db.nombre = nombre
                             pantalon_db.precio = precio
-                            print(f"🔄 Modelo actualizado desde Loyverse: {sku}")
+                            print(f"🔄 Modelo actualizado desde Loyverse: {sku} - {nombre}")
                         
                         db.commit()
                     else:
-                        print(f"⚠️ ERROR LOYVERSE: El pantalón '{nombre}' NO tiene SKU (REF) escrito en Loyverse, ignorado.")
+                        print(f"⚠️ ERROR: El pantalón '{nombre}' NO tiene SKU (REF) escrito en Loyverse.")
                 else:
-                    print(f"⚠️ ERROR LOYVERSE: El pantalón '{nombre}' viene sin variantes/precio.")
+                    print(f"⚠️ ERROR: El pantalón '{nombre}' viene sin variantes.")
