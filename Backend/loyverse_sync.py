@@ -202,7 +202,8 @@ def crear_articulo_loyverse(nombre, sku, precio, nombre_categoria="General"):
             "category_id": cat_id, # ⚡ AQUÍ ASIGNAMOS LA CATEGORÍA
             "variants": [{
                 "sku": sku,
-                "default_price": precio
+                "default_price": precio,
+                "default_pricing_type": "FIXED" # ⚡ EL FIX: Obligamos a que sea Precio Fijo
             }]
         }).encode("utf-8")
         
