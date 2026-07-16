@@ -7,6 +7,7 @@ from datetime import datetime
 from reportlab.graphics.barcode import code128
 from reportlab.lib.units import mm
 import socket
+import logging
 import smtplib
 from email.mime.application import MIMEApplication
 from email.mime.text import MIMEText
@@ -59,8 +60,17 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="API Surprise Jeans - Fortificada")
 
 # ==========================================
-# ⚡ SISTEMA DE CACHÉ EN MEMORIA RAM
+# 📝 SISTEMA DE LOGS PROFESIONAL (Caja Negra)
 # ==========================================
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("surprise_jeans.log"), # Guarda todo en un archivo
+        logging.StreamHandler() # Sigue mostrando los mensajes en la consola de Render
+    ]
+)
+logger = logging.getLogger("SurpriseJeans")
 
 
 scheduler = AsyncIOScheduler()
@@ -553,15 +563,31 @@ def obtener_categorias(request: Request, db: Session = Depends(get_db)):
 def obtener_pantalones(
     request: Request, skip: int = 0, limit: int = 20, 
     busqueda: Optional[str] = None, categoria_id: Optional[int] = None,
+    precio_min: Optional[float] = None, # ⚡ NUEVO: Rango inicial
+    precio_max: Optional[float] = None, # ⚡ NUEVO: Rango límite
+    orden: Optional[str] = None,        # ⚡ NUEVO: "precio_asc", "precio_desc", o "recientes"
     db: Session = Depends(get_db)
 ):
-    print("🗄️ BASE DE DATOS: Buscando catálogo directamente en PostgreSQL...")
+    logger.info("🗄️ BASE DE DATOS: Buscando catálogo con filtros avanzados...")
     query = db.query(models.Pantalon)
     
+    # 1. Filtros exactos y de texto
     if categoria_id: query = query.filter(models.Pantalon.categoria_id == categoria_id)
     if busqueda: query = query.filter(models.Pantalon.nombre.ilike(f"%{busqueda}%"))
     
-    resultados = query.order_by(models.Pantalon.id.desc()).offset(skip).limit(limit).all()
+    # 2. ⚡ Filtros de Presupuesto
+    if precio_min is not None: query = query.filter(models.Pantalon.precio >= precio_min)
+    if precio_max is not None: query = query.filter(models.Pantalon.precio <= precio_max)
+    
+    # 3. ⚡ Algoritmos de Ordenamiento
+    if orden == "precio_asc":
+        query = query.order_by(models.Pantalon.precio.asc()) # Los más baratos primero
+    elif orden == "precio_desc":
+        query = query.order_by(models.Pantalon.precio.desc()) # Los más caros primero
+    else: 
+        query = query.order_by(models.Pantalon.id.desc()) # "recientes" por defecto
+        
+    resultados = query.offset(skip).limit(limit).all()
     return resultados
 
 @app.get("/generar-cupon-100")
@@ -1023,16 +1049,23 @@ async def crear_pantalon(
 
 @app.delete("/pantalones/{pantalon_id}")
 @limiter.limit("15/minute")
-def eliminar_pantalon(request: Request, pantalon_id: int, db: Session = Depends(get_db), token: str = Depends(verificar_token)):
+def eliminar_pantalon(
+    request: Request, 
+    pantalon_id: int, 
+    background_tasks: BackgroundTasks, # ⚡ NUEVO: Inyectamos el motor en segundo plano
+    db: Session = Depends(get_db), 
+    token: str = Depends(verificar_token)
+):
     pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == pantalon_id).first()
     if not pantalon: return {"error": "Pantalón no encontrado"}
-    # ⚡ SINCRONIZACIÓN DE ELIMINACIÓN: Lo borramos de la tablet física
+    
+    # ⚡ SINCRONIZACIÓN ASÍNCRONA: Disparamos el misil a Loyverse en las sombras
     if pantalon.codigo:
-        loyverse_sync.eliminar_articulo_loyverse(pantalon.codigo)
+        background_tasks.add_task(loyverse_sync.eliminar_articulo_loyverse, pantalon.codigo)
+        
     db.delete(pantalon)
     db.commit()
-    # Vaciamos la RAM para que se refresque el catálogo
-    return {"mensaje": "Pantalón eliminado"}
+    return {"mensaje": "Pantalón eliminado de la web y de Loyverse"}
 
 @app.post("/pantalones/excel")
 @limiter.limit("5/minute") 

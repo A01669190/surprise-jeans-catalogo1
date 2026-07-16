@@ -2,7 +2,6 @@ import urllib.request
 import json
 import models
 
-# Tu token maestro de conexión
 TOKEN_LOYVERSE = "b3dca41541684d0cb5dbcfeac1155736"
 
 def descontar_stock_loyverse(sku, stock_after):
@@ -231,3 +230,34 @@ def eliminar_articulo_loyverse(sku):
         print(f"🗑️ Sincronización de Eliminación: Modelo {sku} borrado de Loyverse.")
     except Exception as e:
         print(f"❌ Error al eliminar artículo en Loyverse: {e}")
+
+def eliminar_articulo_loyverse(sku):
+    import urllib.request
+    import json
+    import os
+    
+    token = os.getenv("LOYVERSE_TOKEN", "")
+    if not token: return
+    
+    try:
+        # 1. Buscamos el pantalón en Loyverse por su SKU para robar su ID secreto
+        req_item = urllib.request.Request(f"https://api.loyverse.com/v1.0/items?sku={sku}")
+        req_item.add_header("Authorization", f"Bearer {token}")
+        res_item = urllib.request.urlopen(req_item)
+        items = json.loads(res_item.read().decode('utf-8')).get("items", [])
+        
+        if not items:
+            print(f"⚠️ Loyverse: El código {sku} ya no existía en la tablet.")
+            return
+            
+        item_id = items[0]["id"]
+        
+        # 2. Mandamos la orden (DELETE) directamente a ese ID
+        req_del = urllib.request.Request(f"https://api.loyverse.com/v1.0/items/{item_id}", method="DELETE")
+        req_del.add_header("Authorization", f"Bearer {token}")
+        urllib.request.urlopen(req_del)
+        
+        print(f"🗑️ OMNICANAL: El modelo {sku} fue destruido de Loyverse con éxito.")
+    except Exception as e:
+        error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
+        print(f"❌ Error al eliminar en Loyverse: {error_msg}")
