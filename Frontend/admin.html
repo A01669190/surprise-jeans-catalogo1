@@ -57,6 +57,20 @@
             </form>
         </div>
 
+        <div class="bg-gradient-to-r from-emerald-50 to-teal-50 p-6 rounded-2xl shadow-lg border border-emerald-100 mb-6">
+            <div class="mb-2">
+                <h2 class="text-xl font-black text-emerald-900">✨ Carga Mágica (Solo Fotos)</h2>
+                <p class="text-xs text-emerald-700 font-medium mt-1">Selecciona las fotos con el nombre correcto (Ej. SJ-001_Skinny_350.jpg). El sistema creará el catálogo y subirá las fotos automáticamente.</p>
+            </div>
+            
+            <div class="flex gap-3 items-center mt-4">
+                <input type="file" id="fotos-magicas" multiple accept="image/*" class="flex-1 border border-emerald-200 p-2 rounded-lg text-sm bg-white cursor-pointer">
+                <button onclick="procesarFotosMagicas()" id="btn-magico" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-lg font-bold transition-colors text-sm shadow-md flex items-center gap-2">
+                    <span>🚀</span> SUBIR FOTOS
+                </button>
+            </div>
+        </div>
+
         <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
             <h2 class="text-xl font-black text-gray-800 mb-6">2. Agregar a la Lista Manual</h2>
             

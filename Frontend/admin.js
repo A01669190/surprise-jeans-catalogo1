@@ -478,3 +478,98 @@ async function descargarBaseDeDatos() {
         alert("Hubo un problema de conexión al generar el respaldo.");
     }
 }
+
+// ==========================================
+// 10. CARGA MÁGICA DE FOTOS (NIVEL HACKER)
+// ==========================================
+async function procesarFotosMagicas() {
+    const inputFotos = document.getElementById('fotos-magicas');
+    const archivos = inputFotos.files;
+    const btnMagico = document.getElementById('btn-magico');
+
+    if (archivos.length === 0) {
+        alert("Por favor, selecciona al menos una foto.");
+        return;
+    }
+
+    // Pon aquí tu API Key de ImgBB (Consíguela en api.imgbb.com)
+    const IMGBB_API_KEY = '967d4560b8e4d58a4f50db487013722f'; 
+    
+    btnMagico.innerHTML = 'Subiendo a la nube... ⏳';
+    btnMagico.disabled = true;
+
+    // Empezamos a armar el texto del Excel en la memoria
+    let csvVirtual = "Codigo,Nombre,Precio,Stock,Categoria,Foto_URL\n";
+    let exitos = 0;
+
+    try {
+        for (let i = 0; i < archivos.length; i++) {
+            const archivo = archivos[i];
+            const nombreSinExtension = archivo.name.split('.')[0];
+            const partes = nombreSinExtension.split('_'); // Separa por guiones bajos
+
+            // Validamos que el nombre tenga el formato SKU_Nombre_Precio
+            if (partes.length < 3) {
+                console.warn(`Se saltó ${archivo.name}: El nombre no tiene el formato correcto.`);
+                continue; 
+            }
+
+            const sku = partes[0];
+            const nombre = partes[1];
+            const precio = partes[2];
+
+            // 1. Subimos la foto a ImgBB directamente desde el navegador
+            const fdImg = new FormData();
+            fdImg.append('image', archivo);
+
+            const respuestaImg = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+                method: 'POST',
+                body: fdImg
+            });
+
+            const dataImg = await respuestaImg.json();
+            
+            if (dataImg.success) {
+                const urlDirecta = dataImg.data.url;
+                // 2. Agregamos este modelo a nuestro Excel virtual (Stock 0 por defecto)
+                csvVirtual += `${sku},${nombre},${precio},0,Nuevos,${urlDirecta}\n`;
+                exitos++;
+            }
+        }
+
+        if (exitos === 0) {
+            alert("Ninguna foto tenía el formato correcto (SKU_Nombre_Precio.jpg).");
+            return;
+        }
+
+        btnMagico.innerHTML = 'Sincronizando catálogo... ⚙️';
+
+        // 3. Empaquetamos nuestro Excel virtual y se lo mandamos a tu servidor web
+        const blobCSV = new Blob([csvVirtual], { type: 'text/csv' });
+        const formDataFinal = new FormData();
+        formDataFinal.append('archivo', blobCSV, 'catalogo_magico.csv');
+
+        const respuestaBackend = await fetch(`${API_URL}/pantalones/excel`, {
+            method: 'POST',
+            headers: obtenerTokenHeader(), // Usa tu token de admin
+            body: formDataFinal
+        });
+
+        const dataBackend = await respuestaBackend.json();
+
+        if (respuestaBackend.ok) {
+            alert(`¡Magia completada! ✨\nSe subieron y procesaron ${exitos} fotos nuevas.\n\nEl servidor dice: ${dataBackend.mensaje}`);
+            cargarInventarioAdmin(); // Refresca la tabla
+            inputFotos.value = ''; // Limpia el input
+        } else {
+            alert(`Error del servidor: ${dataBackend.detail || dataBackend.error}`);
+        }
+
+    } catch (error) {
+        console.error("Error en la carga mágica:", error);
+        alert("Hubo un problema de red. Revisa tu conexión.");
+    } finally {
+        btnMagico.innerHTML = '<span>🚀</span> SUBIR FOTOS';
+        btnMagico.disabled = false;
+    }
+}

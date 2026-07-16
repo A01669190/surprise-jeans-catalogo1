@@ -47,3 +47,4 @@
 2026-07-15 23:41:32,388 [INFO] Added job "cron_reporte_mensual" to job store "default"
 2026-07-15 23:41:32,388 [INFO] Added job "cron_respaldo_semanal" to job store "default"
 2026-07-15 23:41:32,388 [INFO] Scheduler started
+2026-07-16 00:41:58,765 [WARNING] Run time of job "cron_recuperar_carritos (trigger: interval[1:00:00], next run at: 2026-07-16 00:41:32 CST)" was missed by 0:00:26.381703
