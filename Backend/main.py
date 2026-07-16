@@ -981,34 +981,45 @@ async def webhook_loyverse(request: Request, db: Session = Depends(get_db)):
         
     return {"status": "procesado"}
 
-@app.put("/pantalones/{pantalon_id}")
+@app.post("/pantalones")
 @limiter.limit("20/minute")
-async def editar_pantalon(
-    request: Request, pantalon_id: int, codigo: str = Form(...), nombre: str = Form(...), precio: float = Form(...),
-    stock: int = Form(...), categoria_id: int = Form(...), foto: Optional[UploadFile] = File(None), 
-    db: Session = Depends(get_db), token: str = Depends(verificar_token)
+async def crear_pantalon(
+    request: Request, 
+    background_tasks: BackgroundTasks, 
+    codigo: str = Form(...), 
+    nombre: str = Form(...), 
+    precio: float = Form(...),
+    stock: int = Form(...), 
+    categoria_id: int = Form(...), 
+    foto: UploadFile = File(...),
+    db: Session = Depends(get_db), 
+    token: str = Depends(verificar_token)
 ):
-    pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == pantalon_id).first()
-    if not pantalon: return {"error": "Pantalón no encontrado"}
+    # 1. Subimos la foto a ImgBB
+    contenido = await foto.read()
+    imagen_base64 = base64.b64encode(contenido).decode("utf-8")
+    API_KEY = "967d4560b8e4d58a4f50db487013722f"
+    respuesta = requests.post("https://api.imgbb.com/1/upload", data={"key": API_KEY, "image": imagen_base64})
     
-    pantalon.codigo = codigo
-    pantalon.nombre = nombre
-    pantalon.precio = precio
-    pantalon.stock = stock
-    pantalon.categoria_id = categoria_id
-    
-    if foto and foto.filename:
-        contenido = await foto.read()
-        imagen_base64 = base64.b64encode(contenido).decode("utf-8")
-        API_KEY = "967d4560b8e4d58a4f50db487013722f"
-        respuesta = requests.post("https://api.imgbb.com/1/upload", data={"key": API_KEY, "image": imagen_base64})
-        
-        if respuesta.status_code == 200:
-            pantalon.imagen_url = respuesta.json()["data"]["url"]
-    
+    if respuesta.status_code == 200: 
+        url_permanente = respuesta.json()["data"]["url"]
+    else: 
+        return {"error": "Fallo la subida a ImgBB"}
+
+    # 2. Guardamos en la Base de Datos
+    nuevo_pantalon = models.Pantalon(
+        codigo=codigo, nombre=nombre, precio=precio, 
+        stock=stock, categoria_id=categoria_id, imagen_url=url_permanente
+    )
+    db.add(nuevo_pantalon)
     db.commit()
-    # Vaciamos la RAM para que se refresque el catálogo
-    return {"mensaje": "Pantalón actualizado correctamente"}
+    
+    # 3. ⚡ MAGIA ASÍNCRONA: Avisamos a Loyverse en segundo plano
+    background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre, codigo, precio)
+    if stock > 0:
+        background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, codigo, stock)
+
+    return {"mensaje": "Pantalón subido con éxito", "url": url_permanente}
 
 @app.delete("/pantalones/{pantalon_id}")
 @limiter.limit("15/minute")
