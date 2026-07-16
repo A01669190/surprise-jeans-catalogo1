@@ -98,7 +98,9 @@ async def procesar_webhooks_loyverse(eventos, db, manager):
     for evento in eventos:
         tipo = evento.get("type")
         
-        # 1. SI SE HACE UNA VENTA EN LA CAJA REGISTRADORA FÍSICA
+        # ☢️ RAYOS X 1: Ver qué tipo de alerta llegó
+        print(f"📦 DEBUG LOYVERSE - Tipo de alerta recibida: {tipo}")
+        
         if tipo == "receipts.update":
             line_items = evento.get("data", {}).get("receipt", {}).get("line_items", [])
             for item in line_items:
@@ -112,38 +114,56 @@ async def procesar_webhooks_loyverse(eventos, db, manager):
                         await manager.broadcast("NUEVO_PEDIDO")
                         print(f"✅ Venta física: Se restaron {cantidad} de {sku}")
 
-        # 2. 🚀 OPCIÓN 2: SI CREAN O EDITAN UN PANTALÓN EN LOYVERSE (CATÁLOGO AUTOMÁTICO)
         elif tipo in ["items.create", "items.update"]:
-            item_data = evento.get("data", {}).get("item", {})
-            nombre = item_data.get("item_name", "Sin Nombre")
-            variantes = item_data.get("variants", [])
+            data_obj = evento.get("data", {})
             
-            if variantes:
-                sku = variantes[0].get("sku")
-                precio = float(variantes[0].get("price", 0.0))
+            # ⚡ FIX BLINDADO: Atrapamos el dato sin importar si Loyverse lo manda como "item" o "items"
+            lista_items = []
+            if "items" in data_obj:
+                lista_items = data_obj["items"]
+            elif "item" in data_obj:
+                lista_items = [data_obj["item"]]
                 
-                if sku:
-                    pantalon_db = db.query(models.Pantalon).filter(models.Pantalon.codigo == sku).first()
+            # ☢️ RAYOS X 2: ¿Cuántos pantalones venían en el paquete?
+            print(f"🔍 DEBUG LOYVERSE - Pantalones encontrados en el paquete: {len(lista_items)}")
+            
+            for item_data in lista_items:
+                nombre = item_data.get("item_name", "Sin Nombre")
+                variantes = item_data.get("variants", [])
+                
+                if variantes:
+                    sku = variantes[0].get("sku")
+                    # Protegemos el código por si Loyverse manda el precio vacío accidentalmente
+                    precio_crudo = variantes[0].get("price", 0.0)
+                    precio = float(precio_crudo) if precio_crudo is not None else 0.0
                     
-                    if not pantalon_db:
-                        # Si es nuevo, lo creamos en una categoría provisional
-                        cat = db.query(models.Categoria).filter(models.Categoria.nombre == "Nuevos").first()
-                        if not cat:
-                            cat = models.Categoria(nombre="Nuevos")
-                            db.add(cat)
-                            db.commit()
-                            db.refresh(cat)
-                            
-                        nuevo = models.Pantalon(
-                            codigo=sku, nombre=nombre, precio=precio, stock=0, categoria_id=cat.id,
-                            imagen_url="https://dummyimage.com/400x500/e0e7ff/3730a3&text=FOTO+PENDIENTE"
-                        )
-                        db.add(nuevo)
-                        print(f"🌟 Nuevo modelo sincronizado desde Loyverse: {sku}")
+                    # ☢️ RAYOS X 3: Leer las entrañas del pantalón exacto
+                    print(f"🔍 DEBUG LOYVERSE - Leyendo Pantalón: Nombre='{nombre}', SKU='{sku}', Precio={precio}")
+                    
+                    if sku:
+                        pantalon_db = db.query(models.Pantalon).filter(models.Pantalon.codigo == sku).first()
+                        
+                        if not pantalon_db:
+                            cat = db.query(models.Categoria).filter(models.Categoria.nombre == "Nuevos").first()
+                            if not cat:
+                                cat = models.Categoria(nombre="Nuevos")
+                                db.add(cat)
+                                db.commit()
+                                db.refresh(cat)
+                                
+                            nuevo = models.Pantalon(
+                                codigo=sku, nombre=nombre, precio=precio, stock=0, categoria_id=cat.id,
+                                imagen_url="https://dummyimage.com/400x500/e0e7ff/3730a3&text=FOTO+PENDIENTE"
+                            )
+                            db.add(nuevo)
+                            print(f"🌟 Nuevo modelo sincronizado desde Loyverse: {sku}")
+                        else:
+                            pantalon_db.nombre = nombre
+                            pantalon_db.precio = precio
+                            print(f"🔄 Modelo actualizado desde Loyverse: {sku}")
+                        
+                        db.commit()
                     else:
-                        # Si ya existía, solo actualizamos el precio y nombre
-                        pantalon_db.nombre = nombre
-                        pantalon_db.precio = precio
-                        print(f"🔄 Modelo actualizado desde Loyverse: {sku}")
-                    
-                    db.commit()
+                        print(f"⚠️ ERROR LOYVERSE: El pantalón '{nombre}' NO tiene SKU (REF) escrito en Loyverse, por lo que fue ignorado.")
+                else:
+                    print(f"⚠️ ERROR LOYVERSE: El pantalón '{nombre}' viene sin información de variantes.")
