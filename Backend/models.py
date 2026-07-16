@@ -2,6 +2,8 @@ from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 import datetime
 from database import Base
+from sqlalchemy import ForeignKey
+from sqlalchemy.orm import relationship
 
 class Categoria(Base):
     __tablename__ = "categorias"
@@ -39,6 +41,19 @@ class Pantalon(Base):
         # El número entre paréntesis () en tu catálogo también ignorará las malas
         resenas_buenas = [r for r in self.resenas if r.calificacion >= 3]
         return len(resenas_buenas)
+    tallas = relationship("VarianteTalla", back_populates="pantalon", cascade="all, delete-orphan")
+
+class VarianteTalla(Base):
+    __tablename__ = "variantes_talla"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    pantalon_id = Column(Integer, ForeignKey("pantalones.id", ondelete="CASCADE"))
+    talla = Column(String)  # Ej: "3", "7", "9"
+    stock = Column(Integer, default=0)
+    sku = Column(String, unique=True, index=True) # Ej: "AM939-7"
+
+    # Conexión de vuelta al papá
+    pantalon = relationship("Pantalon", back_populates="tallas")
 
 class Resena(Base):
     __tablename__ = "resenas"

@@ -9,12 +9,21 @@ class CategoriaRespuesta(CategoriaBase):
     class Config:
         from_attributes = True
 
+class VarianteResponse(BaseModel):
+    talla: str
+    stock: int
+    sku: str
+
+    class Config:
+        from_attributes = True  # Usa orm_mode = True si usas Pydantic v1
+
 class PantalonRespuesta(BaseModel):
     id: int
     codigo: str  
     nombre: str
     descripcion: Optional[str] = None
     precio: float
+    tallas: List[VarianteResponse] = []
     imagen_url: str
     categoria_id: int
     stock: int
@@ -69,3 +78,4 @@ class CambioPasswordReq(BaseModel):
 class PantalonUpdateRapido(BaseModel):
     precio: Optional[float] = None
     stock: Optional[int] = None
+

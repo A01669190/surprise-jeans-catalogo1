@@ -98,6 +98,7 @@ async function cargarPantalones(esNuevaBusqueda) {
 
 // 5. Motor Gráfico de Tarjetas
 function renderizarPantalones(listaPantalones, esNuevaBusqueda) {
+    
     const contenedor = document.getElementById('contenedor-pantalones');
     
     if (listaPantalones.length === 0 && esNuevaBusqueda) {
@@ -113,7 +114,22 @@ function renderizarPantalones(listaPantalones, esNuevaBusqueda) {
         if (imageUrl && imageUrl.includes('localhost:8000')) {
             imageUrl = imageUrl.replace('http://localhost:8000', '');
         }
-        
+        // Si el pantalón tiene tallas, dibuja los botones
+        const botonesTallas = pantalon.tallas && pantalon.tallas.length > 0 ? `
+            <div class="mt-3 mb-2 border-t border-gray-100 pt-3">
+                <p class="text-[10px] uppercase text-gray-500 font-bold mb-2 tracking-wider">Selecciona tu talla:</p>
+                <div class="flex flex-wrap gap-1.5">
+                    ${pantalon.tallas.map(t => `
+                        <button type="button" 
+                                class="w-8 h-8 rounded-md border border-gray-200 text-[11px] font-black text-gray-700 hover:border-indigo-600 hover:text-indigo-600 focus:bg-indigo-600 focus:border-indigo-600 focus:text-white transition-all shadow-sm"
+                                onclick="seleccionarTalla('${pantalon.codigo}', '${t.talla}', '${t.sku}')">
+                            ${t.talla}
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+        ` : '';
+
         const imageUrlDefinitiva = imageUrl && imageUrl.startsWith('http') 
             ? imageUrl 
             : `${API_URL}${imageUrl && imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
@@ -137,11 +153,12 @@ function renderizarPantalones(listaPantalones, esNuevaBusqueda) {
                 </button>
             `;
         } 
-        // Etiqueta de Nuevo (Solo a los primeros 5 de la base de datos que no están agotados, sin filtros activos)
+        // Etiqueta de Nuevo
         else if (index < 5 && offsetGlobal === 0 && esNuevaBusqueda && !busquedaActiva && !categoriaActiva) {
             etiqueta = '<span class="absolute top-3 left-3 bg-indigo-600 text-white text-xs font-black px-3 py-1 rounded-full shadow-md tracking-wider z-10">NUEVO ✨</span>';
         }
 
+        // AQUÍ SE INYECTA TODO JUNTO EN LA TARJETA 
         tarjeta.innerHTML = `
             <div class="relative pt-[130%] bg-stone-50 rounded-xl overflow-hidden mb-4">
                 ${etiqueta}
@@ -150,7 +167,10 @@ function renderizarPantalones(listaPantalones, esNuevaBusqueda) {
             <div class="flex flex-col flex-grow px-1">
                 <h3 class="font-serif text-stone-800 text-lg md:text-xl mb-1">${pantalon.nombre}</h3>
                 <p class="text-xs text-stone-500 font-light mb-3 line-clamp-2">${pantalon.descripcion || 'Calidad y ajuste perfecto.'}</p>
-                <div class="mt-auto flex items-center justify-between">
+                
+                ${botonesTallas} 
+
+                <div class="mt-auto flex items-center justify-between pt-2">
                     <span class="text-stone-900 font-semibold text-lg">$${pantalon.precio}</span>
                     ${botonAccion}
                 </div>

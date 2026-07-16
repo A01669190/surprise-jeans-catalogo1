@@ -1061,6 +1061,72 @@ async def crear_pantalon(
 
     return {"mensaje": "Pantalón subido con éxito", "url": url_permanente}
 
+@app.put("/pantalones/{pantalon_id}")
+@limiter.limit("20/minute")
+async def editar_pantalon(
+    request: Request,
+    pantalon_id: int,
+    background_tasks: BackgroundTasks,
+    codigo: str = Form(...),
+    nombre: str = Form(...),
+    precio: float = Form(...),
+    stock: int = Form(...),
+    categoria_id: int = Form(...),
+    foto: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+    token: str = Depends(verificar_token)
+):
+    # 1. Buscamos el pantalón papá
+    pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == pantalon_id).first()
+    if not pantalon:
+        raise HTTPException(status_code=404, detail="Pantalón no encontrado")
+
+    # 2. Actualizamos la información principal
+    pantalon.codigo = codigo
+    pantalon.nombre = nombre
+    pantalon.precio = precio
+    pantalon.stock = stock
+    pantalon.categoria_id = categoria_id
+
+    # 3. Si subieron una foto nueva, la mandamos a ImgBB
+    if foto and foto.filename:
+        contenido = await foto.read()
+        imagen_base64 = base64.b64encode(contenido).decode("utf-8")
+        API_KEY = "967d4560b8e4d58a4f50db487013722f"
+        respuesta = requests.post("https://api.imgbb.com/1/upload", data={"key": API_KEY, "image": imagen_base64})
+        if respuesta.status_code == 200:
+            pantalon.imagen_url = respuesta.json()["data"]["url"]
+
+    # 4. 🧮 LA MAGIA MATEMÁTICA: Recalcular Tallas
+    paquetes = max(1, stock // 12) if stock > 0 else 0
+    distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
+
+    for talla_str, piezas_por_paquete in distribucion.items():
+        stock_talla = paquetes * piezas_por_paquete
+        sku_variante = f"{codigo}-{talla_str}"
+
+        # Buscamos si la talla ya estaba guardada en la base de datos
+        variante = db.query(models.VarianteTalla).filter(
+            models.VarianteTalla.pantalon_id == pantalon.id,
+            models.VarianteTalla.talla == talla_str
+        ).first()
+
+        if variante:
+            variante.stock = stock_talla
+            variante.sku = sku_variante # Por si acaso le cambiaste el código principal
+        else:
+            variante = models.VarianteTalla(
+                pantalon_id=pantalon.id, talla=talla_str, stock=stock_talla, sku=sku_variante
+            )
+            db.add(variante)
+
+        # 5. ⚡ OMNICANALIDAD: Mandamos el stock individual de esta talla a Loyverse
+        if stock_talla >= 0:
+            background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, sku_variante, stock_talla)
+
+    db.commit()
+    return {"mensaje": "Pantalón y tallas actualizados correctamente."}
+
 @app.delete("/pantalones/{pantalon_id}")
 @limiter.limit("15/minute")
 def eliminar_pantalon(
@@ -1113,7 +1179,7 @@ async def subir_excel(
                 db.add(categoria)
                 db.commit()
                 db.refresh(categoria)
-            
+
             foto_url = str(fila.get('Foto_URL', ''))
             if foto_url == 'nan' or not foto_url.startswith('http'):
                 foto_url = "https://dummyimage.com/400x500/e0e7ff/3730a3&text=FOTO+PENDIENTE"
@@ -1124,16 +1190,35 @@ async def subir_excel(
             precio = float(fila['Precio'])
             stock = int(fila['Stock'])
 
-            # 1. Guardamos en la Página Web
+            # 1. PRIMERO guardamos al papá (Modelo general)
             nuevo_pantalon = models.Pantalon(
                 codigo=codigo, nombre=nombre, precio=precio,
                 stock=stock, categoria_id=categoria.id, imagen_url=foto_url
             )
             db.add(nuevo_pantalon)
+            db.commit() # ¡Lo guardamos para que nazca su ID!
+            db.refresh(nuevo_pantalon)
+            
             pantalones_creados += 1
             
-            # 2. ⚡ OMNICANALIDAD: Le enviamos este pantalón a Loyverse sin congelar la pantalla
-            background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre, codigo, precio, nombre_cat)
+            # 2. SEGUNDO, ahora sí aplicamos la MAGIA MATEMÁTICA de las Tallas (Hijos)
+            paquetes = max(1, stock // 12) if stock > 0 else 0
+            distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
+
+            for talla_str, piezas_por_paquete in distribucion.items():
+                stock_talla = paquetes * piezas_por_paquete
+                nueva_talla = models.VarianteTalla(
+                    pantalon_id=nuevo_pantalon.id, # Ahora sí tenemos el ID del papá
+                    talla=talla_str,
+                    stock=stock_talla,
+                    sku=f"{codigo}-{talla_str}"
+                )
+                db.add(nueva_talla)
+            
+            db.commit() # Guardamos todas las tallas
+            
+            # 3. ⚡ OMNICANALIDAD
+            background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre, codigo, precio, categoria.nombre)
             
             if stock > 0:
                 background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, codigo, stock)

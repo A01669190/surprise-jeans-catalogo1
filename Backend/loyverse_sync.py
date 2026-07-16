@@ -5,12 +5,13 @@ import models
 TOKEN_LOYVERSE = "b3dca41541684d0cb5dbcfeac1155736"
 
 def descontar_stock_loyverse(sku, stock_after):
-    """ Función que actualiza el inventario absoluto en la tablet """
+    """ Función que actualiza el inventario absoluto en la tablet para una variante ESPECÍFICA """
     try:
         req_tienda = urllib.request.Request("https://api.loyverse.com/v1.0/stores")
         req_tienda.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
         store_id = json.loads(urllib.request.urlopen(req_tienda).read().decode('utf-8'))["stores"][0]["id"]
         
+        # Le pedimos a Loyverse el artículo
         req_item = urllib.request.Request(f"https://api.loyverse.com/v1.0/items?sku={sku}")
         req_item.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
         items = json.loads(urllib.request.urlopen(req_item).read().decode('utf-8')).get("items", [])
@@ -19,7 +20,17 @@ def descontar_stock_loyverse(sku, stock_after):
             print(f"⚠️ El código {sku} no existe en Loyverse.")
             return
             
-        variant_id = items[0]["variants"][0]["variant_id"]
+        # ⚡ EL GRAN FIX: Loyverse devuelve el artículo con TODAS sus tallas.
+        # Tenemos que buscar cuál de esas tallas es la que coincide con nuestro SKU exacto.
+        variant_id = None
+        for variante in items[0]["variants"]:
+            if variante["sku"] == sku:
+                variant_id = variante["variant_id"]
+                break
+                
+        if not variant_id:
+            print(f"⚠️ La talla específica {sku} no se encontró en el artículo de Loyverse.")
+            return
         
         ajuste_payload = json.dumps({
             "inventory_levels": [{"store_id": store_id, "variant_id": variant_id, "stock_after": stock_after}]
@@ -29,10 +40,10 @@ def descontar_stock_loyverse(sku, stock_after):
         req_ajuste.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
         req_ajuste.add_header("Content-Type", "application/json")
         urllib.request.urlopen(req_ajuste)
-        print(f"✅ Loyverse actualizado: Modelo {sku} a {stock_after} piezas.")
+        print(f"✅ Loyverse actualizado: Talla {sku} ahora tiene {stock_after} piezas.")
         
     except Exception as e:
-        print(f"❌ Error de Loyverse: {e}")
+        print(f"❌ Error de Loyverse al actualizar stock: {e}")
 
 async def procesar_webhooks_loyverse(eventos, db, manager):
     """ Función que escucha cuando crean un pantalón en la app o cobran en caja """
@@ -197,17 +208,27 @@ def crear_articulo_loyverse(nombre, sku, precio, nombre_categoria="General"):
             cat_id = json.loads(res_nueva_cat.read().decode('utf-8'))["id"]
 
         # 2. 📦 CREAR EL PANTALÓN ASIGNÁNDOLE LA CATEGORÍA
-        payload = json.dumps({
-            "item_name": nombre,
-            "category_id": cat_id, # ⚡ AQUÍ ASIGNAMOS LA CATEGORÍA
-            "variants": [{
-                "sku": sku,
-                "default_price": precio,
-                "default_pricing_type": "FIXED" # ⚡ EL FIX: Obligamos a que sea Precio Fijo
-            }]
-        }).encode("utf-8")
+        # 2. 📦 CREAR EL PANTALÓN ASIGNÁNDOLE LA CATEGORÍA
+        payload_dict = {
+            "item": {
+                "item_name": nombre,
+                "category_id": cat_id,
+                "option1_name": "Talla",
+                "variants": [
+                    {"sku": f"{sku}-3", "pricing_type": "FIXED", "default_price": precio, "option1_value": "3"},
+                    {"sku": f"{sku}-5", "pricing_type": "FIXED", "default_price": precio, "option1_value": "5"},
+                    {"sku": f"{sku}-7", "pricing_type": "FIXED", "default_price": precio, "option1_value": "7"},
+                    {"sku": f"{sku}-9", "pricing_type": "FIXED", "default_price": precio, "option1_value": "9"},
+                    {"sku": f"{sku}-11", "pricing_type": "FIXED", "default_price": precio, "option1_value": "11"},
+                    {"sku": f"{sku}-13", "pricing_type": "FIXED", "default_price": precio, "option1_value": "13"},
+                    {"sku": f"{sku}-15", "pricing_type": "FIXED", "default_price": precio, "option1_value": "15"}
+                ]
+            }
+        }
+        # Empaquetamos correctamente usando json.dumps()
+        payload_final = json.dumps(payload_dict).encode("utf-8")
         
-        req_item = urllib.request.Request("https://api.loyverse.com/v1.0/items", data=payload, method="POST")
+        req_item = urllib.request.Request("https://api.loyverse.com/v1.0/items", data=payload_final, method="POST")
         req_item.add_header("Authorization", f"Bearer {token}")
         req_item.add_header("Content-Type", "application/json")
         urllib.request.urlopen(req_item)
