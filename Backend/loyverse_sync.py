@@ -136,10 +136,15 @@ async def procesar_webhooks_loyverse(eventos, db, manager):
                                 db.add(cat)
                                 db.commit()
                                 db.refresh(cat)
+                            
+                            # ⚡ FIX IMÁGENES: Intentamos jalar la foto de Loyverse
+                            imagen_loyverse = item_data.get("image_url")
+                            if not imagen_loyverse:
+                                imagen_loyverse = "https://dummyimage.com/400x500/e0e7ff/3730a3&text=FOTO+PENDIENTE"
                                 
                             nuevo = models.Pantalon(
                                 codigo=sku, nombre=nombre, precio=precio, stock=0, categoria_id=cat.id,
-                                imagen_url="https://dummyimage.com/400x500/e0e7ff/3730a3&text=FOTO+PENDIENTE"
+                                imagen_url=imagen_loyverse # Asignamos la foto que nos mandó la tablet
                             )
                             db.add(nuevo)
                             print(f"🌟 Nuevo modelo sincronizado desde Loyverse: {sku} - {nombre}")
@@ -153,3 +158,29 @@ async def procesar_webhooks_loyverse(eventos, db, manager):
                         print(f"⚠️ ERROR: El pantalón '{nombre}' NO tiene SKU (REF) escrito en Loyverse.")
                 else:
                     print(f"⚠️ ERROR: El pantalón '{nombre}' viene sin variantes.")
+
+
+def crear_articulo_loyverse(nombre, sku, precio):
+    """ Envía un pantalón recién creado en la web directamente a la tablet de Loyverse """
+    try:
+        payload = json.dumps({
+            "item_name": nombre,
+            "variants": [
+                {
+                    "sku": sku,
+                    "default_pricing_type": "FIXED",
+                    "default_price": float(precio)
+                }
+            ]
+        }).encode("utf-8")
+        
+        req = urllib.request.Request("https://api.loyverse.com/v1.0/items", data=payload, method="POST")
+        req.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
+        req.add_header("Content-Type", "application/json")
+        
+        urllib.request.urlopen(req)
+        print(f"✅ Sincronización Inversa: El modelo {sku} ({nombre}) se inyectó a Loyverse con éxito.")
+        
+    except Exception as e:
+        error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
+        print(f"❌ Error al empujar a Loyverse: {error_msg}")

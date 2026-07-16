@@ -842,16 +842,25 @@ async def crear_pantalon(
 ):
     contenido = await foto.read()
     imagen_base64 = base64.b64encode(contenido).decode("utf-8")
-
     API_KEY = "967d4560b8e4d58a4f50db487013722f"
     respuesta = requests.post("https://api.imgbb.com/1/upload", data={"key": API_KEY, "image": imagen_base64})
     
-    if respuesta.status_code == 200: url_permanente = respuesta.json()["data"]["url"]
-    else: return {"error": "Fallo la subida a ImgBB"}
+    if respuesta.status_code == 200: 
+        url_permanente = respuesta.json()["data"]["url"]
+    else: 
+        return {"error": "Fallo la subida a ImgBB"}
 
     nuevo_pantalon = models.Pantalon(codigo=codigo, nombre=nombre, precio=precio, stock=stock, categoria_id=categoria_id, imagen_url=url_permanente)
     db.add(nuevo_pantalon)
     db.commit()
+    
+    # ⚡ MAGIA BIDIRECCIONAL: Empujamos el producto a la caja registradora de Loyverse
+    loyverse_sync.crear_articulo_loyverse(nombre, codigo, precio)
+    
+    # Si pusiste stock inicial desde la web, de una vez le avisamos a Loyverse que ya hay existencias
+    if stock > 0:
+        loyverse_sync.descontar_stock_loyverse(codigo, stock)
+
     return {"mensaje": "Pantalón subido con éxito", "url": url_permanente}
 
 @app.put("/pantalones/{pantalon_id}")
