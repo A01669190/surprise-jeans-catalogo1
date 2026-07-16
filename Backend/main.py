@@ -8,6 +8,7 @@ from reportlab.graphics.barcode import code128
 from reportlab.lib.units import mm
 import socket
 import smtplib
+from email.mime.application import MIMEApplication
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -19,6 +20,8 @@ from sqlalchemy.orm import Session  # <--- ¡ESTA ES LA LÍNEA QUE FALTABA!
 import base64
 import requests
 import pandas as pd
+import hmac
+import hashlib
 from io import BytesIO
 import models, schemas
 from typing import List, Optional
@@ -54,6 +57,13 @@ import json
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="API Surprise Jeans - Fortificada")
+
+# ==========================================
+# ⚡ SISTEMA DE CACHÉ EN MEMORIA RAM
+# ==========================================
+MEMORIA_CACHE = {
+    "catalogo_pantalones": None
+}
 
 scheduler = AsyncIOScheduler()
 
@@ -105,7 +115,6 @@ def cron_reporte_mensual():
     finally:
         db.close()
 
-# Y en tu @app.on_event("startup") agregas:
 # scheduler.add_job(cron_reporte_mensual, 'cron', hour=8, minute=0) # Corre todos los días a las 8 AM revisando si es día 1
 
 TELEFONO_WHATSAPP = os.getenv("WHATSAPP_NUMERO", "") 
@@ -136,6 +145,8 @@ def iniciar_programador_automatico():
     
     # ⚡ EL FIX: Descomentamos esta línea para que funcione el reporte PDF
     scheduler.add_job(cron_reporte_mensual, 'cron', hour=8, minute=0) 
+
+    scheduler.add_job(cron_respaldo_semanal, 'cron', day_of_week='sun', hour=3, minute=0)
     
     scheduler.start()
     print("⏰ Robot de Carritos y Reportes (APScheduler) Activado y Corriendo.")
@@ -546,10 +557,22 @@ def obtener_pantalones(
     busqueda: Optional[str] = None, categoria_id: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
+    # 1. Si buscan el catálogo normal, revisamos primero la RAM
+    if not busqueda and not categoria_id and skip == 0:
+        if MEMORIA_CACHE["catalogo_pantalones"] is not None:
+            return MEMORIA_CACHE["catalogo_pantalones"]
+
+    # 2. Si la RAM está vacía, hacemos la consulta pesada a la Base de Datos
     query = db.query(models.Pantalon)
     if categoria_id: query = query.filter(models.Pantalon.categoria_id == categoria_id)
     if busqueda: query = query.filter(models.Pantalon.nombre.ilike(f"%{busqueda}%"))
-    return query.order_by(models.Pantalon.id.desc()).offset(skip).limit(limit).all()
+    resultados = query.order_by(models.Pantalon.id.desc()).offset(skip).limit(limit).all()
+    
+    # 3. Guardamos el resultado en la RAM para los siguientes clientes
+    if not busqueda and not categoria_id and skip == 0:
+        MEMORIA_CACHE["catalogo_pantalones"] = resultados
+        
+    return resultados
 
 @app.get("/generar-cupon-100")
 def generar_cupon_100(db: Session = Depends(get_db)):
@@ -879,15 +902,28 @@ def lanzar_recuperacion_carritos(db: Session = Depends(get_db), token: str = Dep
 # ==========================================
 @app.post("/webhook/loyverse")
 async def webhook_loyverse(request: Request, db: Session = Depends(get_db)):
+    # ⚡ 1. SEGURIDAD CRIPTOGRÁFICA: Revisamos que el mensaje venga firmado por Loyverse
+    secreto_loyverse = os.getenv("LOYVERSE_WEBHOOK_SECRET", "")
+    
+    if secreto_loyverse:
+        body_bytes = await request.body()
+        firma_recibida = request.headers.get("Loyverse-Signature", "")
+        
+        # Calculamos nuestra propia firma usando la llave maestra
+        firma_calculada = base64.b64encode(
+            hmac.new(secreto_loyverse.encode('utf-8'), body_bytes, hashlib.sha256).digest()
+        ).decode('utf-8')
+        
+        # Si las firmas no son idénticas, es un ataque y cerramos la puerta
+        if not hmac.compare_digest(firma_recibida, firma_calculada):
+            print("🚨 INTENTO DE HACKEO BLOQUEADO EN WEBHOOK")
+            raise HTTPException(status_code=403, detail="Firma criptográfica inválida")
+
+    # 2. Si pasó la seguridad, procesamos los datos
     try:
         datos = await request.json()
-        
-        # ⚡ EL FIX: Loyverse manda un evento suelto, no una lista. Lo envolvemos en corchetes [ ]
         eventos = [datos] if "type" in datos else datos.get("events", [])
-        
-        # Ahora sí, se lo pasamos al archivo experto
         await loyverse_sync.procesar_webhooks_loyverse(eventos, db, manager)
-        
     except Exception as e:
         print(f"❌ Error en webhook Loyverse: {e}")
         
@@ -961,7 +997,8 @@ async def crear_pantalon(
     # Si pusiste stock inicial desde la web, mandamos la tarea al fondo también
     if stock > 0:
         background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, codigo, stock)
-
+    # Vaciamos la RAM para que se refresque el catálogo
+    MEMORIA_CACHE["catalogo_pantalones"] = None
     return {"mensaje": "Pantalón subido con éxito, sincronizando con Loyverse en segundo plano...", "url": url_permanente}
 
 @app.put("/pantalones/{pantalon_id}")
@@ -990,6 +1027,8 @@ async def editar_pantalon(
             pantalon.imagen_url = respuesta.json()["data"]["url"]
     
     db.commit()
+    # Vaciamos la RAM para que se refresque el catálogo
+    MEMORIA_CACHE["catalogo_pantalones"] = None
     return {"mensaje": "Pantalón actualizado correctamente"}
 
 @app.delete("/pantalones/{pantalon_id}")
@@ -1002,6 +1041,8 @@ def eliminar_pantalon(request: Request, pantalon_id: int, db: Session = Depends(
         loyverse_sync.eliminar_articulo_loyverse(pantalon.codigo)
     db.delete(pantalon)
     db.commit()
+    # Vaciamos la RAM para que se refresque el catálogo
+    MEMORIA_CACHE["catalogo_pantalones"] = None
     return {"mensaje": "Pantalón eliminado"}
 
 @app.post("/pantalones/excel")
@@ -1283,3 +1324,43 @@ def probar_alarma_whatsapp():
     """ Ruta secreta para detonar un error a propósito y probar el bot """
     # Forzamos una excepción (error 500) para despertar al middleware
     raise Exception("Esta es una prueba de fuego del sistema de alarmas de Surprise Jeans 🔥")
+
+def cron_respaldo_semanal():
+    """ Robot que extrae la BD completa y te la manda por correo """
+    db = next(get_db())
+    try:
+        # 1. Empacamos el inventario y clientes
+        pantalones = db.query(models.Pantalon).all()
+        clientes = db.query(models.Cliente).all()
+        
+        datos_respaldo = {
+            "fecha": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+            "inventario": [{"codigo": p.codigo, "nombre": p.nombre, "stock": p.stock} for p in pantalones],
+            "clientes": [{"nombre": c.nombre_completo, "correo": c.correo, "telefono": c.telefono} for c in clientes]
+        }
+        
+        archivo_json = json.dumps(datos_respaldo, indent=4).encode('utf-8')
+        
+        # 2. Preparamos el correo
+        msg = MIMEMultipart()
+        msg["Subject"] = f"📦 Respaldo Automático Surprise Jeans - {datetime.now().strftime('%d/%m/%Y')}"
+        msg["From"] = f"Surprise Jeans <{os.getenv('GMAIL_USER')}>"
+        msg["To"] = "denzellopezcabrera@gmail.com" 
+        
+        msg.attach(MIMEText("Adjunto el respaldo de seguridad de la base de datos de esta semana. Guárdalo bien 🔒.", "plain"))
+        
+        # 3. Adjuntamos el archivo
+        adjunto = MIMEApplication(archivo_json, Name="Respaldo_Surprise.json")
+        adjunto['Content-Disposition'] = 'attachment; filename="Respaldo_Surprise.json"'
+        msg.attach(adjunto)
+        
+        # 4. Lo disparamos
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as servidor:
+            servidor.login(os.getenv("GMAIL_USER"), os.getenv("GMAIL_PASSWORD"))
+            servidor.sendmail(os.getenv("GMAIL_USER"), "denzellopezcabrera@gmail.com", msg.as_string())
+            
+        print("🗄️ Respaldo de seguridad enviado exitosamente por correo.")
+    except Exception as e:
+        print(f"❌ Error en robot de respaldos: {e}")
+    finally:
+        db.close()
