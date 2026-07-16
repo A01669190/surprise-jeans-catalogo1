@@ -505,6 +505,13 @@ async function procesarFotosMagicas() {
     try {
         for (let i = 0; i < archivos.length; i++) {
             const archivo = archivos[i];
+
+            // 🛡️ ESCUDO: Si el archivo oculto no es una imagen, lo saltamos automáticamente
+            if (!archivo.type.startsWith('image/')) continue;
+
+            const nombreSinExtension = archivo.name.split('.')[0];
+            const partes = nombreSinExtension.split('_'); // Separa por guiones bajos
+            
             const nombreSinExtension = archivo.name.split('.')[0];
             const partes = nombreSinExtension.split('_'); // Separa por guiones bajos
 
