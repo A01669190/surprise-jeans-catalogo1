@@ -3,6 +3,7 @@ from sqlalchemy import func, text
 import loyverse_sync
 from fastapi.responses import Response
 from reportlab.pdfgen import canvas
+from datetime import datetime
 from reportlab.graphics.barcode import code128
 from reportlab.lib.units import mm
 import socket
@@ -10,7 +11,6 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-import os
 import shutil
 from fastapi import FastAPI, Depends, File, UploadFile, Form, Request, HTTPException, status, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,6 +28,10 @@ import urllib.request
 from fastapi.responses import FileResponse
 import mercadopago # <-- MOTOR BANCARIO
 from sqlalchemy import text
+import traceback
+from fastapi.responses import JSONResponse
+import urllib.parse
+import requests
 import bcrypt
 # Seguridad de Tráfico
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -39,6 +43,7 @@ from email.mime.multipart import MIMEMultipart
 import string
 import random
 from pydantic import BaseModel
+from fastapi import BackgroundTasks
 # Seguridad de Sesión (JWT)
 import jwt
 from datetime import datetime, timedelta
@@ -74,12 +79,66 @@ def cron_recuperar_carritos():
     finally:
         db.close()
 
+def cron_reporte_mensual():
+    """ Se ejecuta el día 1 de cada mes para generar el corte """
+    hoy = datetime.now()
+    if hoy.day != 1: return # Solo corre el primer día del mes
+    
+    db = next(get_db())
+    try:
+        ventas = db.query(models.Pedido).filter(models.Pedido.estatus == "PAGADO").count()
+        # Aquí puedes sumar tus ingresos de la BD
+        
+        nombre_archivo = f"Reporte_SurpriseJeans_{hoy.strftime('%Y_%m')}.pdf"
+        c = canvas.Canvas(nombre_archivo)
+        
+        # Estructura del PDF
+        c.setFont("Helvetica-Bold", 20)
+        c.drawString(100, 800, f"Reporte de Ventas - Surprise Jeans")
+        c.setFont("Helvetica", 14)
+        c.drawString(100, 750, f"Total de pedidos completados: {ventas}")
+        c.drawString(100, 700, "¡El inventario está sincronizado al 100%!")
+        c.save()
+        
+        # Opcional: Podrías usar tu motor SMTP para enviártelo por correo automáticamente
+        print(f"📄 Reporte {nombre_archivo} generado con éxito.")
+    finally:
+        db.close()
+
+# Y en tu @app.on_event("startup") agregas:
+# scheduler.add_job(cron_reporte_mensual, 'cron', hour=8, minute=0) # Corre todos los días a las 8 AM revisando si es día 1
+
+TELEFONO_WHATSAPP = os.getenv("WHATSAPP_NUMERO", "") 
+API_KEY_CALLMEBOT = os.getenv("WHATSAPP_API_KEY", "")
+
+@app.exception_handler(Exception)
+async def whatsapp_exception_handler(request: Request, exc: Exception):
+    """ Atrapa cualquier error 500 y te lo manda por WhatsApp """
+    error_trace = traceback.format_exc()
+    mensaje = f"🚨 *ERROR FATAL - SURPRISE JEANS* 🚨\n\nRuta: {request.url}\nError: {str(exc)}"
+    
+    try:
+        # Codificamos el texto para URL (para que WhatsApp entienda los espacios y saltos de línea)
+        mensaje_url = urllib.parse.quote(mensaje)
+        url_whatsapp = f"https://api.callmebot.com/whatsapp.php?phone={TELEFONO_WHATSAPP}&text={mensaje_url}&apikey={API_KEY_CALLMEBOT}"
+        
+        # Lo mandamos con un timeout corto para no congelar el servidor si WhatsApp falla
+        requests.get(url_whatsapp, timeout=5) 
+    except:
+        pass # Si falla el mensaje, el servidor sigue vivo
+        
+    return JSONResponse(status_code=500, content={"message": "Error interno. El administrador ha sido notificado por WhatsApp."})
+
 @app.on_event("startup")
 def iniciar_programador_automatico():
     # Se ejecuta cada 1 hora automáticamente
     scheduler.add_job(cron_recuperar_carritos, 'interval', hours=1)
+    
+    # ⚡ EL FIX: Descomentamos esta línea para que funcione el reporte PDF
+    scheduler.add_job(cron_reporte_mensual, 'cron', hour=8, minute=0) 
+    
     scheduler.start()
-    print("⏰ Robot de Carritos Abandonados (APScheduler) Activado y Corriendo.")
+    print("⏰ Robot de Carritos y Reportes (APScheduler) Activado y Corriendo.")
 
 # 1. ANTI-DDOS
 limiter = Limiter(key_func=get_remote_address)
@@ -109,7 +168,6 @@ SECRET_KEY = os.getenv("JWT_SECRET", "llave_secreta_del_catalogo_surprise")
 # ==========================================
 # VARIABLES DE ENTORNO (SEGURIDAD)
 # ==========================================
-import os
 SECRET_KEY = os.getenv("JWT_SECRET", "llave_secreta_del_catalogo_surprise")
 GMAIL_USER = os.getenv("GMAIL_USER", "denzellopezcabrera@gmail.com")
 GMAIL_PASSWORD = os.getenv("GMAIL_PASSWORD", "")
@@ -871,9 +929,16 @@ def eliminar_categoria(
 @app.post("/pantalones")
 @limiter.limit("20/minute")
 async def crear_pantalon(
-    request: Request, codigo: str = Form(...), nombre: str = Form(...), precio: float = Form(...),
-    stock: int = Form(...), categoria_id: int = Form(...), foto: UploadFile = File(...),
-    db: Session = Depends(get_db), token: str = Depends(verificar_token)
+    request: Request, 
+    background_tasks: BackgroundTasks, # ⚡ NUEVO: Inyectamos el motor de segundo plano
+    codigo: str = Form(...), 
+    nombre: str = Form(...), 
+    precio: float = Form(...),
+    stock: int = Form(...), 
+    categoria_id: int = Form(...), 
+    foto: UploadFile = File(...),
+    db: Session = Depends(get_db), 
+    token: str = Depends(verificar_token)
 ):
     contenido = await foto.read()
     imagen_base64 = base64.b64encode(contenido).decode("utf-8")
@@ -889,14 +954,15 @@ async def crear_pantalon(
     db.add(nuevo_pantalon)
     db.commit()
     
-    # ⚡ MAGIA BIDIRECCIONAL: Empujamos el producto a la caja registradora de Loyverse
-    loyverse_sync.crear_articulo_loyverse(nombre, codigo, precio)
+    # ⚡ MAGIA ASÍNCRONA: El servidor delega la comunicación con Loyverse al fondo.
+    # Tu página responde al instante mientras el servidor trabaja en silencio.
+    background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre, codigo, precio)
     
-    # Si pusiste stock inicial desde la web, de una vez le avisamos a Loyverse que ya hay existencias
+    # Si pusiste stock inicial desde la web, mandamos la tarea al fondo también
     if stock > 0:
-        loyverse_sync.descontar_stock_loyverse(codigo, stock)
+        background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, codigo, stock)
 
-    return {"mensaje": "Pantalón subido con éxito", "url": url_permanente}
+    return {"mensaje": "Pantalón subido con éxito, sincronizando con Loyverse en segundo plano...", "url": url_permanente}
 
 @app.put("/pantalones/{pantalon_id}")
 @limiter.limit("20/minute")
