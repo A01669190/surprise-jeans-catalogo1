@@ -145,7 +145,7 @@ function renderizarPantalones(listaPantalones, esNuevaBusqueda) {
         tarjeta.innerHTML = `
             <div class="relative pt-[130%] bg-stone-50 rounded-xl overflow-hidden mb-4">
                 ${etiqueta}
-                <img src="${imageUrlDefinitiva}" alt="${pantalon.nombre}" class="${claseImagen}">
+                <img src="${imageUrlDefinitiva}" alt="${pantalon.nombre}" class="${claseImagen}" loading="lazy">
             </div>
             <div class="flex flex-col flex-grow px-1">
                 <h3 class="font-serif text-stone-800 text-lg md:text-xl mb-1">${pantalon.nombre}</h3>
