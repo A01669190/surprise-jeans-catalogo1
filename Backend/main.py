@@ -620,7 +620,7 @@ def recomendaciones_inteligentes(pantalon_id: int, db: Session = Depends(get_db)
     # 1. Buscamos en qué pedidos se ha comprado este pantalón
     pedidos_con_este = db.query(models.DetallePedido.pedido_id).filter(
         models.DetallePedido.pantalon_id == pantalon_id
-    ).subquery()
+    ).subquery().select()
 
     # 2. Buscamos qué OTRAS cosas compraron en esos mismos pedidos
     otros_pantalones = db.query(
