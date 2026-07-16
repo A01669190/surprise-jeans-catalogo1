@@ -512,8 +512,6 @@ async function procesarFotosMagicas() {
             const nombreSinExtension = archivo.name.split('.')[0];
             const partes = nombreSinExtension.split('_'); // Separa por guiones bajos
             
-            const nombreSinExtension = archivo.name.split('.')[0];
-            const partes = nombreSinExtension.split('_'); // Separa por guiones bajos
 
             // Validamos que el nombre tenga el formato SKU_Nombre_Precio
             if (partes.length < 3) {
