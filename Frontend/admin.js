@@ -520,7 +520,7 @@ async function procesarFotosMagicas() {
             }
 
             const sku = partes[0];
-            const nombre = partes[1];
+            const nombre = partes[1].replace(/([a-z])([A-Z])/g, '$1 $2');
             const precio = partes[2];
 
             // 1. Subimos la foto a ImgBB directamente desde el navegador
