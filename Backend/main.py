@@ -1081,6 +1081,15 @@ async def editar_pantalon(
     if not pantalon:
         raise HTTPException(status_code=404, detail="Pantalón no encontrado")
 
+    # ⚡ BLINDAJE 1: Verificar que el código nuevo NO se lo robemos a otro pantalón
+    pantalon_existente = db.query(models.Pantalon).filter(
+        models.Pantalon.codigo == codigo,
+        models.Pantalon.id != pantalon_id
+    ).first()
+    
+    if pantalon_existente:
+        raise HTTPException(status_code=400, detail=f"El código {codigo} ya está siendo usado por otro modelo.")
+
     # 2. Actualizamos la información principal
     pantalon.codigo = codigo
     pantalon.nombre = nombre
@@ -1113,18 +1122,25 @@ async def editar_pantalon(
 
         if variante:
             variante.stock = stock_talla
-            variante.sku = sku_variante # Por si acaso le cambiaste el código principal
+            variante.sku = sku_variante
         else:
             variante = models.VarianteTalla(
                 pantalon_id=pantalon.id, talla=talla_str, stock=stock_talla, sku=sku_variante
             )
             db.add(variante)
 
-        # 5. ⚡ OMNICANALIDAD: Mandamos el stock individual de esta talla a Loyverse
+        # 5. ⚡ OMNICANALIDAD: Mandamos el stock individual a Loyverse
         if stock_talla >= 0:
             background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, sku_variante, stock_talla)
 
-    db.commit()
+    # ⚡ BLINDAJE 2: El Escudo Anti-Choques de Base de Datos
+    from sqlalchemy.exc import IntegrityError
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Choque de inventario: Ese código de pantalón o talla ya existe.")
+
     return {"mensaje": "Pantalón y tallas actualizados correctamente."}
 
 @app.delete("/pantalones/{pantalon_id}")
