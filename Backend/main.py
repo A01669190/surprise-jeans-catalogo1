@@ -894,7 +894,7 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                     # 3. Si hay un correo válido a dónde enviar (aunque no tenga cuenta), ¡Disparamos!
                     if correo_final:
                         enviar_correo_recibo(correo_final, nombre_final, f"{pedido_db.id:04d}", pedido_db.total, lista_ropa, puntos_ganados)
-                        
+
     return {"status": "procesado"}
 
 @app.post("/admin/lanzar-recuperacion")
@@ -1083,7 +1083,13 @@ def eliminar_pantalon(
 
 @app.post("/pantalones/excel")
 @limiter.limit("5/minute") 
-async def subir_excel(request: Request, archivo: UploadFile = File(...), db: Session = Depends(get_db), token: str = Depends(verificar_token)):
+async def subir_excel(
+    request: Request, 
+    background_tasks: BackgroundTasks, # ⚡ NUEVO: El robot mensajero en segundo plano
+    archivo: UploadFile = File(...), 
+    db: Session = Depends(get_db), 
+    token: str = Depends(verificar_token)
+):
     if not archivo.filename.endswith(('.xlsx', '.xls', '.csv')):
         return {"error": "El archivo debe ser un Excel (.xlsx, .xls) o CSV (.csv)"}
     contenido = await archivo.read()
@@ -1112,15 +1118,28 @@ async def subir_excel(request: Request, archivo: UploadFile = File(...), db: Ses
             if foto_url == 'nan' or not foto_url.startswith('http'):
                 foto_url = "https://dummyimage.com/400x500/e0e7ff/3730a3&text=FOTO+PENDIENTE"
 
+            # Limpiamos los datos de la fila
+            codigo = str(fila['Codigo']).strip()
+            nombre = str(fila['Nombre']).strip()
+            precio = float(fila['Precio'])
+            stock = int(fila['Stock'])
+
+            # 1. Guardamos en la Página Web
             nuevo_pantalon = models.Pantalon(
-                codigo=str(fila['Codigo']).strip(), nombre=str(fila['Nombre']).strip(), precio=float(fila['Precio']),
-                stock=int(fila['Stock']), categoria_id=categoria.id, imagen_url=foto_url
+                codigo=codigo, nombre=nombre, precio=precio,
+                stock=stock, categoria_id=categoria.id, imagen_url=foto_url
             )
             db.add(nuevo_pantalon)
             pantalones_creados += 1
             
+            # 2. ⚡ OMNICANALIDAD: Le enviamos este pantalón a Loyverse sin congelar la pantalla
+            background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre, codigo, precio, nombre_cat)
+            
+            if stock > 0:
+                background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, codigo, stock)
+            
         db.commit()
-        return {"mensaje": f"Carga masiva exitosa. Se crearon {pantalones_creados} modelos."}
+        return {"mensaje": f"Carga masiva exitosa. Se crearon {pantalones_creados} modelos en Web y Loyverse."}
         
     except Exception as e:
         return {"error": "Hubo un problema al leer los datos. Verifica el formato del archivo."}
