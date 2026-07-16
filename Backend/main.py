@@ -1277,3 +1277,9 @@ def descontar_stock_loyverse(sku, nuevo_stock):
     except Exception as e:
         error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
         print(f"❌ Error de Loyverse: {error_msg}")
+
+@app.get("/test-alarma")
+def probar_alarma_whatsapp():
+    """ Ruta secreta para detonar un error a propósito y probar el bot """
+    # Forzamos una excepción (error 500) para despertar al middleware
+    raise Exception("Esta es una prueba de fuego del sistema de alarmas de Surprise Jeans 🔥")
