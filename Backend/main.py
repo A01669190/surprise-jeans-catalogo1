@@ -882,11 +882,19 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                     await manager.broadcast("NUEVO_PEDIDO")
                     
                     # 📧 ENVIAR CORREO GMAIL (PAGO EN TIENDA REAL)
+                    # 📧 ENVIAR CORREO Y GUARDAR DATOS (INVITADOS Y REGISTRADOS)
+                    # 1. Intentamos buscar si es un cliente registrado
                     cliente_db = db.query(models.Cliente).filter(models.Cliente.correo == pedido_db.correo_cliente).first()
-                    if cliente_db:
-                        puntos_ganados = pedido_db.total * 0.05
-                        enviar_correo_recibo(cliente_db.correo, cliente_db.nombre_completo, f"{pedido_db.id:04d}", pedido_db.total, lista_ropa, puntos_ganados)
                     
+                    # 2. Rescatamos el correo desde el Pedido (por si es invitado)
+                    correo_final = pedido_db.correo_cliente
+                    nombre_final = pedido_db.nombre_cliente
+                    puntos_ganados = pedido_db.total * 0.05
+                    
+                    # 3. Si hay un correo válido a dónde enviar (aunque no tenga cuenta), ¡Disparamos!
+                    if correo_final:
+                        enviar_correo_recibo(correo_final, nombre_final, f"{pedido_db.id:04d}", pedido_db.total, lista_ropa, puntos_ganados)
+                        
     return {"status": "procesado"}
 
 @app.post("/admin/lanzar-recuperacion")
@@ -1040,6 +1048,12 @@ async def crear_pantalon(
     db.add(nuevo_pantalon)
     db.commit()
     
+    # Buscamos el nombre de la categoría en la Base de Datos
+    categoria_db = db.query(models.Categoria).filter(models.Categoria.id == categoria_id).first()
+    nombre_cat = categoria_db.nombre if categoria_db else "Sin Categoría"
+    
+    # ⚡ MAGIA ASÍNCRONA: Le pasamos el nombre_cat a Loyverse
+    background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre, codigo, precio, nombre_cat)
     # 3. ⚡ MAGIA ASÍNCRONA: Avisamos a Loyverse en segundo plano
     background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre, codigo, precio)
     if stock > 0:

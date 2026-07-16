@@ -166,31 +166,55 @@ async def procesar_webhooks_loyverse(eventos, db, manager):
                     print(f"⚠️ ERROR: El pantalón '{nombre}' viene sin variantes.")
 
 
-def crear_articulo_loyverse(nombre, sku, precio):
-    """ Envía un pantalón recién creado en la web directamente a la tablet de Loyverse """
+def crear_articulo_loyverse(nombre, sku, precio, nombre_categoria="General"):
+    import urllib.request
+    import json
+    import os
+    
+    token = os.getenv("LOYVERSE_TOKEN", "")
+    if not token: return
+    
     try:
+        # 1. 🔍 BUSCAR O CREAR CATEGORÍA EN LOYVERSE
+        req_cat = urllib.request.Request("https://api.loyverse.com/v1.0/categories")
+        req_cat.add_header("Authorization", f"Bearer {token}")
+        res_cat = urllib.request.urlopen(req_cat)
+        categorias = json.loads(res_cat.read().decode('utf-8')).get("categories", [])
+        
+        cat_id = None
+        for c in categorias:
+            if c["name"].lower() == nombre_categoria.lower():
+                cat_id = c["id"]
+                break
+                
+        if not cat_id:
+            # Si no existe en la tablet, la creamos
+            payload_cat = json.dumps({"name": nombre_categoria}).encode("utf-8")
+            req_nueva_cat = urllib.request.Request("https://api.loyverse.com/v1.0/categories", data=payload_cat, method="POST")
+            req_nueva_cat.add_header("Authorization", f"Bearer {token}")
+            req_nueva_cat.add_header("Content-Type", "application/json")
+            res_nueva_cat = urllib.request.urlopen(req_nueva_cat)
+            cat_id = json.loads(res_nueva_cat.read().decode('utf-8'))["id"]
+
+        # 2. 📦 CREAR EL PANTALÓN ASIGNÁNDOLE LA CATEGORÍA
         payload = json.dumps({
             "item_name": nombre,
-            "track_stock": True,
-            "variants": [
-                {
-                    "sku": sku,
-                    "default_pricing_type": "FIXED",
-                    "default_price": float(precio)
-                }
-            ]
+            "category_id": cat_id, # ⚡ AQUÍ ASIGNAMOS LA CATEGORÍA
+            "variants": [{
+                "sku": sku,
+                "default_price": precio
+            }]
         }).encode("utf-8")
         
-        req = urllib.request.Request("https://api.loyverse.com/v1.0/items", data=payload, method="POST")
-        req.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
-        req.add_header("Content-Type", "application/json")
+        req_item = urllib.request.Request("https://api.loyverse.com/v1.0/items", data=payload, method="POST")
+        req_item.add_header("Authorization", f"Bearer {token}")
+        req_item.add_header("Content-Type", "application/json")
+        urllib.request.urlopen(req_item)
         
-        urllib.request.urlopen(req)
-        print(f"✅ Sincronización Inversa: El modelo {sku} ({nombre}) se inyectó a Loyverse con éxito.")
-        
+        print(f"✅ OMNICANAL: Modelo {sku} creado en Loyverse bajo la categoría '{nombre_categoria}'.")
     except Exception as e:
         error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
-        print(f"❌ Error al empujar a Loyverse: {error_msg}")
+        print(f"❌ Error al crear en Loyverse: {error_msg}")
 
 def crear_cliente_loyverse(nombre, correo, telefono):
     """ Sincroniza a un cliente recién registrado en la web con la tablet física """
