@@ -165,6 +165,7 @@ def crear_articulo_loyverse(nombre, sku, precio):
     try:
         payload = json.dumps({
             "item_name": nombre,
+            "track_stock": True,
             "variants": [
                 {
                     "sku": sku,
