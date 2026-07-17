@@ -43,11 +43,13 @@ class ResenaCrear(BaseModel):
 # ==========================================
 # ESQUEMAS PARA LA BÓVEDA FINANCIERA Y CLIENTES (Sin cambios)
 class ItemCarrito(BaseModel):
-    id: int
-    nombre: str
-    precio: float
+    id: int 
     cantidad: int
+    precio: float
+    nombre: str
     codigo: str
+    sku_variante: str # ⚡ NUEVO
+    talla: str        # ⚡ NUEVO
 
 class InfoEnvio(BaseModel):
     nombre: str

@@ -91,9 +91,11 @@ class DetallePedido(Base):
     pantalon_id = Column(Integer, ForeignKey("pantalones.id"))
     cantidad = Column(Integer)
     precio_unitario = Column(Float)
-    
+    sku_variante = Column(String, nullable=True) # ⚡ NUEVO: Guarda el SKU exacto
+    talla = Column(String, nullable=True)        # ⚡ NUEVO: Guarda la talla
+
     pedido = relationship("Pedido", back_populates="detalles")
-    pantalon = relationship("Pantalon", back_populates="detalles")
+    pantalon = relationship("Pantalon")
 
 # ==========================================
 # TABLA DE CLIENTES Y CUPONES (Sin cambios)
