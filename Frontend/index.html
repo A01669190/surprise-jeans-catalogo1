@@ -568,8 +568,10 @@
                 catalogoCompleto = await respuesta.json();
                 renderizarCatalogo(catalogoCompleto);
             } catch (error) {
-                document.getElementById('grid-pantalones').innerHTML = '<p class="text-center text-rose-500 col-span-full">Error al cargar la colección.</p>';}
-        }
+            document.getElementById('grid-pantalones').innerHTML = '<p class="text-center text-rose-500 col-span-full">Error al cargar la colección.</p>';
+            }
+        } 
+
         async function iniciarCambioPassword() {
             const token = localStorage.getItem('token_cliente_sj');
             if(!token) return;
@@ -645,8 +647,8 @@
 
             // 3. Filtrar los pantalones en pantalla
             // (Borramos lo que haya en la barra de búsqueda para que no choquen)
-            const inputBusqueda = document.querySelector('input[type="text"]');
-            if(inputBusqueda) inputBusqueda.value = ""; 
+            const inputBusqueda = document.getElementById('buscador-tienda');
+             if(inputBusqueda) inputBusqueda.value = "";
 
             if (categoriaSeleccionada === 'Todos') {
                 // Mostramos la lista completa
@@ -684,7 +686,6 @@
             const btnMayoreo = document.getElementById('btn-mayoreo');
 
             if (modo === 'mayoreo') {
-                // Notificación Premium con SweetAlert2 (Reemplaza el viejo alert)
                 Swal.fire({
                     icon: 'info',
                     title: '📦 Venta de Mayoreo',
@@ -699,7 +700,12 @@
                     }
                 });
 
-                // Regresamos el botón a menudeo visualmente
+                // Activar diseño mayoreo
+                btnMenudeo.className = "px-6 py-1.5 rounded-md text-sm font-bold text-gray-500 hover:text-gray-900 transition-all";
+                btnMayoreo.className = "px-6 py-1.5 rounded-md text-sm font-bold bg-white text-gray-900 shadow-sm transition-all";
+            } 
+            else if (modo === 'menudeo') {
+                // Restaurar diseño menudeo
                 btnMenudeo.className = "px-6 py-1.5 rounded-md text-sm font-bold bg-white text-gray-900 shadow-sm transition-all";
                 btnMayoreo.className = "px-6 py-1.5 rounded-md text-sm font-bold text-gray-500 hover:text-gray-900 transition-all";
             }
