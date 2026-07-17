@@ -1076,28 +1076,25 @@ async def editar_pantalon(
     db: Session = Depends(get_db),
     token: str = Depends(verificar_token)
 ):
-    # 1. Buscamos el pantalón papá
     pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == pantalon_id).first()
     if not pantalon:
         raise HTTPException(status_code=404, detail="Pantalón no encontrado")
 
-    # ⚡ BLINDAJE 1: Verificar que el código nuevo NO se lo robemos a otro pantalón
+    # Escudo protector
     pantalon_existente = db.query(models.Pantalon).filter(
         models.Pantalon.codigo == codigo,
         models.Pantalon.id != pantalon_id
     ).first()
     
     if pantalon_existente:
-        raise HTTPException(status_code=400, detail=f"El código {codigo} ya está siendo usado por otro modelo.")
+        raise HTTPException(status_code=400, detail="¡Duplicado! Otro modelo ya usa ese código.")
 
-    # 2. Actualizamos la información principal
     pantalon.codigo = codigo
     pantalon.nombre = nombre
     pantalon.precio = precio
     pantalon.stock = stock
     pantalon.categoria_id = categoria_id
 
-    # 3. Si subieron una foto nueva, la mandamos a ImgBB
     if foto and foto.filename:
         contenido = await foto.read()
         imagen_base64 = base64.b64encode(contenido).decode("utf-8")
@@ -1106,7 +1103,6 @@ async def editar_pantalon(
         if respuesta.status_code == 200:
             pantalon.imagen_url = respuesta.json()["data"]["url"]
 
-    # 4. 🧮 LA MAGIA MATEMÁTICA: Recalcular Tallas
     paquetes = max(1, stock // 12) if stock > 0 else 0
     distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
 
@@ -1114,7 +1110,6 @@ async def editar_pantalon(
         stock_talla = paquetes * piezas_por_paquete
         sku_variante = f"{codigo}-{talla_str}"
 
-        # Buscamos si la talla ya estaba guardada en la base de datos
         variante = db.query(models.VarianteTalla).filter(
             models.VarianteTalla.pantalon_id == pantalon.id,
             models.VarianteTalla.talla == talla_str
@@ -1129,19 +1124,11 @@ async def editar_pantalon(
             )
             db.add(variante)
 
-        # 5. ⚡ OMNICANALIDAD: Mandamos el stock individual a Loyverse
         if stock_talla >= 0:
             background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, sku_variante, stock_talla)
 
-    # ⚡ BLINDAJE 2: El Escudo Anti-Choques de Base de Datos
-    from sqlalchemy.exc import IntegrityError
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status_code=400, detail="Choque de inventario: Ese código de pantalón o talla ya existe.")
-
-    return {"mensaje": "Pantalón y tallas actualizados correctamente."}
+    db.commit()
+    return {"mensaje": "Actualizado correctamente."}
 
 @app.delete("/pantalones/{pantalon_id}")
 @limiter.limit("15/minute")
