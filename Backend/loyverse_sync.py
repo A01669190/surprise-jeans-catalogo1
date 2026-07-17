@@ -131,7 +131,7 @@ def crear_articulo_loyverse(nombre, sku, precio, nombre_categoria="General"):
         payload_dict = {
             "item_name": nombre,
             "category_id": cat_id,
-            "track_inventory": True,
+            "track_stock": True,
             "option1_name": "Talla",
             "variants": [
                 {"sku": f"{sku}-3", "default_pricing_type": "FIXED", "default_price": precio, "option1_value": "3"},

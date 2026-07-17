@@ -1086,14 +1086,12 @@ async def editar_pantalon(
     db: Session = Depends(get_db),
     token: str = Depends(verificar_token)
 ):
-    # 1. Limpieza extrema: Borramos espacios invisibles que tú no ves pero la base sí
     codigo_limpio = codigo.strip()
 
     pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == pantalon_id).first()
     if not pantalon:
         raise HTTPException(status_code=404, detail="Pantalón no encontrado")
 
-    # 2. Escudo protector
     pantalon_existente = db.query(models.Pantalon).filter(
         models.Pantalon.codigo == codigo_limpio,
         models.Pantalon.id != pantalon_id
@@ -1101,6 +1099,15 @@ async def editar_pantalon(
     
     if pantalon_existente:
         raise HTTPException(status_code=400, detail="¡Duplicado! Otro modelo ya usa ese código.")
+
+    # 🚜 TÉCNICA BULLDOZER: Eliminamos todas las variantes viejas para evitar choques de UPDATE
+    db.query(models.VarianteTalla).filter(models.VarianteTalla.pantalon_id == pantalon.id).delete(synchronize_session=False)
+    
+    # También borramos fantasmas globales si existen
+    skus_a_crear = [f"{codigo_limpio}-{t}" for t in ["3", "5", "7", "9", "11", "13", "15"]]
+    db.query(models.VarianteTalla).filter(models.VarianteTalla.sku.in_(skus_a_crear)).delete(synchronize_session=False)
+    
+    db.flush() # Aplicamos la destrucción AHORA MISMO
 
     pantalon.codigo = codigo_limpio
     pantalon.nombre = nombre.strip()
@@ -1116,45 +1123,23 @@ async def editar_pantalon(
         if respuesta.status_code == 200:
             pantalon.imagen_url = respuesta.json()["data"]["url"]
 
+    # Creamos las 7 tallas 100% limpias
     paquetes = max(1, stock // 12) if stock > 0 else 0
     distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
-
-    # ⚡ AUTO-SANACIÓN: Busca tallas fantasmas que estén estorbando y las DESTRUYE
-    skus_a_crear = [f"{codigo_limpio}-{t}" for t in distribucion.keys()]
-    db.query(models.VarianteTalla).filter(
-        models.VarianteTalla.sku.in_(skus_a_crear),
-        models.VarianteTalla.pantalon_id != pantalon.id
-    ).delete(synchronize_session=False)
 
     for talla_str, piezas_por_paquete in distribucion.items():
         stock_talla = paquetes * piezas_por_paquete
         sku_variante = f"{codigo_limpio}-{talla_str}"
 
-        variante = db.query(models.VarianteTalla).filter(
-            models.VarianteTalla.pantalon_id == pantalon.id,
-            models.VarianteTalla.talla == talla_str
-        ).first()
-
-        if variante:
-            variante.stock = stock_talla
-            variante.sku = sku_variante
-        else:
-            variante = models.VarianteTalla(
-                pantalon_id=pantalon.id, talla=talla_str, stock=stock_talla, sku=sku_variante
-            )
-            db.add(variante)
+        nueva_variante = models.VarianteTalla(
+            pantalon_id=pantalon.id, talla=talla_str, stock=stock_talla, sku=sku_variante
+        )
+        db.add(nueva_variante)
 
         if stock_talla >= 0:
             background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, sku_variante, stock_talla)
 
-    # ⚡ BLINDAJE FINAL: Si algo sale mal, el servidor no explota
-    from sqlalchemy.exc import IntegrityError
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status_code=400, detail="Error detectado. Intenta con otro código.")
-
+    db.commit()
     return {"mensaje": "Actualizado correctamente."}
 
 @app.delete("/pantalones/{pantalon_id}")
@@ -1181,22 +1166,24 @@ def eliminar_pantalon(
 @limiter.limit("5/minute") 
 async def subir_excel(
     request: Request, 
-    background_tasks: BackgroundTasks, # ⚡ NUEVO: El robot mensajero en segundo plano
+    background_tasks: BackgroundTasks,
     archivo: UploadFile = File(...), 
     db: Session = Depends(get_db), 
     token: str = Depends(verificar_token)
 ):
     if not archivo.filename.endswith(('.xlsx', '.xls', '.csv')):
-        return {"error": "El archivo debe ser un Excel (.xlsx, .xls) o CSV (.csv)"}
+        return {"error": "El archivo debe ser un Excel o CSV"}
     contenido = await archivo.read()
     try:
+        import pandas as pd
+        from io import BytesIO
         if archivo.filename.endswith('.csv'): df = pd.read_csv(BytesIO(contenido))
         else: df = pd.read_excel(BytesIO(contenido))
         df.columns = df.columns.str.strip()
         
         columnas_esperadas = ["Codigo", "Nombre", "Precio", "Stock", "Categoria", "Foto_URL"]
         for col in columnas_esperadas:
-            if col not in df.columns: return {"error": f"Falta la columna '{col}' en el archivo."}
+            if col not in df.columns: return {"error": f"Falta la columna '{col}'"}
 
         pantalones_creados = 0
         for index, fila in df.iterrows():
@@ -1214,50 +1201,47 @@ async def subir_excel(
             if foto_url == 'nan' or not foto_url.startswith('http'):
                 foto_url = "https://dummyimage.com/400x500/e0e7ff/3730a3&text=FOTO+PENDIENTE"
 
-            # Limpiamos los datos de la fila
             codigo = str(fila['Codigo']).strip()
             nombre = str(fila['Nombre']).strip()
             precio = float(fila['Precio'])
             stock = int(fila['Stock'])
 
-            # 1. PRIMERO guardamos al papá (Modelo general)
+            # 1. CREAMOS AL PAPÁ PRIMERO
             nuevo_pantalon = models.Pantalon(
                 codigo=codigo, nombre=nombre, precio=precio,
                 stock=stock, categoria_id=categoria.id, imagen_url=foto_url
             )
             db.add(nuevo_pantalon)
-            db.commit() # ¡Lo guardamos para que nazca su ID!
+            db.commit()
             db.refresh(nuevo_pantalon)
             
             pantalones_creados += 1
             
-            # 2. SEGUNDO, ahora sí aplicamos la MAGIA MATEMÁTICA de las Tallas (Hijos)
+            # 2. AHORA SÍ, CREAMOS LOS HIJOS (Tallas)
             paquetes = max(1, stock // 12) if stock > 0 else 0
             distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
 
             for talla_str, piezas_por_paquete in distribucion.items():
                 stock_talla = paquetes * piezas_por_paquete
                 nueva_talla = models.VarianteTalla(
-                    pantalon_id=nuevo_pantalon.id, # Ahora sí tenemos el ID del papá
+                    pantalon_id=nuevo_pantalon.id,
                     talla=talla_str,
                     stock=stock_talla,
                     sku=f"{codigo}-{talla_str}"
                 )
                 db.add(nueva_talla)
             
-            db.commit() # Guardamos todas las tallas
+            db.commit()
             
-            # 3. ⚡ OMNICANALIDAD
             background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre, codigo, precio, categoria.nombre)
             
             if stock > 0:
                 background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, codigo, stock)
             
-        db.commit()
-        return {"mensaje": f"Carga masiva exitosa. Se crearon {pantalones_creados} modelos en Web y Loyverse."}
+        return {"mensaje": f"Carga masiva exitosa. Se crearon {pantalones_creados} modelos."}
         
     except Exception as e:
-        return {"error": "Hubo un problema al leer los datos. Verifica el formato del archivo."}
+        return {"error": "Hubo un problema al leer el archivo."}
     
 # ==========================================
 # CENTRO DE DESPACHO (EXCLUSIVO YESSICA)
