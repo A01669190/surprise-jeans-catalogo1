@@ -965,7 +965,17 @@ def crear_categoria(
     request: Request, nombre: str = Form(...), 
     db: Session = Depends(get_db), token: str = Depends(verificar_token)
 ):
-    nueva_categoria = models.Categoria(nombre=nombre)
+    # 1. Limpiamos espacios extra por si acaso
+    nombre_limpio = nombre.strip()
+    
+    # 2. ⚡ ESCUDO: Revisamos si ya existe (ignorando mayúsculas/minúsculas)
+    categoria_existente = db.query(models.Categoria).filter(models.Categoria.nombre.ilike(nombre_limpio)).first()
+    
+    if categoria_existente:
+        raise HTTPException(status_code=400, detail=f"La categoría '{nombre_limpio}' ya existe en el sistema.")
+        
+    # 3. Si no existe, la guardamos sin problema
+    nueva_categoria = models.Categoria(nombre=nombre_limpio)
     db.add(nueva_categoria)
     db.commit()
     db.refresh(nueva_categoria)
