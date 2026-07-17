@@ -489,28 +489,25 @@ async function procesarFotosMagicas() {
         return;
     }
 
-    // Pon aquí tu API Key de ImgBB (Consíguela en api.imgbb.com)
+    // Pon aquí tu API Key de ImgBB
     const IMGBB_API_KEY = '967d4560b8e4d58a4f50db487013722f'; 
     
     btnMagico.innerHTML = 'Subiendo a la nube... ⏳';
     btnMagico.disabled = true;
 
-    // Empezamos a armar el texto del Excel en la memoria
-    let csvVirtual = "Codigo,Nombre,Precio,Stock,Categoria,Foto_URL\n";
+    // ⚡ 1. Agregamos "Color" a los encabezados del Excel Virtual
+    let csvVirtual = "Codigo,Nombre,Precio,Stock,Categoria,Color,Foto_URL\n";
     let exitos = 0;
 
     try {
         for (let i = 0; i < archivos.length; i++) {
             const archivo = archivos[i];
 
-            // 🛡️ ESCUDO: Si el archivo oculto no es una imagen, lo saltamos automáticamente
             if (!archivo.type.startsWith('image/')) continue;
 
             const nombreSinExtension = archivo.name.split('.')[0];
-            const partes = nombreSinExtension.split('_'); // Separa por guiones bajos
+            const partes = nombreSinExtension.split('_'); 
             
-
-            // Validamos que el nombre tenga el formato SKU_Nombre_Precio
             if (partes.length < 3) {
                 console.warn(`Se saltó ${archivo.name}: El nombre no tiene el formato correcto.`);
                 continue; 
@@ -519,8 +516,11 @@ async function procesarFotosMagicas() {
             const sku = partes[0];
             const nombre = partes[1].replace(/([a-z])([A-Z])/g, '$1 $2');
             const precio = partes[2];
+            
+            // ⚡ 2. Extraemos el color si existe (si no, ponemos 'Original')
+            // Automáticamente separa "AzulClaro" en "Azul Claro"
+            const color = partes[3] ? partes[3].replace(/([a-z])([A-Z])/g, '$1 $2') : 'Original';
 
-            // 1. Subimos la foto a ImgBB directamente desde el navegador
             const fdImg = new FormData();
             fdImg.append('image', archivo);
 
@@ -533,27 +533,26 @@ async function procesarFotosMagicas() {
             
             if (dataImg.success) {
                 const urlDirecta = dataImg.data.url;
-                // 2. Agregamos este modelo a nuestro Excel virtual (Stock 0 por defecto)
-                csvVirtual += `${sku},${nombre},${precio},0,Nuevos,${urlDirecta}\n`;
+                // ⚡ 3. Inyectamos la variable "color" en la fila del Excel Virtual
+                csvVirtual += `${sku},${nombre},${precio},0,Nuevos,${color},${urlDirecta}\n`;
                 exitos++;
             }
         }
 
         if (exitos === 0) {
-            alert("Ninguna foto tenía el formato correcto (SKU_Nombre_Precio.jpg).");
+            alert("Ninguna foto tenía el formato correcto (SKU_Nombre_Precio.jpg o SKU_Nombre_Precio_Color.jpg).");
             return;
         }
 
         btnMagico.innerHTML = 'Sincronizando catálogo... ⚙️';
 
-        // 3. Empaquetamos nuestro Excel virtual y se lo mandamos a tu servidor web
         const blobCSV = new Blob([csvVirtual], { type: 'text/csv' });
         const formDataFinal = new FormData();
         formDataFinal.append('archivo', blobCSV, 'catalogo_magico.csv');
 
         const respuestaBackend = await fetch(`${API_URL}/pantalones/excel`, {
             method: 'POST',
-            headers: obtenerTokenHeader(), // Usa tu token de admin
+            headers: obtenerTokenHeader(),
             body: formDataFinal
         });
 
@@ -561,8 +560,8 @@ async function procesarFotosMagicas() {
 
         if (respuestaBackend.ok) {
             alert(`¡Magia completada! ✨\nSe subieron y procesaron ${exitos} fotos nuevas.\n\nEl servidor dice: ${dataBackend.mensaje}`);
-            cargarInventarioAdmin(); // Refresca la tabla
-            inputFotos.value = ''; // Limpia el input
+            cargarInventarioAdmin(); 
+            inputFotos.value = ''; 
         } else {
             alert(`Error del servidor: ${dataBackend.detail || dataBackend.error}`);
         }
