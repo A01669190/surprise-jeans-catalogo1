@@ -13,18 +13,23 @@ def descontar_stock_loyverse(sku, stock_after):
         req_tienda.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
         store_id = json.loads(urllib.request.urlopen(req_tienda).read().decode('utf-8'))["stores"][0]["id"]
         
-        req_item = urllib.request.Request(f"https://api.loyverse.com/v1.0/items?sku={sku}")
+        # ⚡ EL FIX: Pedimos 250 artículos de golpe (el máximo) para no dejar pantalones fuera
+        req_item = urllib.request.Request("https://api.loyverse.com/v1.0/items?limit=250")
         req_item.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
         items = json.loads(urllib.request.urlopen(req_item).read().decode('utf-8')).get("items", [])
         
         if not items:
-            print(f"⚠️ El código {sku} no existe en Loyverse.")
+            print(f"⚠️ El catálogo está vacío en Loyverse.")
             return
             
         variant_id = None
-        for variante in items[0]["variants"]:
-            if variante["sku"] == sku:
-                variant_id = variante["variant_id"]
+        # ⚡ EL GRAN FIX: Quitamos el [0] destructivo. Ahora busca en TODOS los artículos.
+        for item in items:
+            for variante in item.get("variants", []):
+                if variante.get("sku") == sku:
+                    variant_id = variante["variant_id"]
+                    break
+            if variant_id:
                 break
                 
         if not variant_id:
@@ -79,19 +84,15 @@ async def procesar_webhooks_loyverse(eventos, db, manager):
                     precio_crudo = variantes[0].get("default_price", 0.0)
                     precio = float(precio_crudo) if precio_crudo is not None else 0.0
                     
-                    # ⚡ ESCUDO ANTI-FANTASMAS: Buscamos el hijo exacto en la BD
                     variante_db = db.query(models.VarianteTalla).filter(models.VarianteTalla.sku == sku_crudo).first()
                     
                     if variante_db:
-                        # El pantalón existe, solo actualizamos precio/nombre si cambiaron
                         pantalon_db = variante_db.pantalon
                         pantalon_db.nombre = nombre
                         pantalon_db.precio = precio
                         db.commit()
                         print(f"🔄 Modelo sincronizado con Loyverse: {pantalon_db.codigo}")
                     else:
-                        # Solo entra aquí si Yessica lo creó MANUALMENTE en la tablet
-                        # Cortamos con cuidado tomando en cuenta la nueva estructura de colores
                         sku_padre = sku_crudo.rsplit('-', 2)[0] if sku_crudo.count('-') >= 2 else sku_crudo.split('-')[0]
                         
                         if sku_padre:
@@ -175,11 +176,11 @@ def crear_cliente_loyverse(nombre, correo, telefono):
     except Exception as e:
         print(f"❌ Error al crear cliente en Loyverse: {e}")
 
-# ⚡ AHORA BORRA CON PRECISIÓN LÁSER BUSCANDO LA VARIANTE EXACTA
 def eliminar_articulo_loyverse(sku_hijo_exacto):
     """ Busca un artículo por el SKU EXACTO de una de sus tallas y lo destruye de la tablet """
     try:
-        req_item = urllib.request.Request(f"https://api.loyverse.com/v1.0/items?sku={sku_hijo_exacto}")
+        # ⚡ EL FIX: Pedimos hasta 250 artículos
+        req_item = urllib.request.Request("https://api.loyverse.com/v1.0/items?limit=250")
         req_item.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
         res_item = urllib.request.urlopen(req_item)
         items = json.loads(res_item.read().decode('utf-8')).get("items", [])
@@ -188,8 +189,6 @@ def eliminar_articulo_loyverse(sku_hijo_exacto):
             return
             
         item_id = None
-        
-        # ⚡ ESCUDO: Buscamos el match EXACTO de la variante para no borrar otros modelos
         for item in items:
             for variante in item.get("variants", []):
                 if variante.get("sku") == sku_hijo_exacto:
@@ -214,7 +213,6 @@ def eliminar_articulo_loyverse(sku_hijo_exacto):
 def actualizar_categoria_loyverse(sku_hijo_exacto, nombre_categoria):
     """ Busca un artículo en Loyverse y le actualiza su categoría en tiempo real """
     try:
-        # 1. Buscar o crear la categoría nueva en Loyverse
         req_cat = urllib.request.Request("https://api.loyverse.com/v1.0/categories")
         req_cat.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
         res_cat = urllib.request.urlopen(req_cat)
@@ -234,8 +232,8 @@ def actualizar_categoria_loyverse(sku_hijo_exacto, nombre_categoria):
             res_nueva_cat = urllib.request.urlopen(req_nueva_cat)
             cat_id = json.loads(res_nueva_cat.read().decode('utf-8'))["id"]
 
-        # 2. Buscar el artículo completo en Loyverse usando el SKU
-        req_item = urllib.request.Request(f"https://api.loyverse.com/v1.0/items?sku={sku_hijo_exacto}")
+        # ⚡ EL FIX: Pedimos hasta 250 artículos
+        req_item = urllib.request.Request("https://api.loyverse.com/v1.0/items?limit=250")
         req_item.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
         res_item = urllib.request.urlopen(req_item)
         items = json.loads(res_item.read().decode('utf-8')).get("items", [])
@@ -252,7 +250,6 @@ def actualizar_categoria_loyverse(sku_hijo_exacto, nombre_categoria):
         if not item_a_modificar:
             return
 
-        # 3. ⚡ EL FIX: Le cambiamos la categoría al objeto COMPLETO para no perder las tallas
         item_a_modificar["category_id"] = cat_id
         
         payload_update = json.dumps(item_a_modificar).encode("utf-8")
