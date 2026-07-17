@@ -50,7 +50,6 @@ async def procesar_webhooks_loyverse(eventos, db, manager):
     for evento in eventos:
         tipo = evento.get("type")
         
-        # 1. SI SE HACE UNA VENTA EN LA CAJA REGISTRADORA FÍSICA
         if tipo == "receipts.update":
             line_items = evento.get("data", {}).get("receipt", {}).get("line_items", [])
             for item in line_items:
@@ -60,9 +59,7 @@ async def procesar_webhooks_loyverse(eventos, db, manager):
                 if sku_variante:
                     variante = db.query(models.VarianteTalla).filter(models.VarianteTalla.sku == sku_variante).first()
                     if variante and variante.stock >= cantidad:
-                        # Restamos a la talla
                         variante.stock -= cantidad
-                        # Restamos al total del pantalón papá
                         if variante.pantalon and variante.pantalon.stock >= cantidad:
                             variante.pantalon.stock -= cantidad
                         
@@ -82,7 +79,6 @@ async def procesar_webhooks_loyverse(eventos, db, manager):
                     precio_crudo = variantes[0].get("default_price", 0.0)
                     precio = float(precio_crudo) if precio_crudo is not None else 0.0
                     
-                    # ⚡ ESCUDO ANTI-CLONES
                     sku_padre = sku_crudo.split('-')[0] if sku_crudo and '-' in sku_crudo else sku_crudo
                     
                     if sku_padre:
@@ -112,15 +108,9 @@ async def procesar_webhooks_loyverse(eventos, db, manager):
                             print(f"🔄 Modelo actualizado desde Loyverse: {sku_padre} - {nombre}")
                         
                         db.commit()
-                    else:
-                        print(f"⚠️ ERROR: El artículo '{nombre}' NO tiene SKU.")
 
-        elif tipo == "items.delete":
-             lista_items = evento.get("items", [])
-             for item_data in lista_items:
-                 print(f"🗑️ Alerta: Artículo eliminado desde Loyverse con ID: {item_data.get('id')}")
-
-def crear_articulo_loyverse(nombre, sku, precio, nombre_categoria="General"):
+# ⚡ AHORA ESTA FUNCIÓN RECIBE Y PROCESA EL COLOR
+def crear_articulo_loyverse(nombre, sku, precio, nombre_categoria="General", color="Original"):
     try:
         req_cat = urllib.request.Request("https://api.loyverse.com/v1.0/categories")
         req_cat.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
@@ -141,19 +131,23 @@ def crear_articulo_loyverse(nombre, sku, precio, nombre_categoria="General"):
             res_nueva_cat = urllib.request.urlopen(req_nueva_cat)
             cat_id = json.loads(res_nueva_cat.read().decode('utf-8'))["id"]
 
+        # Formateamos el color para usarlo en el SKU
+        color_sku = color.replace(" ", "").upper()
+
         payload_dict = {
             "item_name": nombre,
             "category_id": cat_id,
             "track_stock": True,
             "option1_name": "Talla",
+            "option2_name": "Color", # ⚡ LE DECIMOS A LOYVERSE QUE HAY COLORES
             "variants": [
-                {"sku": f"{sku}-3", "default_pricing_type": "FIXED", "default_price": precio, "option1_value": "3"},
-                {"sku": f"{sku}-5", "default_pricing_type": "FIXED", "default_price": precio, "option1_value": "5"},
-                {"sku": f"{sku}-7", "default_pricing_type": "FIXED", "default_price": precio, "option1_value": "7"},
-                {"sku": f"{sku}-9", "default_pricing_type": "FIXED", "default_price": precio, "option1_value": "9"},
-                {"sku": f"{sku}-11", "default_pricing_type": "FIXED", "default_price": precio, "option1_value": "11"},
-                {"sku": f"{sku}-13", "default_pricing_type": "FIXED", "default_price": precio, "option1_value": "13"},
-                {"sku": f"{sku}-15", "default_pricing_type": "FIXED", "default_price": precio, "option1_value": "15"}
+                {"sku": f"{sku}-{color_sku}-3", "default_pricing_type": "FIXED", "default_price": precio, "option1_value": "3", "option2_value": color},
+                {"sku": f"{sku}-{color_sku}-5", "default_pricing_type": "FIXED", "default_price": precio, "option1_value": "5", "option2_value": color},
+                {"sku": f"{sku}-{color_sku}-7", "default_pricing_type": "FIXED", "default_price": precio, "option1_value": "7", "option2_value": color},
+                {"sku": f"{sku}-{color_sku}-9", "default_pricing_type": "FIXED", "default_price": precio, "option1_value": "9", "option2_value": color},
+                {"sku": f"{sku}-{color_sku}-11", "default_pricing_type": "FIXED", "default_price": precio, "option1_value": "11", "option2_value": color},
+                {"sku": f"{sku}-{color_sku}-13", "default_pricing_type": "FIXED", "default_price": precio, "option1_value": "13", "option2_value": color},
+                {"sku": f"{sku}-{color_sku}-15", "default_pricing_type": "FIXED", "default_price": precio, "option1_value": "15", "option2_value": color}
             ]
         }
         
@@ -163,7 +157,7 @@ def crear_articulo_loyverse(nombre, sku, precio, nombre_categoria="General"):
         req_item.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
         req_item.add_header("Content-Type", "application/json")
         urllib.request.urlopen(req_item)
-        print(f"✅ OMNICANAL: {sku} creado en Loyverse con sus 7 tallas.")
+        print(f"✅ OMNICANAL: {sku} ({color}) creado en Loyverse con sus 7 tallas.")
     except Exception as e:
         error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
         print(f"❌ Error al crear en Loyverse: {error_msg}")
@@ -180,8 +174,9 @@ def crear_cliente_loyverse(nombre, correo, telefono):
     except Exception as e:
         print(f"❌ Error al crear cliente en Loyverse: {e}")
 
+# ⚡ AHORA BORRA BUSCANDO EL PREFIJO DEL SKU
 def eliminar_articulo_loyverse(sku):
-    """ Busca un artículo por su SKU y lo destruye de la tablet (con precisión láser) """
+    """ Busca un artículo por su SKU y lo destruye de la tablet """
     try:
         req_item = urllib.request.Request(f"https://api.loyverse.com/v1.0/items?sku={sku}")
         req_item.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
@@ -191,23 +186,21 @@ def eliminar_articulo_loyverse(sku):
         if not items:
             return
             
-        # ⚡ ESCUDO DE PRECISIÓN: Verificamos que sea el modelo EXACTO buscando su primera talla
         item_id = None
-        sku_esperado = f"{sku}-3"  # Ejemplo: Si intentas borrar SJ-210, debe existir un SJ-210-3
         
+        # Buscamos si alguna variante empieza con el código que queremos borrar
         for item in items:
             for variante in item.get("variants", []):
-                if variante.get("sku") == sku_esperado:
+                if variante.get("sku", "").startswith(sku):
                     item_id = item["id"]
                     break
             if item_id:
                 break
                 
         if not item_id:
-            print(f"⚠️ Loyverse: El código '{sku}' es un fantasma o no es exacto. Se omite para proteger otros modelos.")
+            print(f"⚠️ Loyverse: El código '{sku}' es un fantasma o no es exacto.")
             return
             
-        # Si pasó el escudo, entonces sí es el verdadero y lo destruimos
         req_del = urllib.request.Request(f"https://api.loyverse.com/v1.0/items/{item_id}", method="DELETE")
         req_del.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
         urllib.request.urlopen(req_del)
