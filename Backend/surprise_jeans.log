@@ -742,3 +742,10 @@
 2026-07-17 08:00:00,003 [INFO] Job "cron_reporte_mensual (trigger: cron[hour='8', minute='0'], next run at: 2026-07-18 08:00:00 CST)" executed successfully
 2026-07-17 08:32:52,503 [INFO] Running job "cron_recuperar_carritos (trigger: interval[1:00:00], next run at: 2026-07-17 09:32:52 CST)" (scheduled at 2026-07-17 08:32:52.502069-06:00)
 2026-07-17 08:32:52,505 [INFO] Job "cron_recuperar_carritos (trigger: interval[1:00:00], next run at: 2026-07-17 09:32:52 CST)" executed successfully
+2026-07-17 09:29:29,559 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 09:29:29,564 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 09:29:29,564 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 09:29:29,564 [INFO] Added job "cron_recuperar_carritos" to job store "default"
+2026-07-17 09:29:29,564 [INFO] Added job "cron_reporte_mensual" to job store "default"
+2026-07-17 09:29:29,564 [INFO] Added job "cron_respaldo_semanal" to job store "default"
+2026-07-17 09:29:29,564 [INFO] Scheduler started

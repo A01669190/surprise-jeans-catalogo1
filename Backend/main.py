@@ -1439,11 +1439,11 @@ def reset_db_total():
     # Borrado forzado usando instrucción CASCADE de PostgreSQL
     with engine.begin() as conn:
         # 🟢 Agregamos 'clientes' a la lista de tablas a destruir
-        conn.execute(text("DROP TABLE IF EXISTS detalles_pedido, pedidos, pantalones, categorias, clientes CASCADE;"))
-        
+        conn.execute(text("DROP TABLE IF EXISTS variantes_talla, resenas, detalles_pedido, pedidos, pantalones, categorias, clientes, cupones CASCADE;"))
+
     # Volvemos a construir la estructura limpia
     models.Base.metadata.create_all(bind=engine)
-    return {"mensaje": "Base de datos formateada al 100%. Todo está limpio y listo para empezar."}
+    return {"mensaje": "Base de datos formateada al 100%. ¡Ahora sí está lista para los colores!"}
 
 @app.get("/backup/descargar")
 @limiter.limit("3/minute")
