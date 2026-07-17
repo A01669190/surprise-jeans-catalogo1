@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional, List
+from pydantic import BaseModel
+from typing import Literal
 
 class CategoriaBase(BaseModel):
     nombre: str
@@ -79,3 +81,8 @@ class PantalonUpdateRapido(BaseModel):
     precio: Optional[float] = None
     stock: Optional[int] = None
 
+class RecomendacionTallaRequest(BaseModel):
+    peso_kg: float
+    altura_cm: float
+    corte_pantalon: Literal["Skinny", "Mom Jeans", "Wide Leg", "Recto"]
+    preferencia_ajuste: Literal["Ajustado", "Normal", "Holgado"] = "Normal"

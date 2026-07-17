@@ -4,6 +4,7 @@ import loyverse_sync
 from fastapi.responses import Response
 from reportlab.pdfgen import canvas
 from datetime import datetime
+from logistica_sync import generar_guia_envio
 from reportlab.graphics.barcode import code128
 from reportlab.lib.units import mm
 import socket
@@ -704,6 +705,7 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
 # 5. EL CEREBRO FINANCIERO (WEBHOOKS) 🧠
 # ==========================================
 
+
 @app.post("/crear-pago-seguro")
 async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, db: Session = Depends(get_db)):
     # 1. CÁLCULO DE TOTALES Y APLICACIÓN DE CUPONES
@@ -841,7 +843,7 @@ async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, 
     return {"link_pago": respuesta["response"]["init_point"]}
 
 @app.post("/webhook/mercadopago")
-async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
+async def webhook_mercadopago(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     datos = await request.json()
     
     if datos.get("type") == "payment":
@@ -880,6 +882,8 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                     
                     # Sonido Din por WebSocket
                     await manager.broadcast("NUEVO_PEDIDO")
+
+                    background_tasks.add_task(procesar_logistica_asincrona, pedido_db.id, db)
                     
                     # 📧 ENVIAR CORREO GMAIL (PAGO EN TIENDA REAL)
                     # 📧 ENVIAR CORREO Y GUARDAR DATOS (INVITADOS Y REGISTRADOS)
@@ -896,6 +900,38 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
                         enviar_correo_recibo(correo_final, nombre_final, f"{pedido_db.id:04d}", pedido_db.total, lista_ropa, puntos_ganados)
 
     return {"status": "procesado"}
+
+def procesar_logistica_asincrona(pedido_id: int, db: Session):
+    """ Compra la guía de envío en segundo plano y actualiza la base de datos """
+    # Buscamos el pedido usando tu modelo
+    pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
+    if not pedido:
+        return
+
+    # Empaquetamos la dirección usando las columnas de tu tabla Pedido
+    direccion = {
+        "estado": pedido.estado,
+        "ciudad": pedido.ciudad,
+        "codigo_postal": pedido.codigo_postal,
+        "calle_y_numero": pedido.calle_numero,
+        "telefono": pedido.telefono,
+        "email": pedido.correo_cliente
+    }
+
+    print(f"📦 Solicitando guía de envío para el pedido {pedido.id}...")
+
+    # Llamamos a nuestra API de paquetería
+    guia = generar_guia_envio(pedido.id, pedido.nombre_cliente, direccion)
+
+    if guia:
+        # Usamos la columna que tú creaste para guardar el link de rastreo
+        pedido.guia_rastreo = guia["tracking_url"] 
+        db.commit()
+        print(f"✅ ¡Guía generada! Rastreo: {guia['tracking_number']}")
+        print(f"📄 Descarga la etiqueta térmica aquí: {guia['label_pdf']}")
+
+        # Opcional: Aquí podrías llamar a tu función de enviar correos para avisarle al cliente
+        # enviar_correo_guia(pedido.correo_cliente, guia["tracking_url"])
 
 @app.post("/admin/lanzar-recuperacion")
 def lanzar_recuperacion_carritos(db: Session = Depends(get_db), token: str = Depends(verificar_token)):
@@ -1385,6 +1421,52 @@ def lanzar_recuperacion_carritos(db: Session = Depends(get_db), token: str = Dep
     db.commit()
     return {"mensaje": f"Escaneo completo. Se enviaron {correos_enviados} correos de recuperación."}
 
+@app.post("/api/recomendacion-talla")
+@limiter.limit("15/minute")
+def recomendar_talla(request: Request, datos: schemas.RecomendacionTallaRequest): # ⚡ El secreto está aquí
+    # ... (todo el resto del código se queda igual)
+    # 1. Calculamos el IMC (Índice de Masa Corporal)
+    altura_m = datos.altura_cm / 100
+    imc = datos.peso_kg / (altura_m ** 2)
+    
+    # 2. Lógica base de tallaje mexicano (Aproximación matemática)
+    talla_base = 7  # Talla promedio
+    
+    if imc < 19:
+        talla_base = 3
+    elif 19 <= imc < 22:
+        talla_base = 5
+    elif 22 <= imc < 25:
+        talla_base = 7
+    elif 25 <= imc < 28:
+        talla_base = 9
+    elif 28 <= imc < 31:
+        talla_base = 11
+    elif 31 <= imc < 35:
+        talla_base = 13
+    else:
+        talla_base = 15
+
+    # 3. Modificadores por Tipo de Corte y Preferencia
+    if datos.corte_pantalon == "Skinny" and datos.preferencia_ajuste in ["Normal", "Holgado"]:
+        talla_base += 2  # Si es Skinny pero no lo quiere asfixiante, sube una talla (ej. de 7 a 9)
+        
+    elif datos.corte_pantalon in ["Mom Jeans", "Wide Leg"] and datos.preferencia_ajuste == "Ajustado":
+        talla_base = max(3, talla_base - 2) # Baja una talla porque esos cortes ya vienen amplios
+
+    # Aseguramos que la talla se mantenga en nuestro rango (3 al 15)
+    talla_final = max(3, min(15, talla_base))
+    
+    # 4. Cálculo de confianza (para darle un toque profesional en el frontend)
+    porcentaje_confianza = 85 if datos.preferencia_ajuste == "Normal" else 78
+
+    return {
+        "talla_recomendada": str(talla_final),
+        "corte_analizado": datos.corte_pantalon,
+        "mensaje": f"Basado en tus medidas, te recomendamos la talla {talla_final} para un ajuste {datos.preferencia_ajuste.lower()}.",
+        "confianza": f"{porcentaje_confianza}%"
+    }
+
 @app.patch("/pedidos/{pedido_id}/entregar")
 def marcar_pedido_entregado(pedido_id: int, db: Session = Depends(get_db), token: str = Depends(verificar_token)):
     pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
@@ -1516,3 +1598,22 @@ def cron_respaldo_semanal():
         print(f"❌ Error en robot de respaldos: {e}")
     finally:
         db.close()
+
+@app.get("/test-logistica/{pedido_id}")
+def probar_guia_skydropx(
+    pedido_id: int, 
+    background_tasks: BackgroundTasks, 
+    db: Session = Depends(get_db)
+):
+    """ Ruta secreta para probar envíos sin pagar """
+    pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
+    if not pedido:
+        return {"error": f"El pedido {pedido_id} no existe en tu base de datos local."}
+    
+    # Simulamos lo que haría Mercado Pago
+    background_tasks.add_task(procesar_logistica_asincrona, pedido.id, db)
+    
+    return {
+        "mensaje": f"🚀 Disparando sistema logístico para el pedido {pedido.id}...",
+        "instruccion": "Revisa la terminal (consola) de tu Mac en unos segundos para ver el link de la guía."
+    }
