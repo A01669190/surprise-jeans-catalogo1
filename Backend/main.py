@@ -1294,15 +1294,19 @@ async def editar_pantalon(
 def eliminar_pantalon(
     request: Request, 
     pantalon_id: int, 
-    background_tasks: BackgroundTasks, # ⚡ NUEVO: Inyectamos el motor en segundo plano
+    background_tasks: BackgroundTasks, 
     db: Session = Depends(get_db), 
     token: str = Depends(verificar_token)
 ):
     pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == pantalon_id).first()
     if not pantalon: return {"error": "Pantalón no encontrado"}
     
-    # ⚡ SINCRONIZACIÓN ASÍNCRONA: Disparamos el misil a Loyverse en las sombras
-    if pantalon.codigo:
+    # ⚡ ENVIAMOS EL SKU DE LA PRIMERA TALLA PARA TENER PRECISIÓN LÁSER
+    if pantalon.tallas and len(pantalon.tallas) > 0:
+        sku_laser = pantalon.tallas[0].sku
+        background_tasks.add_task(loyverse_sync.eliminar_articulo_loyverse, sku_laser)
+    elif pantalon.codigo:
+        # Respaldo por si es un pantalón viejo o un fantasma sin tallas
         background_tasks.add_task(loyverse_sync.eliminar_articulo_loyverse, pantalon.codigo)
         
     db.delete(pantalon)
