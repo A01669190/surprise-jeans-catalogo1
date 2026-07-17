@@ -3,7 +3,7 @@ import json
 import os
 import models
 
-# 1. Unificamos el Token para que funcione en cualquier entorno
+# Cargar token desde variables de entorno por seguridad
 TOKEN_LOYVERSE = os.getenv("LOYVERSE_TOKEN", "b3dca41541684d0cb5dbcfeac1155736")
 
 def descontar_stock_loyverse(sku, stock_after):
@@ -18,6 +18,7 @@ def descontar_stock_loyverse(sku, stock_after):
         items = json.loads(urllib.request.urlopen(req_item).read().decode('utf-8')).get("items", [])
         
         if not items:
+            print(f"⚠️ El código {sku} no existe en Loyverse.")
             return
             
         variant_id = None
@@ -25,8 +26,9 @@ def descontar_stock_loyverse(sku, stock_after):
             if variante["sku"] == sku:
                 variant_id = variante["variant_id"]
                 break
-
+                
         if not variant_id:
+            print(f"⚠️ La talla específica {sku} no se encontró en Loyverse.")
             return
         
         ajuste_payload = json.dumps({
@@ -37,12 +39,14 @@ def descontar_stock_loyverse(sku, stock_after):
         req_ajuste.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
         req_ajuste.add_header("Content-Type", "application/json")
         urllib.request.urlopen(req_ajuste)
+        print(f"✅ Loyverse actualizado: Talla {sku} ahora tiene {stock_after} piezas.")
         
     except Exception as e:
-        print(f"❌ Error de Loyverse al actualizar stock: {e}")
+        error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
+        print(f"❌ Error de Loyverse al actualizar stock: {error_msg}")
 
 async def procesar_webhooks_loyverse(eventos, db, manager):
-    """ Escucha cuando cobran en caja o manipulan inventario """
+    """ Escucha ÚNICAMENTE cuando cobran en caja para restar el stock """
     for evento in eventos:
         tipo = evento.get("type")
         
@@ -50,20 +54,22 @@ async def procesar_webhooks_loyverse(eventos, db, manager):
         if tipo == "receipts.update":
             line_items = evento.get("data", {}).get("receipt", {}).get("line_items", [])
             for item in line_items:
-                sku = item.get("sku")
+                sku_variante = item.get("sku")
                 cantidad = int(item.get("quantity", 1))
                 
-                # Escudo para restarle el stock al pantalón general
-                sku_padre = sku.rsplit('-', 1)[0] if sku and '-' in sku else sku 
-                
-                if sku_padre:
-                    pantalon_db = db.query(models.Pantalon).filter(models.Pantalon.codigo == sku_padre).first()
-                    if pantalon_db and pantalon_db.stock >= cantidad:
-                        pantalon_db.stock -= cantidad
+                if sku_variante:
+                    variante = db.query(models.VarianteTalla).filter(models.VarianteTalla.sku == sku_variante).first()
+                    if variante and variante.stock >= cantidad:
+                        # Restamos a la talla
+                        variante.stock -= cantidad
+                        # Restamos al total del pantalón papá
+                        if variante.pantalon and variante.pantalon.stock >= cantidad:
+                            variante.pantalon.stock -= cantidad
+                        
                         db.commit()
                         await manager.broadcast("NUEVO_PEDIDO")
+                        print(f"✅ Venta física: Se restaron {cantidad} de la talla {sku_variante}")
 
-        # 2. SI CREAN O EDITAN UN PANTALÓN EN LOYVERSE
         elif tipo in ["items.create", "items.update"]:
             lista_items = evento.get("items", [])
             
@@ -76,8 +82,8 @@ async def procesar_webhooks_loyverse(eventos, db, manager):
                     precio_crudo = variantes[0].get("default_price", 0.0)
                     precio = float(precio_crudo) if precio_crudo is not None else 0.0
                     
-                    # ⚡ ESCUDO ANTI-FANTASMAS RESTAURADO
-                    sku_padre = sku_crudo.rsplit('-', 1)[0] if sku_crudo and '-' in sku_crudo else sku_crudo
+                    # ⚡ ESCUDO ANTI-CLONES
+                    sku_padre = sku_crudo.split('-')[0] if sku_crudo and '-' in sku_crudo else sku_crudo
                     
                     if sku_padre:
                         pantalon_db = db.query(models.Pantalon).filter(models.Pantalon.codigo == sku_padre).first()
@@ -90,18 +96,29 @@ async def procesar_webhooks_loyverse(eventos, db, manager):
                                 db.commit()
                                 db.refresh(cat)
                                 
-                            imagen_loyverse = item_data.get("image_url") or "https://dummyimage.com/400x500/e0e7ff/3730a3&text=FOTO+PENDIENTE"
+                            imagen_loyverse = item_data.get("image_url")
+                            if not imagen_loyverse:
+                                imagen_loyverse = "https://dummyimage.com/400x500/e0e7ff/3730a3&text=FOTO+PENDIENTE"
                                 
                             nuevo = models.Pantalon(
                                 codigo=sku_padre, nombre=nombre, precio=precio, stock=0, categoria_id=cat.id,
-                                imagen_url=imagen_loyverse
+                                imagen_url=imagen_loyverse 
                             )
                             db.add(nuevo)
+                            print(f"🌟 Nuevo modelo sincronizado desde Loyverse: {sku_padre} - {nombre}")
                         else:
                             pantalon_db.nombre = nombre
                             pantalon_db.precio = precio
+                            print(f"🔄 Modelo actualizado desde Loyverse: {sku_padre} - {nombre}")
                         
                         db.commit()
+                    else:
+                        print(f"⚠️ ERROR: El artículo '{nombre}' NO tiene SKU.")
+
+        elif tipo == "items.delete":
+             lista_items = evento.get("items", [])
+             for item_data in lista_items:
+                 print(f"🗑️ Alerta: Artículo eliminado desde Loyverse con ID: {item_data.get('id')}")
 
 def crear_articulo_loyverse(nombre, sku, precio, nombre_categoria="General"):
     try:
@@ -124,7 +141,6 @@ def crear_articulo_loyverse(nombre, sku, precio, nombre_categoria="General"):
             res_nueva_cat = urllib.request.urlopen(req_nueva_cat)
             cat_id = json.loads(res_nueva_cat.read().decode('utf-8'))["id"]
 
-        # ⚡ SWITCH DE INVENTARIO CORREGIDO A 'track_stock'
         payload_dict = {
             "item_name": nombre,
             "category_id": cat_id,
@@ -147,43 +163,39 @@ def crear_articulo_loyverse(nombre, sku, precio, nombre_categoria="General"):
         req_item.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
         req_item.add_header("Content-Type", "application/json")
         urllib.request.urlopen(req_item)
-        
+        print(f"✅ OMNICANAL: {sku} creado en Loyverse con sus 7 tallas.")
     except Exception as e:
         error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
         print(f"❌ Error al crear en Loyverse: {error_msg}")
 
 def crear_cliente_loyverse(nombre, correo, telefono):
-    """ Sincroniza a un cliente recién registrado """
+    """ Sincroniza a un cliente recién registrado con la tablet física """
     try:
-        payload = json.dumps({
-            "name": nombre,
-            "email": correo,
-            "phone_number": telefono if telefono else ""
-        }).encode("utf-8")
-        
+        payload = json.dumps({"name": nombre, "email": correo, "phone_number": telefono if telefono else ""}).encode("utf-8")
         req = urllib.request.Request("https://api.loyverse.com/v1.0/customers", data=payload, method="POST")
         req.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
         req.add_header("Content-Type", "application/json")
         urllib.request.urlopen(req)
-    except Exception:
-        pass
+        print(f"👤 Cliente guardado en Loyverse: {nombre}")
+    except Exception as e:
+        print(f"❌ Error al crear cliente en Loyverse: {e}")
 
 def eliminar_articulo_loyverse(sku):
-    """ Busca un artículo por su SKU y lo destruye de la tablet """
+    """ Busca un artículo por su SKU en Loyverse y lo destruye """
     try:
         req_item = urllib.request.Request(f"https://api.loyverse.com/v1.0/items?sku={sku}")
         req_item.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
-        res_item = urllib.request.urlopen(req_item)
-        items = json.loads(res_item.read().decode('utf-8')).get("items", [])
+        items = json.loads(urllib.request.urlopen(req_item).read().decode('utf-8')).get("items", [])
         
         if not items:
+            print(f"⚠️ Loyverse: El código {sku} no existe para eliminar.")
             return
             
         item_id = items[0]["id"]
-        
         req_del = urllib.request.Request(f"https://api.loyverse.com/v1.0/items/{item_id}", method="DELETE")
         req_del.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
         urllib.request.urlopen(req_del)
-        
+        print(f"🗑️ OMNICANAL: {sku} destruido de Loyverse.")
     except Exception as e:
-        pass
+        error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
+        print(f"❌ Error al eliminar en Loyverse: {error_msg}")
