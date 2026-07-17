@@ -5,7 +5,7 @@ import os
 SKYDROPX_API_KEY = os.getenv("SKYDROPX_API_KEY", "wwJSo7mpIOXEi5ZzTTSDd-RWU7lddvHg2_4xPvgmKwk")
 
 # ⚡ FIX 1: Usamos la URL de DEMO para que acepte tu token de pruebas
-URL_SKYDROPX = "https://api.demo.skydropx.com/v1/shipments"
+URL_SKYDROPX = "https://api-demo.skydropx.com/v1/shipments"
 
 def generar_guia_envio(pedido_id: int, nombre_cliente: str, direccion: dict, peso_kg: float = 1.0):
     """
@@ -64,7 +64,7 @@ def generar_guia_envio(pedido_id: int, nombre_cliente: str, direccion: dict, pes
         rate_barato_id = rates[0]["id"] 
         
         # 4. Solicitamos el PDF
-        url_label = "https://api.demo.skydropx.com/v1/labels"
+        url_label = "https://api-demo.skydropx.com/v1/labels"
         payload_label = {"rate_id": rate_barato_id, "label_format": "pdf"}
         res_label = requests.post(url_label, headers=headers, json=payload_label)
         
