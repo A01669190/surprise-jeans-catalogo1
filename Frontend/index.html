@@ -530,6 +530,7 @@
         
         let catalogoCompleto = [];
         let carrito = [];
+        let tallasSeleccionadas = {}; // ⚡ NUEVO: Memoria para guardar la talla que el cliente toca
 
         // EL ESCÁNER DE RECIBOS (Se ejecuta apenas abre la página)
         document.addEventListener('DOMContentLoaded', () => {
@@ -916,7 +917,6 @@
             document.getElementById('overlay-menu').classList.add('hidden');
         }
 
-
         function renderizarCatalogo(listaPantalones) {
             const grid = document.getElementById('grid-pantalones');
             grid.innerHTML = '';
@@ -944,17 +944,39 @@
                     : `<p class="text-[10px] text-gray-400 italic mb-1">Nuevo modelo</p>`;
 
                 const botonAccion = estaAgotado
-                    ? `<button disabled class="w-full bg-gray-200 text-gray-400 font-bold py-3 rounded-xl cursor-not-allowed text-sm uppercase tracking-wider">Sin existencias</button>`
-                    : `<button onclick="agregarAlCarrito(${p.id})" class="w-full bg-stone-100 hover:bg-stone-900 text-stone-900 hover:text-white font-bold py-3 rounded-xl transition-colors text-sm shadow-sm">Añadir a la bolsa</button>`;
+                    ? `<button disabled class="w-full bg-gray-200 text-gray-400 font-bold py-3 rounded-xl cursor-not-allowed text-sm uppercase tracking-wider mt-auto">Sin existencias</button>`
+                    : `<button onclick="agregarAlCarrito(${p.id})" class="w-full bg-stone-100 hover:bg-stone-900 text-stone-900 hover:text-white font-bold py-3 rounded-xl transition-colors text-sm shadow-sm mt-auto">Añadir a la bolsa</button>`;
 
-                // ⚡ EXTRAEMOS Y DIBUJAMOS EL COLOR AQUÍ ⚡
                 const colorPantalon = p.tallas && p.tallas.length > 0 ? p.tallas[0].color : 'Original';
                 const badgeColor = colorPantalon !== 'Original' 
                     ? `<span class="inline-block bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ml-2 align-middle">${colorPantalon}</span>` 
                     : '';
 
+                // ⚡ EL FIX: Ya no hay diagonales invertidas rompiendo el código
+                let botonesTallas = '';
+                if (p.tallas && p.tallas.length > 0 && !estaAgotado) {
+                    botonesTallas = `
+                        <div class="mt-3 mb-4 border-t border-gray-100 pt-3">
+                            <p class="text-[10px] uppercase text-gray-500 font-bold mb-2 tracking-wider">Selecciona tu talla:</p>
+                            <div class="flex flex-wrap gap-1.5">
+                                ${p.tallas.map(t => {
+                                    if (t.stock > 0) {
+                                        return `<button type="button" 
+                                            class="btn-talla-${p.id} w-8 h-8 rounded-md border border-gray-200 text-[11px] font-black text-gray-700 hover:border-indigo-600 hover:text-indigo-600 transition-all shadow-sm"
+                                            onclick="seleccionarTalla(${p.id}, '${t.talla}', '${t.sku}')">
+                                            ${t.talla}
+                                        </button>`;
+                                    } else {
+                                        return `<button disabled class="w-8 h-8 rounded-md border border-gray-100 text-[11px] font-black text-gray-300 bg-gray-50 cursor-not-allowed line-through">${t.talla}</button>`;
+                                    }
+                                }).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
                 const div = document.createElement('div');
-                div.className = 'bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 group relative';
+                div.className = 'bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 group flex flex-col relative';
                 
                 div.innerHTML = `
                     <div class="relative overflow-hidden aspect-[3/4] bg-gray-50">
@@ -964,15 +986,17 @@
                             [${p.codigo || 'S/C'}]
                         </div>
                     </div>
-                    <div class="p-5">
+                    <div class="p-5 flex flex-col flex-grow">
                         ${ratingDOM}
-                        <h3 class="font-bold text-stone-800 text-lg uppercase leading-tight mb-2 truncate flex items-center flex-wrap" title="${p.nombre}">
+                        <h3 class="font-bold text-stone-800 text-lg uppercase leading-tight mb-2 flex items-center flex-wrap" title="${p.nombre}">
                             ${p.nombre} ${badgeColor}
                         </h3>
-                        <div class="flex justify-between items-end mb-4">
+                        <div class="flex justify-between items-end mb-1">
                             <p class="text-2xl font-black text-stone-900">$${p.precio}</p>
-                            <p class="text-xs ${estaAgotado ? 'text-red-500 font-bold' : 'text-stone-400 font-medium'}">Quedan ${p.stock}</p>
+                            <p class="text-xs ${estaAgotado ? 'text-red-500 font-bold' : 'text-stone-400 font-medium'}">Total: ${p.stock}</p>
                         </div>
+                        
+                        ${botonesTallas}
                         ${botonAccion}
                     </div>
                 `;
@@ -993,17 +1017,46 @@
             const pantalon = catalogoCompleto.find(p => p.id === id);
             if (!pantalon) return;
 
-            const itemExistente = carrito.find(item => item.id === id);
+            // ⚡ EL CANDADO: Obliga a elegir talla
+            if (!tallasSeleccionadas[id]) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Falta la talla',
+                    text: 'Por favor, selecciona una talla antes de añadir a la bolsa.',
+                    confirmButtonColor: '#4f46e5'
+                });
+                return;
+            }
+
+            const seleccion = tallasSeleccionadas[id];
+            const varianteExacta = pantalon.tallas.find(t => t.sku === seleccion.sku_variante);
+            
+            if(!varianteExacta || varianteExacta.stock <= 0) {
+                Swal.fire({ icon: 'error', text: 'Lo sentimos, esta talla específica se acaba de agotar.' }); 
+                return;
+            }
+
+            // ⚡ Busca en el carrito POR TALLA EXACTA (SKU), no solo por modelo
+            const itemExistente = carrito.find(item => item.sku_variante === seleccion.sku_variante);
+            
             if (itemExistente) {
-                if(itemExistente.cantidad < pantalon.stock) itemExistente.cantidad++;
-                else { alert(`Solo tenemos ${pantalon.stock} unidades en existencia.`); return; }
+                if(itemExistente.cantidad < varianteExacta.stock) {
+                    itemExistente.cantidad++;
+                } else { 
+                    Swal.fire({ icon: 'info', text: `Solo nos quedan ${varianteExacta.stock} piezas de la talla ${seleccion.talla}.` }); 
+                    return; 
+                }
             } else {
-                if(pantalon.stock > 0) carrito.push({ ...pantalon, cantidad: 1 });
-                else { alert('Este modelo está agotado.'); return; }
+                carrito.push({ 
+                    ...pantalon, 
+                    cantidad: 1, 
+                    talla: seleccion.talla,
+                    sku_variante: seleccion.sku_variante
+                });
             }
             
-            // Actualizamos los números y totales, pero YA NO abrimos la ventana
-            actualizarUICarrito(); 
+            actualizarUICarrito();
+            abrirCarrito(); // ⚡ Opcional: Abre la bolsa automáticamente al comprar
         }
 
         function actualizarUICarrito() {
@@ -1025,11 +1078,12 @@
                 total += item.precio * item.cantidad;
                 cantidadTotal += item.cantidad;
 
-                // ⚡ EXTRAEMOS EL COLOR PARA EL CARRITO
                 const colorPantalon = item.tallas && item.tallas.length > 0 ? item.tallas[0].color : 'Original';
                 const badgeColor = colorPantalon !== 'Original' 
                     ? `<span class="inline-block bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ml-2 align-middle">${colorPantalon}</span>` 
                     : '';
+                // ⚡ ETIQUETA NEGRA DE LA TALLA
+                const badgeTalla = `<span class="inline-block bg-stone-800 text-white px-2 py-0.5 rounded-md text-[10px] font-black tracking-wider ml-1 align-middle">TALLA ${item.talla}</span>`;
 
                 const li = document.createElement('li');
                 li.className = 'flex items-center gap-4 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm';
@@ -1037,9 +1091,9 @@
                     <img src="${item.imagen_url}" class="w-20 h-24 object-cover rounded-xl">
                     <div class="flex-1">
                         <p class="font-bold text-sm text-stone-800 uppercase leading-tight mb-1 flex items-center flex-wrap">
-                            ${item.nombre} ${badgeColor}
+                            ${item.nombre} ${badgeColor} ${badgeTalla}
                         </p>
-                        <p class="text-[10px] text-indigo-500 font-black mb-2">[${item.codigo}]</p>
+                        <p class="text-[10px] text-indigo-500 font-black mb-2">[${item.sku_variante}]</p>
                         <div class="flex justify-between items-center">
                             <p class="font-black text-stone-900">$${item.precio}</p>
                             <div class="flex items-center gap-3 bg-gray-50 rounded-lg p-1 border border-gray-200">
@@ -1327,8 +1381,25 @@
             localStorage.removeItem('nombre_cliente_sj');
             window.location.reload();
         }
+        
+// ⚡ NUEVO: Función para pintar y registrar la talla elegida
+        function seleccionarTalla(pantalonId, talla, skuVariante) {
+            tallasSeleccionadas[pantalonId] = { talla: talla, sku_variante: skuVariante };
+            
+            // Efecto visual: Pintar botón seleccionado y despintar los demás
+            const botones = document.querySelectorAll(`.btn-talla-${pantalonId}`);
+            botones.forEach(btn => {
+                if(btn.innerText.trim() === talla) {
+                    btn.classList.add('bg-indigo-600', 'text-white', 'border-indigo-600');
+                    btn.classList.remove('text-gray-700', 'border-gray-200', 'hover:border-indigo-600', 'hover:text-indigo-600');
+                } else {
+                    btn.classList.remove('bg-indigo-600', 'text-white', 'border-indigo-600');
+                    btn.classList.add('text-gray-700', 'border-gray-200', 'hover:border-indigo-600', 'hover:text-indigo-600');
+                }
+            });
+        }
 
-       async function procesarPagoSeguro() {
+        async function procesarPagoSeguro() {
         // 1. Recolección completa de datos
         const telefono = document.getElementById('chk-telefono').value;
         const nombre = document.getElementById('chk-nombre').value;
@@ -1394,11 +1465,9 @@
             Swal.showLoading();
 
             try {
-                // Consultamos al motor qué más compra la gente
                 const res = await fetch(`${API_URL}/pantalones/${id}/recomendaciones`);
                 const recomendados = await res.json();
 
-                // Armamos la vitrina de sugerencias
                 let htmlRecomendados = '';
                 if(recomendados.length > 0) {
                     htmlRecomendados = `<h4 class="text-xs font-black text-gray-500 uppercase tracking-widest mt-6 mb-3 border-t pt-4">Comprados juntos habitualmente</h4>
@@ -1409,13 +1478,36 @@
                             <img src="${r.imagen_url}" class="w-full h-24 object-cover rounded-lg mb-2">
                             <p class="text-[10px] font-bold text-gray-800 truncate" title="${r.nombre}">${r.nombre}</p>
                             <p class="text-[11px] font-black text-indigo-600 mb-2">$${r.precio}</p>
-                            <button onclick="agregarAlCarrito(${r.id}); Swal.close();" class="text-[10px] bg-stone-900 text-white font-bold px-3 py-1.5 rounded-lg w-full hover:bg-indigo-600 transition-colors">Añadir</button>
+                            <button onclick="verDetalles(${r.id}, '${r.nombre.replace(/'/g, "\\'")}', '${r.imagen_url}', ${r.precio})" class="text-[10px] bg-stone-900 text-white font-bold px-3 py-1.5 rounded-lg w-full hover:bg-indigo-600 transition-colors">Ver modelo</button>
                         </div>`;
                     });
                     htmlRecomendados += `</div>`;
                 }
 
-                // Mostramos el producto principal + las sugerencias
+                // ⚡ EL FIX: Sin diagonales invertidas
+                const pantalon = catalogoCompleto.find(p => p.id === id);
+                let botonesTallasModal = '';
+                if (pantalon && pantalon.tallas && pantalon.tallas.length > 0 && pantalon.stock > 0) {
+                    botonesTallasModal = `
+                        <div class="mt-4 mb-2">
+                            <p class="text-[10px] uppercase text-gray-500 font-bold mb-2 tracking-wider">Selecciona tu talla:</p>
+                            <div class="flex flex-wrap gap-2">
+                                ${pantalon.tallas.map(t => {
+                                    if (t.stock > 0) {
+                                        return `<button type="button" 
+                                            class="btn-talla-${pantalon.id} w-10 h-10 rounded-md border border-gray-200 text-xs font-black text-gray-700 hover:border-indigo-600 hover:text-indigo-600 transition-all shadow-sm"
+                                            onclick="seleccionarTalla(${pantalon.id}, '${t.talla}', '${t.sku}')">
+                                            ${t.talla}
+                                        </button>`;
+                                    } else {
+                                        return `<button disabled class="w-10 h-10 rounded-md border border-gray-100 text-xs font-black text-gray-300 bg-gray-50 cursor-not-allowed line-through">${t.talla}</button>`;
+                                    }
+                                }).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
                 Swal.fire({
                     html: `
                         <div class="text-left mt-2">
@@ -1424,6 +1516,7 @@
                             </div>
                             <h2 class="text-xl font-black text-stone-900 leading-tight">${nombre}</h2>
                             <p class="text-3xl text-indigo-600 font-black my-2">$${precio}</p>
+                            ${botonesTallasModal}
                             <button onclick="agregarAlCarrito(${id}); Swal.close();" class="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-3.5 rounded-xl mt-2 shadow-lg transition-all">AÑADIR A LA BOLSA</button>
                             ${htmlRecomendados}
                         </div>
@@ -1473,4 +1566,4 @@
     </script>
     
 </body>
-</html>
+</html
