@@ -181,21 +181,36 @@ def crear_cliente_loyverse(nombre, correo, telefono):
         print(f"❌ Error al crear cliente en Loyverse: {e}")
 
 def eliminar_articulo_loyverse(sku):
-    """ Busca un artículo por su SKU en Loyverse y lo destruye """
+    """ Busca un artículo por su SKU y lo destruye de la tablet (con precisión láser) """
     try:
         req_item = urllib.request.Request(f"https://api.loyverse.com/v1.0/items?sku={sku}")
         req_item.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
-        items = json.loads(urllib.request.urlopen(req_item).read().decode('utf-8')).get("items", [])
+        res_item = urllib.request.urlopen(req_item)
+        items = json.loads(res_item.read().decode('utf-8')).get("items", [])
         
         if not items:
-            print(f"⚠️ Loyverse: El código {sku} no existe para eliminar.")
             return
             
-        item_id = items[0]["id"]
+        # ⚡ ESCUDO DE PRECISIÓN: Verificamos que sea el modelo EXACTO buscando su primera talla
+        item_id = None
+        sku_esperado = f"{sku}-3"  # Ejemplo: Si intentas borrar SJ-210, debe existir un SJ-210-3
+        
+        for item in items:
+            for variante in item.get("variants", []):
+                if variante.get("sku") == sku_esperado:
+                    item_id = item["id"]
+                    break
+            if item_id:
+                break
+                
+        if not item_id:
+            print(f"⚠️ Loyverse: El código '{sku}' es un fantasma o no es exacto. Se omite para proteger otros modelos.")
+            return
+            
+        # Si pasó el escudo, entonces sí es el verdadero y lo destruimos
         req_del = urllib.request.Request(f"https://api.loyverse.com/v1.0/items/{item_id}", method="DELETE")
         req_del.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
         urllib.request.urlopen(req_del)
-        print(f"🗑️ OMNICANAL: {sku} destruido de Loyverse.")
+        
     except Exception as e:
-        error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
-        print(f"❌ Error al eliminar en Loyverse: {error_msg}")
+        pass
