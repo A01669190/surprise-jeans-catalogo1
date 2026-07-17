@@ -254,8 +254,11 @@ def actualizar_categoria_loyverse(sku_hijo_exacto, nombre_categoria):
 
         # 3. Enviar la orden de actualización a Loyverse
         item_id = item_a_modificar["id"]
+        nombre_original = item_a_modificar["item_name"] # ⚡ EXTRAEMOS EL NOMBRE
+        
         payload_update = json.dumps({
             "id": item_id,
+            "item_name": nombre_original, # ⚡ EL FIX: Loyverse exige que se vuelva a mandar el nombre
             "category_id": cat_id
         }).encode("utf-8")
 
