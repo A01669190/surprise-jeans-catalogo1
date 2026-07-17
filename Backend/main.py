@@ -901,37 +901,31 @@ async def webhook_mercadopago(request: Request, background_tasks: BackgroundTask
 
     return {"status": "procesado"}
 
+# Ubica esta función en tu main.py (cerca de la línea 660 aproximadamente)
 def procesar_logistica_asincrona(pedido_id: int, db: Session):
-    """ Compra la guía de envío en segundo plano y actualiza la base de datos """
-    # Buscamos el pedido usando tu modelo
     pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
-    if not pedido:
-        return
+    if not pedido: return
 
-    # Empaquetamos la dirección usando las columnas de tu tabla Pedido
     direccion = {
-        "estado": pedido.estado,
-        "ciudad": pedido.ciudad,
-        "codigo_postal": pedido.codigo_postal,
-        "calle_y_numero": pedido.calle_numero,
-        "telefono": pedido.telefono,
-        "email": pedido.correo_cliente
+        "estado": pedido.estado, "ciudad": pedido.ciudad,
+        "codigo_postal": pedido.codigo_postal, "calle_y_numero": pedido.calle_numero,
+        "telefono": pedido.telefono, "email": pedido.correo_cliente
     }
 
-    print(f"📦 Solicitando guía de envío para el pedido {pedido.id}...")
-
-    # Llamamos a nuestra API de paquetería
+    # Llamada a la función mejorada
     guia = generar_guia_envio(pedido.id, pedido.nombre_cliente, direccion)
 
     if guia:
-        # Usamos la columna que tú creaste para guardar el link de rastreo
-        pedido.guia_rastreo = guia["tracking_url"] 
+        pedido.guia_rastreo = guia["tracking_url"]
+        # ⚡ NUEVO: Opcional, marcar estatus como LISTO_PARA_ENVIO
+        # pedido.estatus = "LISTO_PARA_ENVIO" 
         db.commit()
-        print(f"✅ ¡Guía generada! Rastreo: {guia['tracking_number']}")
-        print(f"📄 Descarga la etiqueta térmica aquí: {guia['label_pdf']}")
-
-        # Opcional: Aquí podrías llamar a tu función de enviar correos para avisarle al cliente
-        # enviar_correo_guia(pedido.correo_cliente, guia["tracking_url"])
+        logger.info(f"✅ Pedido {pedido_id} listo. Guía: {guia['tracking_number']}")
+    else:
+        # ⚡ NUEVO: Avisar en logs que falló
+        pedido.estatus = "ERROR_LOGISTICA"
+        db.commit()
+        logger.error(f"❌ Falló logística en pedido {pedido_id}")
 
 @app.post("/admin/lanzar-recuperacion")
 def lanzar_recuperacion_carritos(db: Session = Depends(get_db), token: str = Depends(verificar_token)):

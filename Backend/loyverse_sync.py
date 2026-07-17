@@ -4,7 +4,7 @@ import os
 import models
 
 # Cargar token desde variables de entorno por seguridad
-TOKEN_LOYVERSE = os.getenv("LOYVERSE_TOKEN", "b3dca41541684d0cb5dbcfeac1155736")
+TOKEN_LOYVERSE = os.getenv("LOYVERSE_TOKEN")
 
 def descontar_stock_loyverse(sku, stock_after):
     """ Actualiza el inventario absoluto en la tablet para una variante ESPECÍFICA """
