@@ -7,7 +7,7 @@ logger = logging.getLogger("SurpriseJeans")
 
 def generar_guia_envio(pedido_id: int, nombre_cliente: str, direccion: dict, peso_kg: float = 1.0):
     API_KEY = os.getenv("SKYDROPX_API_KEY", "")
-    URL_SKYDROPX = "https://api-demo.skydropx.com/v1/shipments"
+    URL_SKYDROPX = "https://api.skydropx.com/v1/shipments"
     
     headers = {
         "Authorization": f"Token token={API_KEY}",
@@ -48,7 +48,7 @@ def generar_guia_envio(pedido_id: int, nombre_cliente: str, direccion: dict, pes
         rate_barato_id = rates[0]["id"] 
         
         # Generar Etiqueta
-        res_label = requests.post("https://api-demo.skydropx.com/v1/labels", 
+        res_label = requests.post("https://api.skydropx.com/v1/labels", 
                                   headers=headers, 
                                   json={"rate_id": rate_barato_id, "label_format": "pdf"})
         
