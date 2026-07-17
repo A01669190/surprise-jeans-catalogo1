@@ -1086,21 +1086,24 @@ async def editar_pantalon(
     db: Session = Depends(get_db),
     token: str = Depends(verificar_token)
 ):
+    # 1. Limpieza extrema: Borramos espacios invisibles que tú no ves pero la base sí
+    codigo_limpio = codigo.strip()
+
     pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == pantalon_id).first()
     if not pantalon:
         raise HTTPException(status_code=404, detail="Pantalón no encontrado")
 
-    # Escudo protector
+    # 2. Escudo protector
     pantalon_existente = db.query(models.Pantalon).filter(
-        models.Pantalon.codigo == codigo,
+        models.Pantalon.codigo == codigo_limpio,
         models.Pantalon.id != pantalon_id
     ).first()
     
     if pantalon_existente:
         raise HTTPException(status_code=400, detail="¡Duplicado! Otro modelo ya usa ese código.")
 
-    pantalon.codigo = codigo
-    pantalon.nombre = nombre
+    pantalon.codigo = codigo_limpio
+    pantalon.nombre = nombre.strip()
     pantalon.precio = precio
     pantalon.stock = stock
     pantalon.categoria_id = categoria_id
@@ -1116,9 +1119,16 @@ async def editar_pantalon(
     paquetes = max(1, stock // 12) if stock > 0 else 0
     distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
 
+    # ⚡ AUTO-SANACIÓN: Busca tallas fantasmas que estén estorbando y las DESTRUYE
+    skus_a_crear = [f"{codigo_limpio}-{t}" for t in distribucion.keys()]
+    db.query(models.VarianteTalla).filter(
+        models.VarianteTalla.sku.in_(skus_a_crear),
+        models.VarianteTalla.pantalon_id != pantalon.id
+    ).delete(synchronize_session=False)
+
     for talla_str, piezas_por_paquete in distribucion.items():
         stock_talla = paquetes * piezas_por_paquete
-        sku_variante = f"{codigo}-{talla_str}"
+        sku_variante = f"{codigo_limpio}-{talla_str}"
 
         variante = db.query(models.VarianteTalla).filter(
             models.VarianteTalla.pantalon_id == pantalon.id,
@@ -1137,7 +1147,14 @@ async def editar_pantalon(
         if stock_talla >= 0:
             background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, sku_variante, stock_talla)
 
-    db.commit()
+    # ⚡ BLINDAJE FINAL: Si algo sale mal, el servidor no explota
+    from sqlalchemy.exc import IntegrityError
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Error detectado. Intenta con otro código.")
+
     return {"mensaje": "Actualizado correctamente."}
 
 @app.delete("/pantalones/{pantalon_id}")
