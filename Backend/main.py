@@ -1391,16 +1391,17 @@ def obtener_pedidos_admin(request: Request, db: Session = Depends(get_db), token
         
     return resultado
 
-@app.patch("/pedidos/{pedido_id}/enviar")
-def marcar_pedido_enviado(pedido_id: int, db: Session = Depends(get_db), token: str = Depends(verificar_token)):
+@app.patch("/pedidos/{pedido_id}/entregar")
+def marcar_pedido_entregado(pedido_id: int, db: Session = Depends(get_db), token: str = Depends(verificar_token)):
     pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido no encontrado")
     
-    pedido.estatus = "ENVIADO"
+    # Cambiamos el estatus al final del ciclo
+    pedido.estatus = "ENTREGADO"
     db.commit()
     
-    # Notificamos por WebSocket para que se actualice la pantalla de Despacho
+    # Avisamos en tiempo real a las pantallas conectadas
     import asyncio
     try:
         loop = asyncio.get_event_loop()
@@ -1408,7 +1409,7 @@ def marcar_pedido_enviado(pedido_id: int, db: Session = Depends(get_db), token: 
     except:
         pass
         
-    return {"mensaje": "Pedido actualizado a ENVIADO con éxito"}
+    return {"mensaje": "Pedido actualizado a ENTREGADO con éxito"}
 
 @app.get("/reset-db-total")
 def reset_db_total():
