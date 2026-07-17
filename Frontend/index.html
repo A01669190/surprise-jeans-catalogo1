@@ -1423,16 +1423,21 @@
 
         try {
             // Objeto unificado y correcto
+            // Objeto unificado y correcto
             const pedidoSeguro = {
                 envio: { nombre, telefono, calle_numero, colonia, ciudad, estado, cp, referencias },
                 items: carrito.map(item => ({
-                    id: item.id, codigo: item.codigo || "S/C", nombre: item.nombre, 
-                    precio: parseFloat(item.precio), cantidad: parseInt(item.cantidad)
+                    id: item.id, 
+                    codigo: item.codigo || "S/C", 
+                    nombre: item.nombre, 
+                    precio: parseFloat(item.precio), 
+                    cantidad: parseInt(item.cantidad),
+                    sku_variante: item.sku_variante, // ⚡ ¡ESTO ERA LO QUE FALTABA!
+                    talla: item.talla                // ⚡ ¡Y ESTO TAMBIÉN!
                 })),
                 cupon: cuponActivo ? cuponActivo.codigo : null,
                 usar_puntos: document.getElementById('chk-usar-puntos') ? document.getElementById('chk-usar-puntos').checked : false
             };
-            
             const headers = { 'Content-Type': 'application/json' };
             const token = localStorage.getItem('token_cliente_sj');
             if(token) headers['Authorization'] = `Bearer ${token}`;
@@ -1597,7 +1602,7 @@
                 Swal.fire({ icon: 'error', title: 'Error', text: 'No pudimos validar el cupón.' });
             }
         }
-        
+
     </script>
     
     
