@@ -4,7 +4,7 @@ import os
 import models
 
 # Cargar token desde variables de entorno por seguridad
-TOKEN_LOYVERSE = os.getenv("LOYVERSE_TOKEN")
+TOKEN_LOYVERSE = os.getenv("LOYVERSE_TOKEN", "")
 
 def descontar_stock_loyverse(sku, stock_after):
     """ Actualiza el inventario absoluto en la tablet para una variante ESPECÍFICA """
@@ -211,6 +211,8 @@ def eliminar_articulo_loyverse(sku):
         req_del = urllib.request.Request(f"https://api.loyverse.com/v1.0/items/{item_id}", method="DELETE")
         req_del.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
         urllib.request.urlopen(req_del)
+        print(f"✅ OMNICANAL: Artículo {sku} eliminado de Loyverse con éxito.")
         
     except Exception as e:
-        pass
+        error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
+        print(f"❌ Error al eliminar en Loyverse: {error_msg}")

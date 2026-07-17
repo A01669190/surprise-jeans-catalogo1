@@ -252,37 +252,6 @@
                 `;
             });
         }
-               
-        function generarTicketPDF(folio, cliente, direccion, referencias, ropaStr) {
-            const htmlContent = `
-                <div style="width: 280px; padding: 20px; font-family: 'Courier New', Courier, monospace; color: black; background: white;">
-                    <div style="text-align: center; border-bottom: 2px dashed black; padding-bottom: 15px; margin-bottom: 15px;">
-                        <h2 style="margin: 0; font-size: 26px; font-weight: 900; font-style: italic;">Surprise Jeans</h2>
-                        <p style="margin: 5px 0 0; font-size: 14px; font-weight: bold; text-transform: uppercase;">Guía de Envío</p>
-                        <p style="margin: 10px 0 0; font-size: 18px; font-weight: black; background: black; color: white; padding: 5px; border-radius: 4px;">${folio}</p>
-                    </div>
-                    <div style="margin-bottom: 20px;">
-                        <p style="font-size: 12px; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid black; display: inline-block;">DESTINATARIO:</p>
-                        <p style="margin: 5px 0 0; font-size: 16px; font-weight: bold; text-transform: uppercase;">${cliente}</p>
-                    </div>
-                    <div style="margin-bottom: 20px;">
-                        <p style="font-size: 12px; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid black; display: inline-block;">DIRECCIÓN DE ENTREGA:</p>
-                        <p style="margin: 5px 0 0; font-size: 14px; line-height: 1.4;">${direccion}</p>
-                        <p style="margin: 5px 0 0; font-size: 12px; font-style: italic;">Ref: ${referencias || 'N/A'}</p>
-                    </div>
-                    <div style="border-top: 2px dashed black; padding-top: 15px; margin-top: 15px;">
-                        <p style="font-size: 10px; font-weight: bold; margin-bottom: 5px;">CONTENIDO DEL PAQUETE:</p>
-                        <p style="font-size: 10px; line-height: 1.5; margin:0;">${ropaStr}</p>
-                    </div>
-                </div>
-            `;
-            const opt = {
-                margin: 0, filename: `Envio_${folio}.pdf`, image: { type: 'jpeg', quality: 1.0 },
-                html2canvas: { scale: 3 }, jsPDF: { unit: 'mm', format: [80, 180], orientation: 'portrait' }
-            };
-            Swal.fire({ title: 'Generando Etiqueta...', text: 'Descargando PDF', timer: 1500, showConfirmButton: false, icon: 'info' });
-            html2pdf().set(opt).from(htmlContent).save();
-        }
 
         async function marcarEnviado(id, folio, telefono, cliente) {
             const { value: guia } = await Swal.fire({

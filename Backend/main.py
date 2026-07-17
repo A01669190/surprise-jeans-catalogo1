@@ -7,6 +7,7 @@ from datetime import datetime
 from logistica_sync import generar_guia_envio
 from reportlab.graphics.barcode import code128
 from reportlab.lib.units import mm
+from database import SessionLocal
 import socket
 import logging
 import smtplib
@@ -36,26 +37,20 @@ from sqlalchemy import text
 import traceback
 from fastapi.responses import JSONResponse
 import urllib.parse
-import requests
 import bcrypt
 # Seguridad de Tráfico
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-import smtplib
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import string
 import random
 from pydantic import BaseModel
 from fastapi import BackgroundTasks
-# Seguridad de Sesión (JWT)
 import jwt
 from datetime import datetime, timedelta
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi import WebSocket, WebSocketDisconnect
-import urllib.request
-import json
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="API Surprise Jeans - Fortificada")
@@ -78,7 +73,7 @@ scheduler = AsyncIOScheduler()
 
 def cron_recuperar_carritos():
     """ El robot revisará la base de datos automáticamente cada hora """
-    db = next(get_db())
+    db = SessionLocal()
     try:
         hace_una_hora = datetime.utcnow() - timedelta(hours=1)
         pedidos_abandonados = db.query(models.Pedido).filter(
@@ -103,7 +98,7 @@ def cron_reporte_mensual():
     hoy = datetime.now()
     if hoy.day != 1: return # Solo corre el primer día del mes
     
-    db = next(get_db())
+    db = SessionLocal()
     try:
         ventas = db.query(models.Pedido).filter(models.Pedido.estatus == "PAGADO").count()
         # Aquí puedes sumar tus ingresos de la BD
@@ -504,7 +499,7 @@ def crear_resena(
     
     # 1. Verificar si realmente lo compró y ya se lo enviamos/cobramos
     compro = db.query(models.DetallePedido).join(models.Pedido).filter(
-        models.Pedido.telefono == cliente.telefono,
+        models.Pedido.correo_cliente == cliente.correo,
         models.DetallePedido.pantalon_id == pantalon_id,
         models.Pedido.estatus.in_(["PAGADO", "ENVIADO"])
     ).first()
@@ -761,17 +756,9 @@ async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, 
         except:
             pass
 
-    # 3. APLICAR DESCUENTO DE PUNTOS
-    total_final = total_pedido - puntos_a_descontar
-    if total_final < 0: total_final = 0
-
-    if puntos_a_descontar > 0:
-        items_para_banco.append({
-            "title": "Descuento Surprise Points",
-            "quantity": 1,
-            "unit_price": round(-puntos_a_descontar, 2),
-            "currency_id": "MXN"
-        })
+    # 3.5 CÁLCULO DEL TOTAL FINAL ANTES DE CREAR EL PEDIDO
+    total_final = total_pedido * (1.0 - (descuento_porc / 100.0)) - puntos_a_descontar
+    total_final = max(0.0, total_final) # Evitamos que un error de cupones cause un cobro negativo
 
     # 4. CREAR PEDIDO
     nuevo_pedido = models.Pedido(
@@ -883,49 +870,60 @@ async def webhook_mercadopago(request: Request, background_tasks: BackgroundTask
                     # Sonido Din por WebSocket
                     await manager.broadcast("NUEVO_PEDIDO")
 
-                    background_tasks.add_task(procesar_logistica_asincrona, pedido_db.id, db)
+                    background_tasks.add_task(procesar_logistica_asincrona, pedido_db.id)
                     
-                    # 📧 ENVIAR CORREO GMAIL (PAGO EN TIENDA REAL)
-                    # 📧 ENVIAR CORREO Y GUARDAR DATOS (INVITADOS Y REGISTRADOS)
-                    # 1. Intentamos buscar si es un cliente registrado
+                    # 📧 ENVIAR CORREO Y GESTIONAR PUNTOS (SOLO PAGOS APROBADOS)
                     cliente_db = db.query(models.Cliente).filter(models.Cliente.correo == pedido_db.correo_cliente).first()
                     
-                    # 2. Rescatamos el correo desde el Pedido (por si es invitado)
                     correo_final = pedido_db.correo_cliente
                     nombre_final = pedido_db.nombre_cliente
                     puntos_ganados = pedido_db.total * 0.05
                     
-                    # 3. Si hay un correo válido a dónde enviar (aunque no tenga cuenta), ¡Disparamos!
+                    if cliente_db:
+                        # 1. Detectar si usó puntos (Si el total pagado es menor a la suma del precio de sus artículos)
+                        suma_articulos = sum(d.precio_unitario * d.cantidad for d in pedido_db.detalles)
+                        puntos_usados = suma_articulos - pedido_db.total
+                        
+                        # 2. Si usó puntos, los restamos de su bóveda
+                        if puntos_usados > 0:
+                            cliente_db.puntos = max(0, cliente_db.puntos - puntos_usados)
+                            
+                        # 3. Le sumamos los nuevos puntos generados por esta compra
+                        cliente_db.puntos += puntos_ganados
+                        db.commit()
+                    
                     if correo_final:
                         enviar_correo_recibo(correo_final, nombre_final, f"{pedido_db.id:04d}", pedido_db.total, lista_ropa, puntos_ganados)
 
     return {"status": "procesado"}
 
 # Ubica esta función en tu main.py (cerca de la línea 660 aproximadamente)
-def procesar_logistica_asincrona(pedido_id: int, db: Session):
-    pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
-    if not pedido: return
+def procesar_logistica_asincrona(pedido_id: int):
+    # Abrimos una sesión nueva y exclusiva para el hilo secundario
+    db = SessionLocal()
+    try:
+        pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
+        if not pedido: return
 
-    direccion = {
-        "estado": pedido.estado, "ciudad": pedido.ciudad,
-        "codigo_postal": pedido.codigo_postal, "calle_y_numero": pedido.calle_numero,
-        "telefono": pedido.telefono, "email": pedido.correo_cliente
-    }
+        direccion = {
+            "estado": pedido.estado, "ciudad": pedido.ciudad,
+            "codigo_postal": pedido.codigo_postal, "calle_y_numero": pedido.calle_numero,
+            "telefono": pedido.telefono, "email": pedido.correo_cliente
+        }
 
-    # Llamada a la función mejorada
-    guia = generar_guia_envio(pedido.id, pedido.nombre_cliente, direccion)
+        guia = generar_guia_envio(pedido.id, pedido.nombre_cliente, direccion)
 
-    if guia:
-        pedido.guia_rastreo = guia["tracking_url"]
-        # ⚡ NUEVO: Opcional, marcar estatus como LISTO_PARA_ENVIO
-        # pedido.estatus = "LISTO_PARA_ENVIO" 
-        db.commit()
-        logger.info(f"✅ Pedido {pedido_id} listo. Guía: {guia['tracking_number']}")
-    else:
-        # ⚡ NUEVO: Avisar en logs que falló
-        pedido.estatus = "ERROR_LOGISTICA"
-        db.commit()
-        logger.error(f"❌ Falló logística en pedido {pedido_id}")
+        if guia:
+            pedido.guia_rastreo = guia["tracking_url"]
+            db.commit()
+            logger.info(f"✅ Pedido {pedido_id} listo. Guía: {guia['tracking_number']}")
+        else:
+            pedido.estatus = "ERROR_LOGISTICA"
+            db.commit()
+            logger.error(f"❌ Falló logística en pedido {pedido_id}")
+    finally:
+        # Siempre cerramos la conexión al terminar
+        db.close()
 
 @app.post("/admin/lanzar-recuperacion")
 def lanzar_recuperacion_carritos(db: Session = Depends(get_db), token: str = Depends(verificar_token)):
@@ -1023,38 +1021,6 @@ def eliminar_categoria(
     db.commit()
     return {"mensaje": "Categoría eliminada"}
 
-@app.post("/webhook/loyverse")
-async def webhook_loyverse(request: Request, db: Session = Depends(get_db)):
-    # ⚡ 1. SEGURIDAD CRIPTOGRÁFICA: Revisamos que el mensaje venga firmado por Loyverse
-    secreto_loyverse = os.getenv("LOYVERSE_WEBHOOK_SECRET", "")
-    
-    if secreto_loyverse:
-        body_bytes = await request.body()
-        firma_recibida = request.headers.get("Loyverse-Signature", "")
-        
-        # Calculamos nuestra propia firma usando la llave maestra
-        firma_calculada = base64.b64encode(
-            hmac.new(secreto_loyverse.encode('utf-8'), body_bytes, hashlib.sha256).digest()
-        ).decode('utf-8')
-        
-        # Si las firmas no son idénticas, es un ataque y cerramos la puerta
-        if not hmac.compare_digest(firma_recibida, firma_calculada):
-            print("🚨 INTENTO DE HACKEO BLOQUEADO EN WEBHOOK")
-            raise HTTPException(status_code=403, detail="Firma criptográfica inválida")
-
-    # 2. Si pasó la seguridad, procesamos los datos
-    try:
-        datos = await request.json()
-        eventos = [datos] if "type" in datos else datos.get("events", [])
-        await loyverse_sync.procesar_webhooks_loyverse(eventos, db, manager)
-        
-        # ⚡ EL FIX: ¡Borramos la memoria RAM para que la página web se actualice con lo de Loyverse!
-        
-    except Exception as e:
-        print(f"❌ Error en webhook Loyverse: {e}")
-        
-    return {"status": "procesado"}
-
 @app.post("/pantalones")
 @limiter.limit("20/minute")
 async def crear_pantalon(
@@ -1080,22 +1046,39 @@ async def crear_pantalon(
     else: 
         return {"error": "Fallo la subida a ImgBB"}
 
-    # 2. Guardamos en la Base de Datos
+    # Creamos al papá primero en BD
     nuevo_pantalon = models.Pantalon(
         codigo=codigo, nombre=nombre, precio=precio, 
         stock=stock, categoria_id=categoria_id, imagen_url=url_permanente
     )
     db.add(nuevo_pantalon)
     db.commit()
+    db.refresh(nuevo_pantalon) # Refrescamos para obtener el ID del pantalón papá
     
-    # Buscamos el nombre de la categoría en la Base de Datos
+    # --- ⚡ NUEVO BLOQUE: CREACIÓN DE TALLAS PARA LA BASE DE DATOS WEB ---
+    paquetes = max(1, stock // 12) if stock > 0 else 0
+    distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
+
+    for talla_str, piezas_por_paquete in distribucion.items():
+        stock_talla = paquetes * piezas_por_paquete
+        sku_variante = f"{codigo}-{talla_str}"
+
+        nueva_variante = models.VarianteTalla(
+            pantalon_id=nuevo_pantalon.id, 
+            talla=talla_str, 
+            stock=stock_talla, 
+            sku=sku_variante
+        )
+        db.add(nueva_variante)
+    db.commit()
+    # ---------------------------------------------------------------------
+    
     categoria_db = db.query(models.Categoria).filter(models.Categoria.id == categoria_id).first()
     nombre_cat = categoria_db.nombre if categoria_db else "Sin Categoría"
     
-    # ⚡ MAGIA ASÍNCRONA: Le pasamos el nombre_cat a Loyverse
+    # ⚡ CORREGIDO: Una sola llamada a Loyverse
     background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre, codigo, precio, nombre_cat)
-    # 3. ⚡ MAGIA ASÍNCRONA: Avisamos a Loyverse en segundo plano
-    background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre, codigo, precio)
+    
     if stock > 0:
         background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, codigo, stock)
 
@@ -1392,29 +1375,6 @@ async def marcar_pedido_enviado(pedido_id: int, request: Request, db: Session = 
     
     return {"mensaje": "Estatus actualizado a ENVIADO exitosamente"}
 
-@app.post("/admin/lanzar-recuperacion")
-def lanzar_recuperacion_carritos(db: Session = Depends(get_db), token: str = Depends(verificar_token)):
-    # Buscamos pedidos abandonados de hace más de 1 hora
-    hace_una_hora = datetime.utcnow() - timedelta(hours=1)
-    
-    pedidos_abandonados = db.query(models.Pedido).filter(
-        models.Pedido.estatus == "PENDIENTE",
-        models.Pedido.correo_cliente != None,
-        models.Pedido.fecha <= hace_una_hora
-    ).all()
-
-    correos_enviados = 0
-    for pedido in pedidos_abandonados:
-        # Enviamos el correo con el cupón REGRESA10
-        enviar_correo_carrito_abandonado(pedido.correo_cliente, pedido.nombre_cliente, f"{pedido.id:04d}")
-        
-        # Cambiamos estatus para marcarlo como procesado
-        pedido.estatus = "RECORDATORIO_ENVIADO"
-        correos_enviados += 1
-        
-    db.commit()
-    return {"mensaje": f"Escaneo completo. Se enviaron {correos_enviados} correos de recuperación."}
-
 @app.post("/api/recomendacion-talla")
 @limiter.limit("15/minute")
 def recomendar_talla(request: Request, datos: schemas.RecomendacionTallaRequest): # ⚡ El secreto está aquí
@@ -1502,50 +1462,14 @@ def forzar_conexion_loyverse():
             
     return {"estado": "Operación Maestra Terminada 👾", "detalles": resultados}
     
-
-# ==========================================
-# 🔄 VÍA 2: LA WEB LE AVISA A LA TIENDA FÍSICA
-# ==========================================
-def descontar_stock_loyverse(sku, nuevo_stock):
-    token = os.getenv("LOYVERSE_TOKEN", "")    
+def procesar_logistica_asincrona(pedido_id: int): # Quitamos db de aquí
+    db = SessionLocal() # Abrimos nueva sesión
     try:
-        # 1. Obtener el ID de la tienda física
-        req_tienda = urllib.request.Request("https://api.loyverse.com/v1.0/stores")
-        req_tienda.add_header("Authorization", f"Bearer {token}")
-        res_tienda = urllib.request.urlopen(req_tienda)
-        store_id = json.loads(res_tienda.read().decode('utf-8'))["stores"][0]["id"]
-        
-        # 2. Buscar el pantalón en Loyverse por su SKU
-        req_item = urllib.request.Request(f"https://api.loyverse.com/v1.0/items?sku={sku}")
-        req_item.add_header("Authorization", f"Bearer {token}")
-        res_item = urllib.request.urlopen(req_item)
-        items = json.loads(res_item.read().decode('utf-8')).get("items", [])
-        
-        if not items:
-            print(f"⚠️ El código {sku} no existe en Loyverse.")
-            return
-            
-        variant_id = items[0]["variants"][0]["variant_id"]
-        
-        # 3. ⚡ MANDAR EL STOCK ABSOLUTO (stock_after)
-        ajuste_payload = json.dumps({
-            "inventory_levels": [{
-                "store_id": store_id,
-                "variant_id": variant_id,
-                "stock_after": nuevo_stock 
-            }]
-        }).encode("utf-8")
-        
-        req_ajuste = urllib.request.Request("https://api.loyverse.com/v1.0/inventory", data=ajuste_payload, method="POST")
-        req_ajuste.add_header("Authorization", f"Bearer {token}")
-        req_ajuste.add_header("Content-Type", "application/json")
-        
-        urllib.request.urlopen(req_ajuste)
-        print(f"✅ Omnicanal: El modelo {sku} se actualizó a {nuevo_stock} piezas en Loyverse.")
-        
-    except Exception as e:
-        error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
-        print(f"❌ Error de Loyverse: {error_msg}")
+        pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
+        # ... resto de tu código
+        db.commit()
+    finally:
+        db.close() # Cerramos limpiamente
 
 @app.get("/test-alarma")
 def probar_alarma_whatsapp():
@@ -1555,7 +1479,7 @@ def probar_alarma_whatsapp():
 
 def cron_respaldo_semanal():
     """ Robot que extrae la BD completa y te la manda por correo """
-    db = next(get_db())
+    db = SessionLocal()
     try:
         # 1. Empacamos el inventario y clientes
         pantalones = db.query(models.Pantalon).all()
@@ -1605,7 +1529,7 @@ def probar_guia_skydropx(
         return {"error": f"El pedido {pedido_id} no existe en tu base de datos local."}
     
     # Simulamos lo que haría Mercado Pago
-    background_tasks.add_task(procesar_logistica_asincrona, pedido.id, db)
+    background_tasks.add_task(procesar_logistica_asincrona, pedido.id)
     
     return {
         "mensaje": f"🚀 Disparando sistema logístico para el pedido {pedido.id}...",

@@ -2,8 +2,6 @@ from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 import datetime
 from database import Base
-from sqlalchemy import ForeignKey
-from sqlalchemy.orm import relationship
 
 class Categoria(Base):
     __tablename__ = "categorias"
