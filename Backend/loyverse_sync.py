@@ -234,7 +234,7 @@ def actualizar_categoria_loyverse(sku_hijo_exacto, nombre_categoria):
             res_nueva_cat = urllib.request.urlopen(req_nueva_cat)
             cat_id = json.loads(res_nueva_cat.read().decode('utf-8'))["id"]
 
-        # 2. Buscar el artículo en Loyverse usando el SKU
+        # 2. Buscar el artículo completo en Loyverse usando el SKU
         req_item = urllib.request.Request(f"https://api.loyverse.com/v1.0/items?sku={sku_hijo_exacto}")
         req_item.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
         res_item = urllib.request.urlopen(req_item)
@@ -252,15 +252,10 @@ def actualizar_categoria_loyverse(sku_hijo_exacto, nombre_categoria):
         if not item_a_modificar:
             return
 
-        # 3. Enviar la orden de actualización a Loyverse
-        item_id = item_a_modificar["id"]
-        nombre_original = item_a_modificar["item_name"] # ⚡ EXTRAEMOS EL NOMBRE
+        # 3. ⚡ EL FIX: Le cambiamos la categoría al objeto COMPLETO para no perder las tallas
+        item_a_modificar["category_id"] = cat_id
         
-        payload_update = json.dumps({
-            "id": item_id,
-            "item_name": nombre_original, # ⚡ EL FIX: Loyverse exige que se vuelva a mandar el nombre
-            "category_id": cat_id
-        }).encode("utf-8")
+        payload_update = json.dumps(item_a_modificar).encode("utf-8")
 
         req_upd = urllib.request.Request("https://api.loyverse.com/v1.0/items", data=payload_update, method="POST")
         req_upd.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
