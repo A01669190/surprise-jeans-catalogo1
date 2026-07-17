@@ -558,18 +558,23 @@ def obtener_mis_pedidos(correo: str = Depends(verificar_token_cliente), db: Sess
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
     
-    # ⚡ LA SOLUCIÓN: Ahora buscamos exactamente por su correo, ignorando el teléfono
     pedidos = db.query(models.Pedido).filter(models.Pedido.correo_cliente == cliente.correo).order_by(models.Pedido.fecha.desc()).all()
     
     resultado = []
     for p in pedidos:
-        ropa_comprada = [{"id": d.pantalon_id, "nombre": d.pantalon.nombre if d.pantalon else "Modelo"} for d in p.detalles]
+        # ⚡ EL FIX: Extraemos la talla para que el cliente la vea en su recibo web
+        ropa_comprada = []
+        for d in p.detalles:
+            nombre_base = d.pantalon.nombre if d.pantalon else "Modelo"
+            nombre_final = f"{nombre_base} (Talla {d.talla})" if d.talla else nombre_base
+            ropa_comprada.append({"id": d.pantalon_id, "nombre": nombre_final})
+            
         resultado.append({
             "folio": f"SJ-{p.id:04d}",
             "fecha": p.fecha.strftime("%d/%m/%Y"),
             "total": p.total,
             "estatus": p.estatus,
-            "guia": p.guia_rastreo, # ⚡ MANDAMOS LA GUÍA AL FRONTEND
+            "guia": p.guia_rastreo, 
             "ropa": ropa_comprada
         })
     return resultado
@@ -861,11 +866,14 @@ async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, 
     for item in pedido_req.items:
         precio_final = float(item.precio) * (1.0 - (descuento_porc / 100.0))
         db.add(models.DetallePedido(
-            pedido_id=nuevo_pedido.id, pantalon_id=item.id, 
-            cantidad=item.cantidad, # ⚡ CORREGIDO
-            precio_unitario=round(precio_final, 2)
+            pedido_id=nuevo_pedido.id, 
+            pantalon_id=item.id, 
+            cantidad=item.cantidad, 
+            precio_unitario=round(precio_final, 2),
+            sku_variante=item.sku_variante, # ⚡ ESTO ES CLAVE
+            talla=item.talla                # ⚡ ESTO TAMBIÉN
         ))
-        lista_ropa.append({"cantidad": item.cantidad, "nombre": item.nombre, "precio": round(precio_final, 2)})
+        lista_ropa.append({"cantidad": item.cantidad, "nombre": f"{item.nombre} (Talla {item.talla})", "precio": round(precio_final, 2)})
     db.commit()
     
     puntos_ganados = total_final * 0.05
@@ -874,17 +882,27 @@ async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, 
         db.commit()
 
     # 🚨 LA MAGIA: BYPASS DE INVENTARIO Y LOYVERSE 🚨
-    if total_final <= 0 or pedido_req.cupon == "VENTA-PRESENCIAL":
-        nuevo_pedido.estatus = "PAGADO"
-        
-        for detalle in nuevo_pedido.detalles:
-            pantalon_db = db.query(models.Pantalon).filter(models.Pantalon.id == detalle.pantalon_id).first()
-            if pantalon_db and pantalon_db.stock >= detalle.cantidad:
-                pantalon_db.stock -= detalle.cantidad
-                loyverse_sync.descontar_stock_loyverse(pantalon_db.codigo, pantalon_db.stock)    
-                db.commit()
-        
-        await manager.broadcast("NUEVO_PEDIDO")
+        if total_final <= 0 or pedido_req.cupon == "VENTA-PRESENCIAL":
+            nuevo_pedido.estatus = "PAGADO"
+            
+            for detalle in nuevo_pedido.detalles:
+                # ⚡ EL FIX: Usamos el SKU exacto con talla y color
+                if detalle.sku_variante: 
+                    variante_db = db.query(models.VarianteTalla).filter(models.VarianteTalla.sku == detalle.sku_variante).first()
+                    
+                    if variante_db and variante_db.stock >= detalle.cantidad:
+                        # 1. Descontamos stock de la talla
+                        variante_db.stock -= detalle.cantidad
+                        # 2. Descontamos stock del total del pantalón padre
+                        if variante_db.pantalon:
+                            variante_db.pantalon.stock -= detalle.cantidad 
+                            
+                        # 3. Le avisamos a Loyverse usando precisión láser
+                        loyverse_sync.descontar_stock_loyverse(detalle.sku_variante, variante_db.stock)    
+                        db.commit()
+            
+            await manager.broadcast("NUEVO_PEDIDO")
+            # ... el resto del código del correo y el return se queda igual ...
         
         if cliente_db:
             enviar_correo_recibo(cliente_db.correo, cliente_db.nombre_completo, f"{nuevo_pedido.id:04d}", total_final, lista_ropa, puntos_ganados)
@@ -1346,14 +1364,20 @@ def obtener_pedidos_admin(request: Request, db: Session = Depends(get_db), token
         lista_ropa = []
         for d in p.detalles:
             pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == d.pantalon_id).first()
+            nombre_base = pantalon.nombre if pantalon else "Modelo eliminado"
+            
+            # ⚡ EL FIX: Le mostramos la talla y el SKU exacto al equipo de empaque
+            nombre_final = f"{nombre_base} (Talla {d.talla})" if d.talla else nombre_base
+            codigo_final = d.sku_variante if d.sku_variante else (pantalon.codigo if pantalon else "S/C")
+            
             lista_ropa.append({
                 "cantidad": d.cantidad,
-                "nombre": pantalon.nombre if pantalon else "Modelo eliminado",
-                "codigo": pantalon.codigo if pantalon else "S/C"
+                "nombre": nombre_final,
+                "codigo": codigo_final
             })
         
         resultado.append({
-            "id": p.id,  # ⚡ ¡ESTA ES LA LÍNEA MÁGICA QUE FALTABA! ⚡
+            "id": p.id,
             "folio": f"SJ-{p.id:04d}",
             "cliente": p.nombre_cliente,
             "telefono": p.telefono,
@@ -1366,6 +1390,25 @@ def obtener_pedidos_admin(request: Request, db: Session = Depends(get_db), token
         })
         
     return resultado
+
+@app.patch("/pedidos/{pedido_id}/enviar")
+def marcar_pedido_enviado(pedido_id: int, db: Session = Depends(get_db), token: str = Depends(verificar_token)):
+    pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido no encontrado")
+    
+    pedido.estatus = "ENVIADO"
+    db.commit()
+    
+    # Notificamos por WebSocket para que se actualice la pantalla de Despacho
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+        loop.create_task(manager.broadcast("NUEVO_PEDIDO"))
+    except:
+        pass
+        
+    return {"mensaje": "Pedido actualizado a ENVIADO con éxito"}
 
 @app.get("/reset-db-total")
 def reset_db_total():

@@ -848,3 +848,40 @@
 2026-07-17 14:58:06,892 [INFO] Job "cron_recuperar_carritos (trigger: interval[1:00:00], next run at: 2026-07-17 15:58:06 CST)" executed successfully
 2026-07-17 15:58:06,868 [INFO] Running job "cron_recuperar_carritos (trigger: interval[1:00:00], next run at: 2026-07-17 16:58:06 CST)" (scheduled at 2026-07-17 15:58:06.866524-06:00)
 2026-07-17 15:58:06,871 [INFO] Job "cron_recuperar_carritos (trigger: interval[1:00:00], next run at: 2026-07-17 16:58:06 CST)" executed successfully
+2026-07-17 16:58:06,867 [INFO] Running job "cron_recuperar_carritos (trigger: interval[1:00:00], next run at: 2026-07-17 17:58:06 CST)" (scheduled at 2026-07-17 16:58:06.866524-06:00)
+2026-07-17 16:58:06,874 [INFO] Job "cron_recuperar_carritos (trigger: interval[1:00:00], next run at: 2026-07-17 17:58:06 CST)" executed successfully
+2026-07-17 17:02:43,040 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 17:02:43,043 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 17:02:43,043 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 17:02:43,044 [INFO] Added job "cron_recuperar_carritos" to job store "default"
+2026-07-17 17:02:43,044 [INFO] Added job "cron_reporte_mensual" to job store "default"
+2026-07-17 17:02:43,044 [INFO] Added job "cron_respaldo_semanal" to job store "default"
+2026-07-17 17:02:43,044 [INFO] Scheduler started
+2026-07-17 17:03:12,085 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 17:03:12,088 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 17:03:12,088 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 17:03:12,089 [INFO] Added job "cron_recuperar_carritos" to job store "default"
+2026-07-17 17:03:12,089 [INFO] Added job "cron_reporte_mensual" to job store "default"
+2026-07-17 17:03:12,089 [INFO] Added job "cron_respaldo_semanal" to job store "default"
+2026-07-17 17:03:12,089 [INFO] Scheduler started
+2026-07-17 17:06:06,566 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 17:06:06,570 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 17:06:06,570 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 17:06:06,570 [INFO] Added job "cron_recuperar_carritos" to job store "default"
+2026-07-17 17:06:06,571 [INFO] Added job "cron_reporte_mensual" to job store "default"
+2026-07-17 17:06:06,571 [INFO] Added job "cron_respaldo_semanal" to job store "default"
+2026-07-17 17:06:06,571 [INFO] Scheduler started
+2026-07-17 17:06:33,321 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 17:06:33,324 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 17:06:33,324 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 17:06:33,324 [INFO] Added job "cron_recuperar_carritos" to job store "default"
+2026-07-17 17:06:33,324 [INFO] Added job "cron_reporte_mensual" to job store "default"
+2026-07-17 17:06:33,324 [INFO] Added job "cron_respaldo_semanal" to job store "default"
+2026-07-17 17:06:33,324 [INFO] Scheduler started
+2026-07-17 17:06:52,091 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 17:06:52,094 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 17:06:52,094 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 17:06:52,094 [INFO] Added job "cron_recuperar_carritos" to job store "default"
+2026-07-17 17:06:52,095 [INFO] Added job "cron_reporte_mensual" to job store "default"
+2026-07-17 17:06:52,095 [INFO] Added job "cron_respaldo_semanal" to job store "default"
+2026-07-17 17:06:52,095 [INFO] Scheduler started
