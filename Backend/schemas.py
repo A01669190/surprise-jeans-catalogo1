@@ -13,6 +13,7 @@ class CategoriaRespuesta(CategoriaBase):
 
 class VarianteResponse(BaseModel):
     talla: str
+    color: str # ⚡ Agregamos el color al esquema
     stock: int
     sku: str
 
@@ -86,3 +87,6 @@ class RecomendacionTallaRequest(BaseModel):
     altura_cm: float
     corte_pantalon: Literal["Skinny", "Mom Jeans", "Wide Leg", "Recto"]
     preferencia_ajuste: Literal["Ajustado", "Normal", "Holgado"] = "Normal"
+
+class RefreshTokenReq(BaseModel):
+    refresh_token: str

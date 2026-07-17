@@ -271,24 +271,46 @@ def registrar_cliente(cliente: schemas.ClienteRegistro, db: Session = Depends(ge
 
 @app.post("/login-cliente")
 def login_cliente(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    # Usamos form_data.username para recibir el correo del cliente
     cliente = db.query(models.Cliente).filter(models.Cliente.correo == form_data.username).first()
     
-    # Verificamos que el cliente exista y que la contraseña coincida con el hash
     if not cliente or not verificar_password(form_data.password, cliente.password_hash):
         raise HTTPException(status_code=401, detail="Correo o contraseña incorrectos.")
     
-    # Generamos su Pase VIP (JWT)
-    token_data = {"sub": cliente.correo, "rol": "cliente", "id": cliente.id}
-    token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
+    # ⚡ Access Token (Dura 15 minutos)
+    exp_access = datetime.utcnow() + timedelta(minutes=15)
+    access_token = jwt.encode({"sub": cliente.correo, "rol": "cliente", "id": cliente.id, "exp": exp_access}, SECRET_KEY, algorithm=ALGORITHM)
+    
+    # ⚡ Refresh Token (Dura 7 días)
+    exp_refresh = datetime.utcnow() + timedelta(days=7)
+    refresh_token = jwt.encode({"sub": cliente.correo, "rol": "cliente", "type": "refresh", "exp": exp_refresh}, SECRET_KEY, algorithm=ALGORITHM)
     
     return {
-        "access_token": token, 
+        "access_token": access_token, 
+        "refresh_token": refresh_token,
         "token_type": "bearer", 
         "nombre": cliente.nombre_completo
     }
 
-
+@app.post("/refresh-token")
+def renovar_sesion(req: schemas.RefreshTokenReq):
+    try:
+        payload = jwt.decode(req.refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Token inválido para renovación.")
+            
+        nuevo_exp_access = datetime.utcnow() + timedelta(minutes=15)
+        nuevo_access_token = jwt.encode(
+            {"sub": payload.get("sub"), "rol": payload.get("rol"), "exp": nuevo_exp_access}, 
+            SECRET_KEY, algorithm=ALGORITHM
+        )
+        
+        return {"access_token": nuevo_access_token, "token_type": "bearer"}
+        
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="El Refresh Token expiró. Inicia sesión de nuevo.")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Refresh Token inválido.")
 
 # ==========================================
 # 🚨 PARCHE DE RED PARA RENDER (Forzar IPv4) 🚨
@@ -329,6 +351,28 @@ def enviar_correo_gmail(correo_destino, asunto, html_content):
     except Exception as e:
         print(f"❌ Error al enviar correo por SMTP de Gmail: {e}")
         return False
+    
+def enviar_correo_actualizacion_envio(correo_destino, nombre, folio, estatus_envio, guia, link_rastreo):
+    mensajes = {
+        "en_transito": "🚚 ¡Tu paquete ya está en camino! Ha salido de nuestro almacén y va directo a ti.",
+        "entregado": "🎉 ¡Tu paquete ha sido entregado! Esperamos que disfrutes mucho tus Surprise Jeans."
+    }
+    
+    mensaje_personalizado = mensajes.get(estatus_envio, "📦 Hay una actualización en el estado de tu paquete.")
+    
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px;">
+        <h2 style="color: #4f46e5; text-align: center; font-style: italic;">Surprise Jeans</h2>
+        <h3 style="color: #111827; text-align: center;">Actualización de tu pedido SJ-{folio}</h3>
+        <p style="color: #4b5563; font-size: 15px; text-align: center;">Hola {nombre}, {mensaje_personalizado}</p>
+        <div style="background-color: #f9fafb; padding: 15px; text-align: center; border-radius: 8px; margin-top: 20px;">
+            <p style="margin: 0; color: #6b7280;">Número de Guía:</p>
+            <p style="font-size: 18px; font-weight: bold; color: #111827;">{guia}</p>
+            <a href="{link_rastreo}" style="display: inline-block; margin-top: 15px; background-color: #10b981; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold;">Rastrear Paquete</a>
+        </div>
+    </div>
+    """
+    enviar_correo_gmail(correo_destino, f"Actualización de Envío - Pedido SJ-{folio}", html_content)
 
 def enviar_correo_recibo(correo_destino, nombre, folio, total, lista_ropa, puntos_ganados):
     items_html = "".join([f"<li style='margin-bottom: 5px; color: #4b5563;'><b>{i['cantidad']}x</b> {i['nombre']} - ${i['precio']}</li>" for i in lista_ropa])
@@ -404,6 +448,36 @@ def verificar_token_cliente(token: str = Depends(oauth2_scheme)):
     except:
         raise HTTPException(status_code=401, detail="Token expirado o inválido")
 
+@app.post("/webhook/skydropx")
+async def webhook_skydropx(request: Request, db: Session = Depends(get_db)):
+    try:
+        datos = await request.json()
+        evento = datos.get("event_type")
+        
+        # Solo nos interesan las actualizaciones de estado de rastreo
+        if evento == "tracker.updated":
+            rastreo = datos.get("data", {})
+            guia = rastreo.get("tracking_number")
+            nuevo_estado = rastreo.get("status") # Puede ser "in_transit", "delivered", etc.
+            
+            # Buscamos el pedido en la base de datos usando la guía
+            pedido = db.query(models.Pedido).filter(models.Pedido.guia_rastreo.ilike(f"%{guia}%")).first()
+            
+            if pedido:
+                if nuevo_estado == "in_transit" and pedido.estatus != "EN_TRANSITO":
+                    pedido.estatus = "EN_TRANSITO"
+                    db.commit()
+                    enviar_correo_actualizacion_envio(pedido.correo_cliente, pedido.nombre_cliente, f"{pedido.id:04d}", "en_transito", guia, pedido.guia_rastreo)
+                    
+                elif nuevo_estado == "delivered" and pedido.estatus != "ENTREGADO":
+                    pedido.estatus = "ENTREGADO"
+                    db.commit()
+                    enviar_correo_actualizacion_envio(pedido.correo_cliente, pedido.nombre_cliente, f"{pedido.id:04d}", "entregado", guia, pedido.guia_rastreo)
+                    
+        return {"status": "procesado"}
+    except Exception as e:
+        logger.error(f"Error procesando webhook de Skydropx: {e}")
+        return {"status": "error"}
 
 @app.post("/recuperar-password")
 async def recuperar_password(request: Request, db: Session = Depends(get_db)):
@@ -845,9 +919,9 @@ async def webhook_mercadopago(request: Request, background_tasks: BackgroundTask
             if estado_pago == "approved" and pedido_id:
                 pedido_db = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
                 
-                # Aceptamos pagos pendientes o recuperados
                 if pedido_db and pedido_db.estatus in ["PENDIENTE", "RECORDATORIO_ENVIADO"]:
                     pedido_db.estatus = "PAGADO"
+                    pedido_db.pago_id = str(pago_id) # ⚡ GUARDAMOS LA LLAVE AQUÍ
                     lista_ropa = []
                     
                     for detalle in pedido_db.detalles:
@@ -896,6 +970,49 @@ async def webhook_mercadopago(request: Request, background_tasks: BackgroundTask
                         enviar_correo_recibo(correo_final, nombre_final, f"{pedido_db.id:04d}", pedido_db.total, lista_ropa, puntos_ganados)
 
     return {"status": "procesado"}
+
+@app.post("/admin/pedidos/{pedido_id}/reembolsar")
+def reembolsar_pedido(
+    pedido_id: int, 
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db), 
+    token: str = Depends(verificar_token)
+):
+    pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido no encontrado")
+        
+    if pedido.estatus == "REEMBOLSADO":
+        raise HTTPException(status_code=400, detail="El pedido ya fue reembolsado anteriormente.")
+        
+    # 1. Hablar con Mercado Pago
+    if pedido.pago_id:
+        respuesta_mp = sdk.refund().create(pedido.pago_id)
+        if respuesta_mp["status"] not in [200, 201]:
+            raise HTTPException(status_code=400, detail="Error en Mercado Pago: No se pudo procesar el reembolso.")
+            
+    # 2. Actualizar el estatus
+    pedido.estatus = "REEMBOLSADO"
+    
+    # 3. Devolver Inventario Físico y Web
+    for detalle in pedido.detalles:
+        pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == detalle.pantalon_id).first()
+        if pantalon:
+            # Regresamos el stock web
+            pantalon.stock += detalle.cantidad 
+            db.commit()
+            
+            # ⚡ Regresamos el stock en Loyverse asíncronamente
+            background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, pantalon.codigo, pantalon.stock)
+            
+    # 4. Quitar puntos ganados al cliente (Protección anti-fraude)
+    cliente = db.query(models.Cliente).filter(models.Cliente.correo == pedido.correo_cliente).first()
+    if cliente:
+        puntos_a_quitar = pedido.total * 0.05
+        cliente.puntos = max(0.0, cliente.puntos - puntos_a_quitar)
+        db.commit()
+        
+    return {"mensaje": f"Reembolso del pedido SJ-{pedido.id:04d} procesado exitosamente. Inventario restaurado."}
 
 # Ubica esta función en tu main.py (cerca de la línea 660 aproximadamente)
 def procesar_logistica_asincrona(pedido_id: int):
@@ -1031,6 +1148,7 @@ async def crear_pantalon(
     precio: float = Form(...),
     stock: int = Form(...), 
     categoria_id: int = Form(...), 
+    color: str = Form("Original"), # ⚡ RECIBE EL COLOR
     foto: UploadFile = File(...),
     db: Session = Depends(get_db), 
     token: str = Depends(verificar_token)
@@ -1045,6 +1163,10 @@ async def crear_pantalon(
         url_permanente = respuesta.json()["data"]["url"]
     else: 
         return {"error": "Fallo la subida a ImgBB"}
+
+    # ⚡ LIMPIEZA DE COLOR Y ARMADO DE PREFIJO
+    color_limpio = color.strip()
+    color_sku = color_limpio.replace(" ", "").upper()
 
     # Creamos al papá primero en BD
     nuevo_pantalon = models.Pantalon(
@@ -1061,26 +1183,28 @@ async def crear_pantalon(
 
     for talla_str, piezas_por_paquete in distribucion.items():
         stock_talla = paquetes * piezas_por_paquete
-        sku_variante = f"{codigo}-{talla_str}"
+        sku_variante = f"{codigo}-{color_sku}-{talla_str}"
 
         nueva_variante = models.VarianteTalla(
             pantalon_id=nuevo_pantalon.id, 
             talla=talla_str, 
+            color=color_limpio, # ⚡ GUARDAMOS EL COLOR
             stock=stock_talla, 
             sku=sku_variante
         )
         db.add(nueva_variante)
+
+        if stock_talla > 0:
+            background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, sku_variante, stock_talla)
+
     db.commit()
     # ---------------------------------------------------------------------
     
     categoria_db = db.query(models.Categoria).filter(models.Categoria.id == categoria_id).first()
     nombre_cat = categoria_db.nombre if categoria_db else "Sin Categoría"
     
-    # ⚡ CORREGIDO: Una sola llamada a Loyverse
-    background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre, codigo, precio, nombre_cat)
-    
-    if stock > 0:
-        background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, codigo, stock)
+    # ⚡ LLAMADA A LOYVERSE INCLUYENDO EL COLOR
+    background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre, codigo, precio, nombre_cat, color_limpio)
 
     return {"mensaje": "Pantalón subido con éxito", "url": url_permanente}
 
@@ -1218,6 +1342,12 @@ async def subir_excel(
             nombre = str(fila['Nombre']).strip()
             precio = float(fila['Precio'])
             stock = int(fila['Stock'])
+            
+            # ⚡ LECTURA DEL COLOR
+            color_excel = str(fila.get('Color', 'Original')).strip()
+            if color_excel == 'nan' or not color_excel:
+                color_excel = "Original"
+            color_sku = color_excel.replace(" ", "").upper()
 
             # 1. CREAMOS AL PAPÁ PRIMERO
             nuevo_pantalon = models.Pantalon(
@@ -1230,32 +1360,36 @@ async def subir_excel(
             
             pantalones_creados += 1
             
-            # 2. AHORA SÍ, CREAMOS LOS HIJOS (Tallas)
+            # 2. AHORA SÍ, CREAMOS LOS HIJOS (Tallas) CON SU COLOR
             paquetes = max(1, stock // 12) if stock > 0 else 0
             distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
 
             for talla_str, piezas_por_paquete in distribucion.items():
                 stock_talla = paquetes * piezas_por_paquete
+                sku_variante = f"{codigo}-{color_sku}-{talla_str}"
+                
                 nueva_talla = models.VarianteTalla(
                     pantalon_id=nuevo_pantalon.id,
                     talla=talla_str,
+                    color=color_excel, # ⚡ GUARDAMOS EL COLOR EN BD
                     stock=stock_talla,
-                    sku=f"{codigo}-{talla_str}"
+                    sku=sku_variante
                 )
                 db.add(nueva_talla)
+                
+                if stock_talla > 0:
+                    background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, sku_variante, stock_talla)
             
             db.commit()
             
-            background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre, codigo, precio, categoria.nombre)
-            
-            if stock > 0:
-                background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, codigo, stock)
+            # ⚡ CREAMOS EN LOYVERSE CON COLOR
+            background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre, codigo, precio, categoria.nombre, color_excel)
             
         return {"mensaje": f"Carga masiva exitosa. Se crearon {pantalones_creados} modelos."}
         
     except Exception as e:
         return {"error": "Hubo un problema al leer el archivo."}
-    
+        
 # ==========================================
 # CENTRO DE DESPACHO (EXCLUSIVO YESSICA)
 # ==========================================
@@ -1344,93 +1478,83 @@ def ver_clientes(db: Session = Depends(get_db)):
         
     return resultado
 
-@app.patch("/pantalones/{pantalon_id}/rapido")
-def actualizar_pantalon_rapido(
-    pantalon_id: int, datos: schemas.PantalonUpdateRapido,
-    db: Session = Depends(get_db), token: str = Depends(verificar_token)
+@app.put("/pantalones/{pantalon_id}")
+@limiter.limit("20/minute")
+async def editar_pantalon(
+    request: Request,
+    pantalon_id: int,
+    background_tasks: BackgroundTasks,
+    codigo: str = Form(...),
+    nombre: str = Form(...),
+    precio: float = Form(...),
+    stock: int = Form(...),
+    categoria_id: int = Form(...),
+    color: str = Form("Original"), # ⚡ RECIBE EL COLOR
+    foto: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+    token: str = Depends(verificar_token)
 ):
+    codigo_limpio = codigo.strip()
+    color_limpio = color.strip()
+    color_sku = color_limpio.replace(" ", "").upper()
+
     pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == pantalon_id).first()
     if not pantalon:
-        raise HTTPException(status_code=404, detail="Modelo no encontrado")
+        raise HTTPException(status_code=404, detail="Pantalón no encontrado")
+
+    pantalon_existente = db.query(models.Pantalon).filter(
+        models.Pantalon.codigo == codigo_limpio,
+        models.Pantalon.id != pantalon_id
+    ).first()
     
-    if datos.precio is not None:
-        pantalon.precio = datos.precio
-    if datos.stock is not None:
-        pantalon.stock = datos.stock
-        
+    if pantalon_existente:
+        raise HTTPException(status_code=400, detail="¡Duplicado! Otro modelo ya usa ese código.")
+
+    # 🚜 TÉCNICA BULLDOZER: Eliminamos todas las variantes viejas para evitar choques de UPDATE
+    db.query(models.VarianteTalla).filter(models.VarianteTalla.pantalon_id == pantalon.id).delete(synchronize_session=False)
+    
+    # También borramos fantasmas globales si existen usando el nuevo formato
+    skus_a_crear = [f"{codigo_limpio}-{color_sku}-{t}" for t in ["3", "5", "7", "9", "11", "13", "15"]]
+    db.query(models.VarianteTalla).filter(models.VarianteTalla.sku.in_(skus_a_crear)).delete(synchronize_session=False)
+    
+    db.flush() # Aplicamos la destrucción AHORA MISMO
+
+    pantalon.codigo = codigo_limpio
+    pantalon.nombre = nombre.strip()
+    pantalon.precio = precio
+    pantalon.stock = stock
+    pantalon.categoria_id = categoria_id
+
+    if foto and foto.filename:
+        contenido = await foto.read()
+        imagen_base64 = base64.b64encode(contenido).decode("utf-8")
+        API_KEY = "967d4560b8e4d58a4f50db487013722f"
+        respuesta = requests.post("https://api.imgbb.com/1/upload", data={"key": API_KEY, "image": imagen_base64})
+        if respuesta.status_code == 200:
+            pantalon.imagen_url = respuesta.json()["data"]["url"]
+
+    # Creamos las 7 tallas 100% limpias
+    paquetes = max(1, stock // 12) if stock > 0 else 0
+    distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
+
+    for talla_str, piezas_por_paquete in distribucion.items():
+        stock_talla = paquetes * piezas_por_paquete
+        sku_variante = f"{codigo_limpio}-{color_sku}-{talla_str}"
+
+        nueva_variante = models.VarianteTalla(
+            pantalon_id=pantalon.id, 
+            talla=talla_str, 
+            color=color_limpio, # ⚡ GUARDAMOS EL COLOR
+            stock=stock_talla, 
+            sku=sku_variante
+        )
+        db.add(nueva_variante)
+
+        if stock_talla >= 0:
+            background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, sku_variante, stock_talla)
+
     db.commit()
-    return {"mensaje": "Inventario actualizado exitosamente"}
-
-@app.patch("/pedidos/{pedido_id}/enviar")
-async def marcar_pedido_enviado(pedido_id: int, request: Request, db: Session = Depends(get_db), token: str = Depends(verificar_token)):
-    datos = await request.json() # ⚡ RECIBIMOS LOS DATOS
-    
-    pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
-    if not pedido:
-        raise HTTPException(status_code=404, detail="Pedido no encontrado")
-    
-    pedido.estatus = "ENVIADO"
-    pedido.guia_rastreo = datos.get("guia", "") # Guardamos la guía (o en blanco si no hay)
-    db.commit()
-    
-    return {"mensaje": "Estatus actualizado a ENVIADO exitosamente"}
-
-@app.post("/api/recomendacion-talla")
-@limiter.limit("15/minute")
-def recomendar_talla(request: Request, datos: schemas.RecomendacionTallaRequest): # ⚡ El secreto está aquí
-    # ... (todo el resto del código se queda igual)
-    # 1. Calculamos el IMC (Índice de Masa Corporal)
-    altura_m = datos.altura_cm / 100
-    imc = datos.peso_kg / (altura_m ** 2)
-    
-    # 2. Lógica base de tallaje mexicano (Aproximación matemática)
-    talla_base = 7  # Talla promedio
-    
-    if imc < 19:
-        talla_base = 3
-    elif 19 <= imc < 22:
-        talla_base = 5
-    elif 22 <= imc < 25:
-        talla_base = 7
-    elif 25 <= imc < 28:
-        talla_base = 9
-    elif 28 <= imc < 31:
-        talla_base = 11
-    elif 31 <= imc < 35:
-        talla_base = 13
-    else:
-        talla_base = 15
-
-    # 3. Modificadores por Tipo de Corte y Preferencia
-    if datos.corte_pantalon == "Skinny" and datos.preferencia_ajuste in ["Normal", "Holgado"]:
-        talla_base += 2  # Si es Skinny pero no lo quiere asfixiante, sube una talla (ej. de 7 a 9)
-        
-    elif datos.corte_pantalon in ["Mom Jeans", "Wide Leg"] and datos.preferencia_ajuste == "Ajustado":
-        talla_base = max(3, talla_base - 2) # Baja una talla porque esos cortes ya vienen amplios
-
-    # Aseguramos que la talla se mantenga en nuestro rango (3 al 15)
-    talla_final = max(3, min(15, talla_base))
-    
-    # 4. Cálculo de confianza (para darle un toque profesional en el frontend)
-    porcentaje_confianza = 85 if datos.preferencia_ajuste == "Normal" else 78
-
-    return {
-        "talla_recomendada": str(talla_final),
-        "corte_analizado": datos.corte_pantalon,
-        "mensaje": f"Basado en tus medidas, te recomendamos la talla {talla_final} para un ajuste {datos.preferencia_ajuste.lower()}.",
-        "confianza": f"{porcentaje_confianza}%"
-    }
-
-@app.patch("/pedidos/{pedido_id}/entregar")
-def marcar_pedido_entregado(pedido_id: int, db: Session = Depends(get_db), token: str = Depends(verificar_token)):
-    pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
-    if not pedido:
-        raise HTTPException(status_code=404, detail="Pedido no encontrado")
-    
-    pedido.estatus = "ENTREGADO"
-    db.commit()
-    
-    return {"mensaje": "Pedido marcado como ENTREGADO exitosamente"}
+    return {"mensaje": "Actualizado correctamente."}
 
 # ==========================================
 # 🚨 PUERTA SECRETA PARA VINCULAR LOYVERSE (MODO HACKER)

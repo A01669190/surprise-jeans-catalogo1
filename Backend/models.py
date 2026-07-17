@@ -43,14 +43,12 @@ class Pantalon(Base):
 
 class VarianteTalla(Base):
     __tablename__ = "variantes_talla"
-    
     id = Column(Integer, primary_key=True, index=True)
     pantalon_id = Column(Integer, ForeignKey("pantalones.id", ondelete="CASCADE"))
-    talla = Column(String)  # Ej: "3", "7", "9"
+    talla = Column(String)  
+    color = Column(String, default="Original") # ⚡ NUEVA COLUMNA PARA COLORES
     stock = Column(Integer, default=0)
-    sku = Column(String, unique=True, index=True) # Ej: "AM939-7"
-
-    # Conexión de vuelta al papá
+    sku = Column(String, unique=True, index=True) 
     pantalon = relationship("Pantalon", back_populates="tallas")
 
 class Resena(Base):
@@ -81,7 +79,8 @@ class Pedido(Base):
     referencias = Column(String, nullable=True)
     total = Column(Float)
     estatus = Column(String, default="PENDIENTE")
-    guia_rastreo = Column(String, nullable=True) # ⚡ NUEVA COLUMNA PARA EL RASTREO
+    guia_rastreo = Column(String, nullable=True) 
+    pago_id = Column(String, nullable=True) # ⚡ NUEVA COLUMNA PARA REEMBOLSOS
     fecha = Column(DateTime, default=datetime.datetime.utcnow)
     detalles = relationship("DetallePedido", back_populates="pedido")
 

@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine  # ⚡ EL FIX ESTÁ AQUÍ
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 # Intentamos obtener la URL de la base de datos
