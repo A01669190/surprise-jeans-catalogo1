@@ -1,9 +1,11 @@
 import requests
 import os
 
-# Tu Token de Skydropx (Lo ideal es ponerlo en las variables de entorno de Render)
+# 🚨 IMPORTANTE: Borra el token de aquí y ponlo en las variables de entorno de Render
 SKYDROPX_API_KEY = os.getenv("SKYDROPX_API_KEY", "wwJSo7mpIOXEi5ZzTTSDd-RWU7lddvHg2_4xPvgmKwk")
-URL_SKYDROPX = "https://api.skydropx.com/v1/shipments"
+
+# ⚡ FIX 1: Usamos la URL de DEMO para que acepte tu token de pruebas
+URL_SKYDROPX = "https://api.demo.skydropx.com/v1/shipments"
 
 def generar_guia_envio(pedido_id: int, nombre_cliente: str, direccion: dict, peso_kg: float = 1.0):
     """
@@ -14,7 +16,7 @@ def generar_guia_envio(pedido_id: int, nombre_cliente: str, direccion: dict, pes
         "Content-Type": "application/json"
     }
     
-    # 1. Armamos el paquete de datos con la dirección de tu tienda y la del cliente
+    # 1. Armamos el paquete de datos
     payload = {
         "address_from": {
             "province": "Jalisco", 
@@ -29,9 +31,10 @@ def generar_guia_envio(pedido_id: int, nombre_cliente: str, direccion: dict, pes
             "province": direccion.get("estado", "Jalisco"),
             "city": direccion.get("ciudad", "Guadalajara"),
             "name": nombre_cliente,
-            "zip": direccion.get("codigo_postal", "00000"),
+            # ⚡ FIX 2: Usamos un CP válido de rescate en lugar de 00000
+            "zip": direccion.get("codigo_postal") if direccion.get("codigo_postal") else "44100",
             "address1": direccion.get("calle_y_numero", "Conocido"),
-            "phone": direccion.get("telefono", "0000000000"),
+            "phone": direccion.get("telefono") if direccion.get("telefono") else "3300000000",
             "email": direccion.get("email", "cliente@correo.com")
         },
         "parcels": [{
@@ -50,7 +53,7 @@ def generar_guia_envio(pedido_id: int, nombre_cliente: str, direccion: dict, pes
             print(f"❌ Error Skydropx al crear embarque: {datos}")
             return None
 
-        # 3. Extraemos el ID del embarque y buscamos la tarifa más barata
+        # 3. Extraemos el ID del embarque y buscamos la tarifa
         embarque_id = datos["data"]["id"]
         rates = datos.get("included", [])
         
@@ -60,14 +63,13 @@ def generar_guia_envio(pedido_id: int, nombre_cliente: str, direccion: dict, pes
             
         rate_barato_id = rates[0]["id"] 
         
-        # 4. Solicitamos la generación del PDF y el código de rastreo
-        url_label = "https://api.skydropx.com/v1/labels"
+        # 4. Solicitamos el PDF
+        url_label = "https://api.demo.skydropx.com/v1/labels"
         payload_label = {"rate_id": rate_barato_id, "label_format": "pdf"}
         res_label = requests.post(url_label, headers=headers, json=payload_label)
         
         data_label = res_label.json()
         
-        # Retornamos el diccionario con los datos mágicos
         return {
             "tracking_number": data_label["data"]["attributes"]["tracking_number"],
             "tracking_url": data_label["data"]["attributes"]["tracking_url_provider"],
