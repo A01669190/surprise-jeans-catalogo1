@@ -210,3 +210,61 @@ def eliminar_articulo_loyverse(sku_hijo_exacto):
     except Exception as e:
         error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
         print(f"❌ Error al eliminar en Loyverse: {error_msg}")
+
+def actualizar_categoria_loyverse(sku_hijo_exacto, nombre_categoria):
+    """ Busca un artículo en Loyverse y le actualiza su categoría en tiempo real """
+    try:
+        # 1. Buscar o crear la categoría nueva en Loyverse
+        req_cat = urllib.request.Request("https://api.loyverse.com/v1.0/categories")
+        req_cat.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
+        res_cat = urllib.request.urlopen(req_cat)
+        categorias = json.loads(res_cat.read().decode('utf-8')).get("categories", [])
+        
+        cat_id = None
+        for c in categorias:
+            if c["name"].lower() == nombre_categoria.lower():
+                cat_id = c["id"]
+                break
+                
+        if not cat_id:
+            payload_cat = json.dumps({"name": nombre_categoria}).encode("utf-8")
+            req_nueva_cat = urllib.request.Request("https://api.loyverse.com/v1.0/categories", data=payload_cat, method="POST")
+            req_nueva_cat.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
+            req_nueva_cat.add_header("Content-Type", "application/json")
+            res_nueva_cat = urllib.request.urlopen(req_nueva_cat)
+            cat_id = json.loads(res_nueva_cat.read().decode('utf-8'))["id"]
+
+        # 2. Buscar el artículo en Loyverse usando el SKU
+        req_item = urllib.request.Request(f"https://api.loyverse.com/v1.0/items?sku={sku_hijo_exacto}")
+        req_item.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
+        res_item = urllib.request.urlopen(req_item)
+        items = json.loads(res_item.read().decode('utf-8')).get("items", [])
+        
+        item_a_modificar = None
+        for item in items:
+            for variante in item.get("variants", []):
+                if variante.get("sku") == sku_hijo_exacto:
+                    item_a_modificar = item
+                    break
+            if item_a_modificar:
+                break
+                
+        if not item_a_modificar:
+            return
+
+        # 3. Enviar la orden de actualización a Loyverse
+        item_id = item_a_modificar["id"]
+        payload_update = json.dumps({
+            "id": item_id,
+            "category_id": cat_id
+        }).encode("utf-8")
+
+        req_upd = urllib.request.Request("https://api.loyverse.com/v1.0/items", data=payload_update, method="POST")
+        req_upd.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
+        req_upd.add_header("Content-Type", "application/json")
+        urllib.request.urlopen(req_upd)
+        print(f"✅ OMNICANAL: Categoría actualizada en Loyverse para el SKU {sku_hijo_exacto}.")
+        
+    except Exception as e:
+        error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
+        print(f"❌ Error al actualizar categoría en Loyverse: {error_msg}")

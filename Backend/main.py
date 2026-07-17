@@ -1497,6 +1497,13 @@ async def editar_pantalon(
             background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, sku_variante, stock_talla)
 
     db.commit()
+    categoria_db = db.query(models.Categoria).filter(models.Categoria.id == categoria_id).first()
+    nombre_cat = categoria_db.nombre if categoria_db else "General"
+    
+    # Usamos la talla 3 como "Puntero Láser" para encontrar el artículo correcto en Loyverse
+    sku_laser = f"{codigo_limpio}-{color_sku}-3" 
+    background_tasks.add_task(loyverse_sync.actualizar_categoria_loyverse, sku_laser, nombre_cat)
+
     return {"mensaje": "Actualizado correctamente."}
 
 @app.patch("/pantalones/{pantalon_id}/rapido")
