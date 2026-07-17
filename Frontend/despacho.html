@@ -158,6 +158,7 @@
                 if (res.ok) {
                     const data = await res.json();
                     tokenPrivado = data.access_token; 
+                    sessionStorage.setItem('refresh_token_despacho', data.refresh_token); // ⚡ NUEVA LÍNEA 
                     
                     document.getElementById('pantalla-login').classList.add('hidden');
                     document.getElementById('nav-botones').classList.remove('hidden');
@@ -193,6 +194,31 @@
                 cargarInventario();
             }
         }
+
+        function iniciarRenovacionDespacho() {
+            setInterval(async () => {
+                const refresh = sessionStorage.getItem('refresh_token_despacho');
+                if (!refresh) return;
+
+                try {
+                    const res = await fetch(`${API_URL}/refresh-token`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ refresh_token: refresh })
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        tokenPrivado = data.access_token; // ⚡ Actualizamos la variable global
+                    } else {
+                        cerrarSesion();
+                    }
+                } catch (e) {}
+            }, 600000);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            iniciarRenovacionDespacho();
+        });
 
         // ==========================================
         // PEDIDOS Y PDF
@@ -314,12 +340,21 @@
                 const bgStock = p.stock === 0 ? 'bg-rose-50' : 'bg-white';
                 const colorTextoStock = p.stock === 0 ? 'text-rose-600' : 'text-emerald-600';
                 
+                // ⚡ EXTRAEMOS EL COLOR PARA EL ALMACÉN
+                const colorModelo = p.tallas && p.tallas.length > 0 ? p.tallas[0].color : "Original";
+                const colorSeguro = colorModelo ? String(colorModelo).replace(/'/g, "\\'") : 'Original';
+                const badgeColor = colorSeguro !== 'Original' 
+                    ? `<span class="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] font-bold ml-1">${colorSeguro}</span>` 
+                    : '';
+
                 tbody.innerHTML += `
                     <tr class="${bgStock} border-b border-gray-100 hover:bg-gray-50 transition-colors">
                         <td class="p-4 flex items-center gap-3">
                             <img src="${p.imagen_url}" class="w-12 h-12 object-cover rounded-md border border-gray-200 shadow-sm">
                             <div>
-                                <p class="text-sm font-bold text-gray-800 uppercase leading-tight">${p.nombre}</p>
+                                <p class="text-sm font-bold text-gray-800 uppercase leading-tight">
+                                    ${p.nombre} ${badgeColor}
+                                </p>
                                 <p class="text-[10px] text-gray-500 font-mono mt-0.5">[${p.codigo}]</p>
                             </div>
                         </td>

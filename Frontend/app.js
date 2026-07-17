@@ -158,6 +158,12 @@ function renderizarPantalones(listaPantalones, esNuevaBusqueda) {
             etiqueta = '<span class="absolute top-3 left-3 bg-indigo-600 text-white text-xs font-black px-3 py-1 rounded-full shadow-md tracking-wider z-10">NUEVO ✨</span>';
         }
 
+        // ⚡ EXTRAEMOS Y DIBUJAMOS EL COLOR AQUÍ ⚡
+        const colorPantalon = pantalon.tallas && pantalon.tallas.length > 0 ? pantalon.tallas[0].color : 'Original';
+        const badgeColor = colorPantalon !== 'Original' 
+            ? `<span class="inline-block bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ml-2 align-middle">${colorPantalon}</span>` 
+            : '';
+
         // AQUÍ SE INYECTA TODO JUNTO EN LA TARJETA 
         tarjeta.innerHTML = `
             <div class="relative pt-[130%] bg-stone-50 rounded-xl overflow-hidden mb-4">
@@ -165,7 +171,9 @@ function renderizarPantalones(listaPantalones, esNuevaBusqueda) {
                 <img src="${imageUrlDefinitiva}" alt="${pantalon.nombre}" class="${claseImagen}" loading="lazy">
             </div>
             <div class="flex flex-col flex-grow px-1">
-                <h3 class="font-serif text-stone-800 text-lg md:text-xl mb-1">${pantalon.nombre}</h3>
+                <h3 class="font-serif text-stone-800 text-lg md:text-xl mb-1 flex items-center flex-wrap">
+                    ${pantalon.nombre} ${badgeColor}
+                </h3>
                 <p class="text-xs text-stone-500 font-light mb-3 line-clamp-2">${pantalon.descripcion || 'Calidad y ajuste perfecto.'}</p>
                 
                 ${botonesTallas} 

@@ -22,6 +22,7 @@ async function verificarAcceso() {
         if (respuesta.ok) {
             const data = await respuesta.json();
             sessionStorage.setItem('token_vip', data.access_token); 
+            sessionStorage.setItem('refresh_token_vip', data.refresh_token); // ⚡ NUEVA LÍNEA
             const panel = document.getElementById('panel-login');
             panel.style.opacity = '0';
             setTimeout(() => { panel.style.display = 'none'; }, 500);
@@ -210,6 +211,7 @@ document.getElementById('formulario-admin').addEventListener('submit', (e) => {
     const precio = document.getElementById('precio').value;
     const stock = document.getElementById('stock').value;
     const catSelect = document.getElementById('categoria');
+    const color = document.getElementById('color').value;
     const foto = document.getElementById('foto').files[0];
     
     if(!foto) return;
@@ -220,11 +222,13 @@ document.getElementById('formulario-admin').addEventListener('submit', (e) => {
         precio: precio, 
         stock: stock, 
         categoria_id: catSelect.value, 
+        color: color, 
         foto: foto 
     });
     
     document.getElementById('formulario-admin').reset(); 
     document.getElementById('stock').value = 1;
+    document.getElementById('color').value = "Original";
     actualizarUICola(); 
 });
 
@@ -268,7 +272,6 @@ async function subirTodos() {
     
     let exitos = 0;
     
-    // Leemos la cola de atrás hacia adelante para no perder los datos si fallan
     for (let i = pantalonesEnCola.length - 1; i >= 0; i--) {
         let p = pantalonesEnCola[i];
         const fd = new FormData();
@@ -277,41 +280,32 @@ async function subirTodos() {
         fd.append('precio', p.precio);
         fd.append('stock', p.stock); 
         fd.append('categoria_id', p.categoria_id); 
+        fd.append('color', p.color);
         fd.append('foto', p.foto);
         
         try { 
             const respuesta = await fetch(`${API_URL}/pantalones`, { 
-                method: 'POST', 
-                headers: obtenerTokenHeader(), 
-                body: fd 
+                method: 'POST', headers: obtenerTokenHeader(), body: fd 
             });
             
             if (respuesta.ok) {
                 exitos++;
-                // Solo si la carga fue un éxito, lo borramos de la lista de espera
                 pantalonesEnCola.splice(i, 1);
             } else {
-                // Si el servidor lo rechaza, te lanza la alerta y NO lo borra de la lista
                 alert(`❌ El servidor rechazó el modelo: ${p.nombre}. (Verifica que formateaste la BD).`);
             }
         } catch(e) {
             console.error("Fallo al subir:", p.nombre, e);
-            alert(`⚠️ Error de red al intentar subir: ${p.nombre}. Revisa tu conexión.`);
+            alert(`⚠️ Error de red al intentar subir: ${p.nombre}.`);
         }
     }
     
-    if(exitos > 0) {
-        alert(`¡Se subieron ${exitos} modelos con éxito!`);
-    }
-    
-    // Actualizamos visualmente la interfaz sin perder los que hayan fallado
+    if(exitos > 0) alert(`¡Se subieron ${exitos} modelos con éxito!`);
     actualizarUICola(); 
     cargarInventarioAdmin(); 
-    
     btn.innerText = '🚀 SUBIR TODOS AL CATÁLOGO'; 
     btn.disabled = false;
 }
-
 // ==========================================
 // 7. INVENTARIO ACTUAL
 // ==========================================
@@ -334,9 +328,10 @@ async function cargarInventarioAdmin() {
             const div = document.createElement('div'); 
             div.className = 'flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-200';
             
-            // ESCUDO DE SEGURIDAD: Evita que nombres o códigos vacíos crasheen la app
             const nomSeguro = p.nombre ? String(p.nombre).replace(/'/g, "\\'") : 'Sin Nombre';
             const codSeguro = p.codigo ? String(p.codigo).replace(/'/g, "\\'") : 'S/C';
+            const colorModelo = p.tallas && p.tallas.length > 0 ? p.tallas[0].color : "Original";
+            const colorSeguro = colorModelo ? String(colorModelo).replace(/'/g, "\\'") : 'Original';
             
             div.innerHTML = `
                 <div class="flex items-center gap-4">
@@ -344,12 +339,13 @@ async function cargarInventarioAdmin() {
                     <div>
                         <p class="font-bold text-sm text-gray-800 uppercase">
                             <span class="text-indigo-600 font-black">[${codSeguro}]</span> ${p.nombre}
+                            <span class="bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded text-[10px] ml-1">${colorSeguro}</span>
                         </p>
                         <p class="text-xs text-stone-500 font-semibold">Stock: ${p.stock} | $${p.precio} MXN</p>
                     </div>
                 </div>
                 <div class="flex gap-1">
-                    <button type="button" onclick="abrirModal(${p.id}, '${codSeguro}', '${nomSeguro}', ${p.precio}, ${p.stock}, ${p.categoria_id})" class="text-indigo-500 hover:bg-indigo-100 p-2 rounded-lg transition-colors" title="Editar">✏️</button>
+                    <button type="button" onclick="abrirModal(${p.id}, '${codSeguro}', '${nomSeguro}', ${p.precio}, ${p.stock}, ${p.categoria_id}, '${colorSeguro}')" class="text-indigo-500 hover:bg-indigo-100 p-2 rounded-lg transition-colors" title="Editar">✏️</button>
                     <button type="button" onclick="borrarPantalonDefinitivo(${p.id})" class="text-rose-500 hover:bg-rose-100 p-2 rounded-lg transition-colors" title="Borrar">🗑️</button>
                 </div>
             `;
@@ -382,13 +378,14 @@ async function borrarPantalonDefinitivo(id) {
 // ==========================================
 // 8. MODAL DE EDICIÓN FLOTANTE
 // ==========================================
-function abrirModal(id, codigo, nombre, precio, stock, categoria_id) {
+function abrirModal(id, codigo, nombre, precio, stock, categoria_id, color) {
     document.getElementById('edit-id').value = id;
     document.getElementById('edit-codigo').value = codigo;
     document.getElementById('edit-nombre').value = nombre;
     document.getElementById('edit-precio').value = precio;
     document.getElementById('edit-stock').value = stock;
     document.getElementById('edit-categoria').value = categoria_id;
+    document.getElementById('edit-color').value = color || "Original";
     document.getElementById('edit-foto').value = '';
     
     document.getElementById('modal-editar').classList.remove('hidden');
@@ -412,6 +409,7 @@ document.getElementById('formulario-editar').addEventListener('submit', async (e
     formData.append('precio', document.getElementById('edit-precio').value);
     formData.append('stock', document.getElementById('edit-stock').value);
     formData.append('categoria_id', document.getElementById('edit-categoria').value);
+    formData.append('color', document.getElementById('edit-color').value);
     
     const foto = document.getElementById('edit-foto').files[0]; 
     if(foto) {
@@ -420,9 +418,7 @@ document.getElementById('formulario-editar').addEventListener('submit', async (e
 
     try {
         const respuesta = await fetch(`${API_URL}/pantalones/${id}`, {
-            method: 'PUT', 
-            headers: obtenerTokenHeader(), 
-            body: formData
+            method: 'PUT', headers: obtenerTokenHeader(), body: formData
         });
         
         if(respuesta.ok) {
@@ -432,13 +428,14 @@ document.getElementById('formulario-editar').addEventListener('submit', async (e
         } else { 
             alert('Error al actualizar. Posiblemente sesión caducada.');
         }
-    } catch (e) {
-        console.error("Error al editar:", e);
-    } finally { 
-        btn.innerText = "GUARDAR CAMBIOS"; 
-        btn.disabled = false; 
-    }
-}); // <-- ¡AQUÍ ES DONDE FALTABA CERRAR EL BLOQUE ANTERIOR!
+    } catch (e) { console.error("Error al editar:", e); } 
+    finally { btn.innerText = "GUARDAR CAMBIOS"; btn.disabled = false; }
+});
+
+function cerrarModal() { 
+    document.getElementById('modal-editar').classList.add('hidden'); 
+}
+
 
 // ==========================================
 // 9. RESPALDOS DE SEGURIDAD (GLOBAL)
@@ -577,4 +574,117 @@ async function procesarFotosMagicas() {
         btnMagico.innerHTML = '<span>🚀</span> SUBIR FOTOS';
         btnMagico.disabled = false;
     }
+}
+
+function iniciarRenovacionAdmin() {
+    const refreshToken = sessionStorage.getItem('refresh_token_vip');
+    if (!refreshToken) return;
+
+    setInterval(async () => {
+        try {
+            const res = await fetch(`${API_URL}/refresh-token`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: sessionStorage.getItem('refresh_token_vip') })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                sessionStorage.setItem('token_vip', data.access_token);
+            } else {
+                sessionStorage.removeItem('token_vip');
+                sessionStorage.removeItem('refresh_token_vip');
+                window.location.reload();
+            }
+        } catch (e) { console.log("Reconectando..."); }
+    }, 600000);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    iniciarRenovacionAdmin();
+});
+
+
+function renderizarPantalones(listaPantalones, esNuevaBusqueda) {
+    const contenedor = document.getElementById('contenedor-pantalones');
+    
+    if (listaPantalones.length === 0 && esNuevaBusqueda) {
+        contenedor.innerHTML = '<p class="col-span-full text-center text-stone-400 py-10 font-medium">No encontramos resultados 😔</p>';
+        return;
+    }
+
+    listaPantalones.forEach((pantalon, index) => {
+        const tarjeta = document.createElement('div');
+        tarjeta.className = 'group flex flex-col cursor-pointer';
+        
+        let imageUrl = pantalon.imagen_url;
+        if (imageUrl && imageUrl.includes('localhost:8000')) {
+            imageUrl = imageUrl.replace('http://localhost:8000', '');
+        }
+
+        const botonesTallas = pantalon.tallas && pantalon.tallas.length > 0 ? `
+            <div class="mt-3 mb-2 border-t border-gray-100 pt-3">
+                <p class="text-[10px] uppercase text-gray-500 font-bold mb-2 tracking-wider">Selecciona tu talla:</p>
+                <div class="flex flex-wrap gap-1.5">
+                    ${pantalon.tallas.map(t => `
+                        <button type="button" 
+                                class="w-8 h-8 rounded-md border border-gray-200 text-[11px] font-black text-gray-700 hover:border-indigo-600 hover:text-indigo-600 focus:bg-indigo-600 focus:border-indigo-600 focus:text-white transition-all shadow-sm"
+                                onclick="seleccionarTalla('${pantalon.codigo}', '${t.talla}', '${t.sku}')">
+                            ${t.talla}
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+        ` : '';
+
+        const imageUrlDefinitiva = imageUrl && imageUrl.startsWith('http') 
+            ? imageUrl 
+            : `${API_URL}${imageUrl && imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+        
+        let etiqueta = '';
+        let claseImagen = 'absolute top-0 left-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out';
+        
+        let botonAccion = `
+            <a href="https://wa.me/525581410686?text=Hola! Me encantó el modelo ${pantalon.nombre}. ¿Tienen disponibilidad?" target="_blank" class="bg-stone-900 text-white hover:bg-rose-500 hover:text-white px-4 py-2 rounded-full text-xs font-semibold tracking-wider transition-colors shadow-md">
+                COMPRAR
+            </a>
+        `;
+
+        if (pantalon.stock === 0) {
+            etiqueta = '<span class="absolute top-3 left-3 bg-rose-600 text-white text-xs font-black px-3 py-1 rounded-full shadow-md tracking-wider z-10">AGOTADO</span>';
+            claseImagen += ' grayscale opacity-60'; 
+            botonAccion = `
+                <button disabled class="bg-stone-200 text-stone-400 px-4 py-2 rounded-full text-xs font-semibold tracking-wider cursor-not-allowed">
+                    SIN STOCK
+                </button>
+            `;
+        } else if (index < 5 && offsetGlobal === 0 && esNuevaBusqueda && !busquedaActiva && !categoriaActiva) {
+            etiqueta = '<span class="absolute top-3 left-3 bg-indigo-600 text-white text-xs font-black px-3 py-1 rounded-full shadow-md tracking-wider z-10">NUEVO ✨</span>';
+        }
+
+        const colorPantalon = pantalon.tallas && pantalon.tallas.length > 0 ? pantalon.tallas[0].color : 'Original';
+        const badgeColor = colorPantalon !== 'Original' 
+            ? `<span class="inline-block bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ml-2 align-middle">${colorPantalon}</span>` 
+            : '';
+
+        tarjeta.innerHTML = `
+            <div class="relative pt-[130%] bg-stone-50 rounded-xl overflow-hidden mb-4">
+                ${etiqueta}
+                <img src="${imageUrlDefinitiva}" alt="${pantalon.nombre}" class="${claseImagen}" loading="lazy">
+            </div>
+            <div class="flex flex-col flex-grow px-1">
+                <h3 class="font-serif text-stone-800 text-lg md:text-xl mb-1 flex items-center flex-wrap">
+                    ${pantalon.nombre} ${badgeColor}
+                </h3>
+                <p class="text-xs text-stone-500 font-light mb-3 line-clamp-2">${pantalon.descripcion || 'Calidad y ajuste perfecto.'}</p>
+                
+                ${botonesTallas} 
+
+                <div class="mt-auto flex items-center justify-between pt-2">
+                    <span class="text-stone-900 font-semibold text-lg">$${pantalon.precio}</span>
+                    ${botonAccion}
+                </div>
+            </div>
+        `;
+        contenedor.appendChild(tarjeta);
+    });
 }

@@ -947,10 +947,15 @@
                     ? `<button disabled class="w-full bg-gray-200 text-gray-400 font-bold py-3 rounded-xl cursor-not-allowed text-sm uppercase tracking-wider">Sin existencias</button>`
                     : `<button onclick="agregarAlCarrito(${p.id})" class="w-full bg-stone-100 hover:bg-stone-900 text-stone-900 hover:text-white font-bold py-3 rounded-xl transition-colors text-sm shadow-sm">Añadir a la bolsa</button>`;
 
+                // ⚡ EXTRAEMOS Y DIBUJAMOS EL COLOR AQUÍ ⚡
+                const colorPantalon = p.tallas && p.tallas.length > 0 ? p.tallas[0].color : 'Original';
+                const badgeColor = colorPantalon !== 'Original' 
+                    ? `<span class="inline-block bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ml-2 align-middle">${colorPantalon}</span>` 
+                    : '';
+
                 const div = document.createElement('div');
                 div.className = 'bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 group relative';
                 
-                // ⚡ A LA IMAGEN LE AGREGAMOS EL CLIC PARA VER DETALLES Y RECOMENDACIONES ⚡
                 div.innerHTML = `
                     <div class="relative overflow-hidden aspect-[3/4] bg-gray-50">
                         ${etiquetaAgotado}
@@ -961,7 +966,9 @@
                     </div>
                     <div class="p-5">
                         ${ratingDOM}
-                        <h3 class="font-bold text-stone-800 text-lg uppercase leading-tight mb-2 truncate" title="${p.nombre}">${p.nombre}</h3>
+                        <h3 class="font-bold text-stone-800 text-lg uppercase leading-tight mb-2 truncate flex items-center flex-wrap" title="${p.nombre}">
+                            ${p.nombre} ${badgeColor}
+                        </h3>
                         <div class="flex justify-between items-end mb-4">
                             <p class="text-2xl font-black text-stone-900">$${p.precio}</p>
                             <p class="text-xs ${estaAgotado ? 'text-red-500 font-bold' : 'text-stone-400 font-medium'}">Quedan ${p.stock}</p>
@@ -1018,12 +1025,20 @@
                 total += item.precio * item.cantidad;
                 cantidadTotal += item.cantidad;
 
+                // ⚡ EXTRAEMOS EL COLOR PARA EL CARRITO
+                const colorPantalon = item.tallas && item.tallas.length > 0 ? item.tallas[0].color : 'Original';
+                const badgeColor = colorPantalon !== 'Original' 
+                    ? `<span class="inline-block bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ml-2 align-middle">${colorPantalon}</span>` 
+                    : '';
+
                 const li = document.createElement('li');
                 li.className = 'flex items-center gap-4 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm';
                 li.innerHTML = `
                     <img src="${item.imagen_url}" class="w-20 h-24 object-cover rounded-xl">
                     <div class="flex-1">
-                        <p class="font-bold text-sm text-stone-800 uppercase leading-tight mb-1">${item.nombre}</p>
+                        <p class="font-bold text-sm text-stone-800 uppercase leading-tight mb-1 flex items-center flex-wrap">
+                            ${item.nombre} ${badgeColor}
+                        </p>
                         <p class="text-[10px] text-indigo-500 font-black mb-2">[${item.codigo}]</p>
                         <div class="flex justify-between items-center">
                             <p class="font-black text-stone-900">$${item.precio}</p>
@@ -1124,6 +1139,13 @@
             carrito.forEach(item => {
                 const totalItem = item.precio * item.cantidad;
                 subtotal += totalItem;
+
+                // ⚡ EXTRAEMOS EL COLOR PARA EL CHECKOUT
+                const colorPantalon = item.tallas && item.tallas.length > 0 ? item.tallas[0].color : 'Original';
+                const badgeColor = colorPantalon !== 'Original' 
+                    ? `<span class="bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ml-1 align-middle">${colorPantalon}</span>` 
+                    : '';
+
                 contenedorCheckout.innerHTML += `
                     <div class="flex items-center gap-4">
                         <div class="relative">
@@ -1131,8 +1153,10 @@
                             <span class="absolute -top-2 -right-2 bg-gray-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">${item.cantidad}</span>
                         </div>
                         <div class="flex-1">
-                            <p class="font-bold text-sm text-gray-800 leading-tight">${item.nombre}</p>
-                            <p class="text-[10px] text-gray-500">${item.codigo}</p>
+                            <p class="font-bold text-sm text-gray-800 leading-tight flex items-center flex-wrap">
+                                ${item.nombre} ${badgeColor}
+                            </p>
+                            <p class="text-[10px] text-gray-500 mt-0.5">${item.codigo}</p>
                         </div>
                         <span class="font-medium text-sm text-gray-900">$${totalItem.toFixed(2)}</span>
                     </div>
@@ -1141,7 +1165,6 @@
 
             document.getElementById('chk-subtotal').innerText = `$${subtotal.toFixed(2)}`;
             
-            // Aplicar cálculos de descuento en tiempo real
             // Aplicar cálculos de descuento en tiempo real
             let totalFinal = subtotal;
             if (cuponActivo) {
@@ -1159,41 +1182,6 @@
             }
 
             document.getElementById('chk-total').innerText = `$${totalFinal.toFixed(2)}`;
-        }
-
-        async function aplicarCupon() {
-            const codigo = document.getElementById('chk-cupon-input').value.trim();
-            const msg = document.getElementById('msg-cupon');
-            
-            if(!codigo) return;
-
-            msg.classList.remove('hidden');
-            msg.className = "text-xs font-bold mt-2 text-indigo-500";
-            msg.innerText = "Verificando cupón...";
-
-            try {
-                const respuesta = await fetch(`${API_URL}/validar-cupon`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ codigo })
-                });
-
-                if (respuesta.ok) {
-                    cuponActivo = await respuesta.json();
-                    msg.className = "text-xs font-bold mt-2 text-emerald-500";
-                    msg.innerText = `¡Cupón de ${cuponActivo.porcentaje}% aplicado con éxito! 🎉`;
-                    
-                    document.getElementById('chk-cupon-input').disabled = true;
-                    document.getElementById('btn-aplicar-cupon').disabled = true;
-                    
-                    renderizarResumenCheckout(); // Recalculamos los totales visualmente
-                } else {
-                    msg.className = "text-xs font-bold mt-2 text-rose-500";
-                    msg.innerText = "Cupón inválido o expirado.";
-                }
-            } catch(e) {
-                msg.innerText = "Error de conexión.";
-            }
         }
 
         function cerrarCheckout() {
@@ -1309,6 +1297,7 @@
                 if (respuesta.ok) {
                     const data = await respuesta.json();
                     localStorage.setItem('token_cliente_sj', data.access_token);
+                    localStorage.setItem('refresh_token_cliente_sj', data.refresh_token); // ⚡ NUEVA LÍNEA
                     localStorage.setItem('nombre_cliente_sj', data.nombre);
                     
                     Swal.fire({
@@ -1448,6 +1437,39 @@
                 console.error("Error al cargar recomendaciones");
             }
         }
+
+        // ==========================================
+        // RENOVACIÓN SILENCIOSA DE SESIÓN
+        // ==========================================
+        function iniciarRenovacionSilenciosa() {
+            const refreshToken = localStorage.getItem('refresh_token_cliente_sj');
+            if (!refreshToken) return;
+
+            // Se ejecuta en la sombra cada 10 minutos (600,000 milisegundos)
+            setInterval(async () => {
+                try {
+                    const res = await fetch(`${API_URL}/refresh-token`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ refresh_token: localStorage.getItem('refresh_token_cliente_sj') })
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        localStorage.setItem('token_cliente_sj', data.access_token);
+                    } else {
+                        // Si la llave maestra caducó (pasaron 7 días), cerramos la sesión
+                        cerrarSesionCliente(); 
+                    }
+                } catch (e) {
+                    console.log("Esperando conexión para renovar sesión...");
+                }
+            }, 600000);
+        }
+
+        // ⚡ Llama a la función justo cuando cargue la página
+        document.addEventListener('DOMContentLoaded', () => {
+            iniciarRenovacionSilenciosa();
+        });
     </script>
     
 </body>

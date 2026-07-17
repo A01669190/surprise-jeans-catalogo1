@@ -533,9 +533,19 @@ def cambiar_password(
 @app.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
     if form_data.username == "admin" and form_data.password == "yessica2026":
-        expiracion = datetime.utcnow() + timedelta(hours=3)
-        token = jwt.encode({"sub": "admin_yessica", "exp": expiracion}, SECRET_KEY, algorithm=ALGORITHM)
-        return {"access_token": token, "token_type": "bearer"}
+        # Gafete de acceso (15 min)
+        exp_access = datetime.utcnow() + timedelta(minutes=15)
+        access_token = jwt.encode({"sub": "admin_yessica", "exp": exp_access}, SECRET_KEY, algorithm=ALGORITHM)
+        
+        # Llave maestra de renovación (7 días)
+        exp_refresh = datetime.utcnow() + timedelta(days=7)
+        refresh_token = jwt.encode({"sub": "admin_yessica", "type": "refresh", "exp": exp_refresh}, SECRET_KEY, algorithm=ALGORITHM)
+        
+        return {
+            "access_token": access_token, 
+            "refresh_token": refresh_token, 
+            "token_type": "bearer"
+        }
     raise HTTPException(status_code=400, detail="Contraseña incorrecta")
 
 @app.get("/")
