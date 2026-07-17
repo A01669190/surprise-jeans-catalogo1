@@ -784,3 +784,24 @@
 2026-07-17 09:56:20,222 [INFO] Added job "cron_reporte_mensual" to job store "default"
 2026-07-17 09:56:20,222 [INFO] Added job "cron_respaldo_semanal" to job store "default"
 2026-07-17 09:56:20,222 [INFO] Scheduler started
+2026-07-17 10:05:22,857 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 10:05:22,863 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 10:05:22,863 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 10:05:22,863 [INFO] Added job "cron_recuperar_carritos" to job store "default"
+2026-07-17 10:05:22,864 [INFO] Added job "cron_reporte_mensual" to job store "default"
+2026-07-17 10:05:22,864 [INFO] Added job "cron_respaldo_semanal" to job store "default"
+2026-07-17 10:05:22,864 [INFO] Scheduler started
+2026-07-17 10:08:10,252 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 10:08:10,257 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 10:08:10,257 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 10:08:10,258 [INFO] Added job "cron_recuperar_carritos" to job store "default"
+2026-07-17 10:08:10,258 [INFO] Added job "cron_reporte_mensual" to job store "default"
+2026-07-17 10:08:10,258 [INFO] Added job "cron_respaldo_semanal" to job store "default"
+2026-07-17 10:08:10,258 [INFO] Scheduler started
+2026-07-17 10:09:40,443 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 10:09:40,447 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 10:09:40,448 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-17 10:09:40,448 [INFO] Added job "cron_recuperar_carritos" to job store "default"
+2026-07-17 10:09:40,448 [INFO] Added job "cron_reporte_mensual" to job store "default"
+2026-07-17 10:09:40,448 [INFO] Added job "cron_respaldo_semanal" to job store "default"
+2026-07-17 10:09:40,448 [INFO] Scheduler started

@@ -1218,77 +1218,6 @@ async def crear_pantalon(
 
     return {"mensaje": "Pantalón subido con éxito", "url": url_permanente}
 
-@app.put("/pantalones/{pantalon_id}")
-@limiter.limit("20/minute")
-async def editar_pantalon(
-    request: Request,
-    pantalon_id: int,
-    background_tasks: BackgroundTasks,
-    codigo: str = Form(...),
-    nombre: str = Form(...),
-    precio: float = Form(...),
-    stock: int = Form(...),
-    categoria_id: int = Form(...),
-    foto: Optional[UploadFile] = File(None),
-    db: Session = Depends(get_db),
-    token: str = Depends(verificar_token)
-):
-    codigo_limpio = codigo.strip()
-
-    pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == pantalon_id).first()
-    if not pantalon:
-        raise HTTPException(status_code=404, detail="Pantalón no encontrado")
-
-    pantalon_existente = db.query(models.Pantalon).filter(
-        models.Pantalon.codigo == codigo_limpio,
-        models.Pantalon.id != pantalon_id
-    ).first()
-    
-    if pantalon_existente:
-        raise HTTPException(status_code=400, detail="¡Duplicado! Otro modelo ya usa ese código.")
-
-    # 🚜 TÉCNICA BULLDOZER: Eliminamos todas las variantes viejas para evitar choques de UPDATE
-    db.query(models.VarianteTalla).filter(models.VarianteTalla.pantalon_id == pantalon.id).delete(synchronize_session=False)
-    
-    # También borramos fantasmas globales si existen
-    skus_a_crear = [f"{codigo_limpio}-{t}" for t in ["3", "5", "7", "9", "11", "13", "15"]]
-    db.query(models.VarianteTalla).filter(models.VarianteTalla.sku.in_(skus_a_crear)).delete(synchronize_session=False)
-    
-    db.flush() # Aplicamos la destrucción AHORA MISMO
-
-    pantalon.codigo = codigo_limpio
-    pantalon.nombre = nombre.strip()
-    pantalon.precio = precio
-    pantalon.stock = stock
-    pantalon.categoria_id = categoria_id
-
-    if foto and foto.filename:
-        contenido = await foto.read()
-        imagen_base64 = base64.b64encode(contenido).decode("utf-8")
-        API_KEY = "967d4560b8e4d58a4f50db487013722f"
-        respuesta = requests.post("https://api.imgbb.com/1/upload", data={"key": API_KEY, "image": imagen_base64})
-        if respuesta.status_code == 200:
-            pantalon.imagen_url = respuesta.json()["data"]["url"]
-
-    # Creamos las 7 tallas 100% limpias
-    paquetes = max(1, stock // 12) if stock > 0 else 0
-    distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
-
-    for talla_str, piezas_por_paquete in distribucion.items():
-        stock_talla = paquetes * piezas_por_paquete
-        sku_variante = f"{codigo_limpio}-{talla_str}"
-
-        nueva_variante = models.VarianteTalla(
-            pantalon_id=pantalon.id, talla=talla_str, stock=stock_talla, sku=sku_variante
-        )
-        db.add(nueva_variante)
-
-        if stock_talla >= 0:
-            background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, sku_variante, stock_talla)
-
-    db.commit()
-    return {"mensaje": "Actualizado correctamente."}
-
 @app.delete("/pantalones/{pantalon_id}")
 @limiter.limit("15/minute")
 def eliminar_pantalon(
@@ -1524,14 +1453,13 @@ async def editar_pantalon(
     if pantalon_existente:
         raise HTTPException(status_code=400, detail="¡Duplicado! Otro modelo ya usa ese código.")
 
-    # 🚜 TÉCNICA BULLDOZER: Eliminamos todas las variantes viejas para evitar choques de UPDATE
+    # 🚜 Eliminamos variantes viejas
     db.query(models.VarianteTalla).filter(models.VarianteTalla.pantalon_id == pantalon.id).delete(synchronize_session=False)
     
-    # También borramos fantasmas globales si existen usando el nuevo formato
+    # Borramos fantasmas globales con el nuevo formato
     skus_a_crear = [f"{codigo_limpio}-{color_sku}-{t}" for t in ["3", "5", "7", "9", "11", "13", "15"]]
     db.query(models.VarianteTalla).filter(models.VarianteTalla.sku.in_(skus_a_crear)).delete(synchronize_session=False)
-    
-    db.flush() # Aplicamos la destrucción AHORA MISMO
+    db.flush() 
 
     pantalon.codigo = codigo_limpio
     pantalon.nombre = nombre.strip()
@@ -1547,18 +1475,19 @@ async def editar_pantalon(
         if respuesta.status_code == 200:
             pantalon.imagen_url = respuesta.json()["data"]["url"]
 
-    # Creamos las 7 tallas 100% limpias
     paquetes = max(1, stock // 12) if stock > 0 else 0
     distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
 
     for talla_str, piezas_por_paquete in distribucion.items():
         stock_talla = paquetes * piezas_por_paquete
+        
+        # ⚡ EL FIX: ARMAMOS EL SKU EXACTO PARA LOYVERSE
         sku_variante = f"{codigo_limpio}-{color_sku}-{talla_str}"
 
         nueva_variante = models.VarianteTalla(
             pantalon_id=pantalon.id, 
             talla=talla_str, 
-            color=color_limpio, # ⚡ GUARDAMOS EL COLOR
+            color=color_limpio, 
             stock=stock_talla, 
             sku=sku_variante
         )
@@ -1569,6 +1498,38 @@ async def editar_pantalon(
 
     db.commit()
     return {"mensaje": "Actualizado correctamente."}
+
+@app.patch("/pantalones/{pantalon_id}/rapido")
+@limiter.limit("30/minute")
+def actualizacion_rapida(
+    request: Request,
+    pantalon_id: int, 
+    datos: dict, 
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db), 
+    token: str = Depends(verificar_token)
+):
+    pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == pantalon_id).first()
+    if not pantalon:
+        raise HTTPException(status_code=404, detail="Pantalón no encontrado")
+        
+    if "precio" in datos:
+        pantalon.precio = float(datos["precio"])
+    if "stock" in datos:
+        nuevo_stock = int(datos["stock"])
+        pantalon.stock = nuevo_stock
+        
+        paquetes = max(1, nuevo_stock // 12) if nuevo_stock > 0 else 0
+        distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
+        
+        for variante in pantalon.tallas:
+            piezas = distribucion.get(variante.talla, 0)
+            variante.stock = paquetes * piezas
+            # ⚡ Usamos "variante.sku" directamente de la BD, así nunca se equivoca
+            background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, variante.sku, variante.stock)
+            
+    db.commit()
+    return {"mensaje": "Stock y precio actualizados"}
 
 # ==========================================
 # 🚨 PUERTA SECRETA PARA VINCULAR LOYVERSE (MODO HACKER)
@@ -1599,15 +1560,6 @@ def forzar_conexion_loyverse():
             resultados.append({evento: f"Info: {error_msg}"})
             
     return {"estado": "Operación Maestra Terminada 👾", "detalles": resultados}
-    
-def procesar_logistica_asincrona(pedido_id: int): # Quitamos db de aquí
-    db = SessionLocal() # Abrimos nueva sesión
-    try:
-        pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
-        # ... resto de tu código
-        db.commit()
-    finally:
-        db.close() # Cerramos limpiamente
 
 @app.get("/test-alarma")
 def probar_alarma_whatsapp():
