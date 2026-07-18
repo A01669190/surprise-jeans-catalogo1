@@ -160,11 +160,12 @@
         </div>
     </footer>
 
-    <button onclick="abrirCarrito()" class="fixed bottom-6 right-6 bg-stone-900 text-white p-4 rounded-full shadow-2xl hover:bg-stone-800 transition-transform hover:scale-110 z-40">
+    <!-- Le agregamos el id="btn-flotante-carrito" y la clase transition-all -->
+    <button id="btn-flotante-carrito" onclick="abrirCarrito()" class="fixed bottom-6 right-6 bg-stone-900 text-white p-4 rounded-full shadow-2xl transition-all duration-300 hover:scale-110 z-40">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
         </svg>
-        <span id="cart-badge" class="absolute -top-2 -right-2 bg-rose-500 text-white text-xs font-black w-6 h-6 rounded-full flex items-center justify-center shadow-md">0</span>
+        <span id="cart-badge" class="absolute -top-2 -right-2 bg-rose-500 text-white text-xs font-black w-6 h-6 rounded-full flex items-center justify-center shadow-md transition-all duration-300">0</span>
     </button>
 
     <!-- ========================================== -->
@@ -1231,9 +1232,10 @@
                        </div>`
                     : `<p class="text-[10px] text-gray-400 italic mb-1">Nuevo modelo</p>`;
 
+                // Cámbialo de agregarAlCarrito(${p.id}) a agregarAlCarrito(${p.id}, this)
                 const botonAccion = estaAgotado
-                    ? `<button disabled class="w-full bg-gray-200 text-gray-400 font-bold py-3 rounded-xl cursor-not-allowed text-sm uppercase tracking-wider mt-auto">Sin existencias</button>`
-                    : `<button onclick="agregarAlCarrito(${p.id})" class="w-full bg-stone-100 hover:bg-stone-900 text-stone-900 hover:text-white font-bold py-3 rounded-xl transition-colors text-sm shadow-sm mt-auto">Añadir a la bolsa</button>`;
+                    ? `<button disabled class="w-full bg-gray-200 text-gray-400 font-bold py-3 rounded-xl cursor-not-allowed text-sm uppercase tracking-wider shadow-xl mt-3 md:mt-0">Sin existencias</button>`
+                    : `<button onclick="agregarAlCarrito(${p.id}, this)" class="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-3 rounded-xl transition-all duration-300 text-sm shadow-xl mt-3 md:mt-0">Añadir a la bolsa</button>`;
 
                 const colorPantalon = p.tallas && p.tallas.length > 0 ? p.tallas[0].color : 'Original';
                 const badgeColor = colorPantalon !== 'Original' 
@@ -1323,7 +1325,7 @@
             renderizarCatalogo(filtrados);
         });
 
-        function agregarAlCarrito(id) {
+        function agregarAlCarrito(id, botonElemento = null) {
             const pantalon = catalogoCompleto.find(p => p.id === id);
             if (!pantalon) return;
 
@@ -1346,7 +1348,6 @@
                 return;
             }
 
-            // ⚡ Busca en el carrito POR TALLA EXACTA (SKU), no solo por modelo
             const itemExistente = carrito.find(item => item.sku_variante === seleccion.sku_variante);
             
             if (itemExistente) {
@@ -1357,27 +1358,52 @@
                     return; 
                 }
             } else {
-                carrito.push({ 
-                    ...pantalon, 
-                    cantidad: 1, 
-                    talla: seleccion.talla,
-                    sku_variante: seleccion.sku_variante
-                });
+                carrito.push({ ...pantalon, cantidad: 1, talla: seleccion.talla, sku_variante: seleccion.sku_variante });
             }
             
             actualizarUICarrito();
             
-            // ⚡ EL FIX: Notificación silenciosa en la esquina en lugar de abrir el carrito de golpe
+            // ==========================================
+            // ⚡ 1. MICRO-ANIMACIÓN DEL BOTÓN (Verde Esmeralda)
+            // ==========================================
+            if (botonElemento) {
+                const textoOriginal = botonElemento.innerHTML;
+                
+                // Forzamos el color verde esmeralda y el texto de éxito usando !important de Tailwind
+                botonElemento.innerHTML = '¡Añadido! ✓';
+                botonElemento.classList.add('!bg-emerald-500', '!text-white', '!scale-105');
+                
+                // Lo regresamos a la normalidad después de 1 segundo
+                setTimeout(() => {
+                    botonElemento.innerHTML = textoOriginal;
+                    botonElemento.classList.remove('!bg-emerald-500', '!text-white', '!scale-105');
+                }, 1000);
+            }
+
+            // ==========================================
+            // ⚡ 2. LATIDO DEL CARRITO FLOTANTE (Heartbeat)
+            // ==========================================
+            const carritoFlotante = document.getElementById('btn-flotante-carrito');
+            const badgeCarrito = document.getElementById('cart-badge');
+            
+            if (carritoFlotante && badgeCarrito) {
+                // El carrito hace un zoom rápido y cambia a verde
+                carritoFlotante.classList.replace('bg-stone-900', 'bg-emerald-500');
+                carritoFlotante.classList.add('scale-125');
+                badgeCarrito.classList.add('scale-150', 'bg-stone-900');
+                
+                // Regresamos el carrito a su estado original después de 400ms (un latido)
+                setTimeout(() => {
+                    carritoFlotante.classList.replace('bg-emerald-500', 'bg-stone-900');
+                    carritoFlotante.classList.remove('scale-125');
+                    badgeCarrito.classList.remove('scale-150', 'bg-stone-900');
+                }, 400);
+            }
+
+            // Notificación silenciosa
             Swal.fire({
-                toast: true,
-                position: 'top-end',
-                icon: 'success',
-                title: 'Añadido a la bolsa',
-                showConfirmButton: false,
-                timer: 1500,
-                background: '#10b981', // Verde esmeralda para que se vea premium
-                color: '#ffffff',
-                iconColor: '#ffffff'
+                toast: true, position: 'top-end', icon: 'success', title: 'Añadido a la bolsa',
+                showConfirmButton: false, timer: 1500, background: '#10b981', color: '#ffffff', iconColor: '#ffffff'
             });
         }
 
@@ -1828,7 +1854,7 @@
                             <img src="${r.imagen_url}" class="w-full h-24 object-cover rounded-lg mb-2">
                             <p class="text-[10px] font-bold text-gray-800 truncate" title="${r.nombre}">${r.nombre}</p>
                             <p class="text-[11px] font-black text-indigo-600 mb-2">$${r.precio}</p>
-                            <button onclick="verDetalles(${r.id}, '${r.nombre.replace(/'/g, "\\'")}', '${r.imagen_url}', ${r.precio})" class="text-[10px] bg-stone-900 text-white font-bold px-3 py-1.5 rounded-lg w-full hover:bg-indigo-600 transition-colors">Ver modelo</button>
+                            <button onclick="agregarAlCarrito(${id}, this); setTimeout(() => Swal.close(), 800);" class="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-3.5 rounded-xl mt-2 shadow-lg transition-all duration-300">AÑADIR A LA BOLSA</button>
                         </div>`;
                     });
                     htmlRecomendados += `</div>`;
