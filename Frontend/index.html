@@ -597,6 +597,7 @@
         
         let catalogoCompleto = [];
         let carrito = [];
+        let misFavoritos = JSON.parse(localStorage.getItem('favoritos_sj')) || [];
         let tallasSeleccionadas = {};
         // ⚡ VARIABLES PARA EL SCROLL INFINITO
         let pantalonesActuales = [];
@@ -1315,6 +1316,9 @@
                     `;
                 }
 
+                // ⚡ Revisamos si el cliente ya lo tiene en favoritos
+                const esFavorito = misFavoritos.includes(p.id);
+                const corazonClase = esFavorito ? 'text-rose-500 fill-current' : 'text-gray-400';
                 const div = document.createElement('div');
                 div.className = 'opacity-0 translate-y-12 transition-all duration-700 ease-out bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl group flex flex-col relative';                
                 div.innerHTML = `
@@ -1325,6 +1329,11 @@
                         <div class="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-[10px] font-black text-indigo-600 shadow-sm tracking-wider">
                             [${p.codigo || 'S/C'}]
                         </div>
+
+                        <!-- ⚡ NUEVO: BOTÓN DE FAVORITOS (Wishlist) -->
+                        <button onclick="event.stopPropagation(); toggleFavorito(${p.id}, this)" class="absolute top-4 right-4 z-20 bg-white/90 backdrop-blur p-2.5 rounded-full shadow-sm hover:scale-110 transition-transform duration-300">
+                            <svg class="w-4 h-4 ${corazonClase} transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                        </button>
 
                         <!-- ⚡ Botón Deslizante (Aparece al pasar el ratón en la PC) -->
                         <div class="absolute inset-x-0 bottom-0 p-4 opacity-0 translate-y-4 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0 hidden md:block z-10">
@@ -2021,8 +2030,8 @@
                 Swal.fire({
                     html: `
                         <div class="text-left mt-2">
-                            <div class="relative rounded-2xl overflow-hidden mb-5 border border-gray-100 shadow-sm">
-                                <img src="${img}" class="w-full h-72 object-cover">
+                            <div class="relative rounded-2xl overflow-hidden mb-5 border border-gray-100 shadow-sm group cursor-crosshair" onmousemove="zoomImagen(event, this)" onmouseleave="resetZoomImagen(this)">
+                                <img src="${img}" class="w-full h-72 object-cover transition-transform duration-200 pointer-events-none group-hover:scale-[2]">
                             </div>
                             <h2 class="text-xl font-black text-stone-900 leading-tight">${nombre}</h2>
                             <p class="text-3xl text-indigo-600 font-black my-2">$${precio}</p>
@@ -2046,6 +2055,24 @@
                 Swal.close();
                 console.error("Error al cargar recomendaciones");
             }
+        }
+
+        // ==========================================
+        // ⚡ ZOOM MÁGICO DE TELA
+        // ==========================================
+        function zoomImagen(e, contenedor) {
+            const img = contenedor.querySelector('img');
+            const rect = contenedor.getBoundingClientRect();
+            // Calculamos en qué porcentaje de la foto está el cursor
+            const x = ((e.clientX - rect.left) / rect.width) * 100;
+            const y = ((e.clientY - rect.top) / rect.height) * 100;
+            // Movemos el centro del zoom hacia donde está el ratón
+            img.style.transformOrigin = `${x}% ${y}%`;
+        }
+
+        function resetZoomImagen(contenedor) {
+            const img = contenedor.querySelector('img');
+            img.style.transformOrigin = 'center center'; // Regresa al centro al salir
         }
 
         // ==========================================
@@ -2113,6 +2140,37 @@
             } catch(e) {
                 Swal.fire({ icon: 'error', title: 'Error', text: 'No pudimos validar el cupón.' });
             }
+        }
+
+
+
+        // ==========================================
+        // ⚡ GUARDAR EN FAVORITOS (WISHLIST)
+        // ==========================================
+        function toggleFavorito(id, btn) {
+            const index = misFavoritos.indexOf(id);
+            const icono = btn.querySelector('svg');
+            
+            if (index === -1) {
+                // Si no está, lo agregamos y pintamos de rojo
+                misFavoritos.push(id);
+                icono.classList.remove('text-gray-400');
+                icono.classList.add('text-rose-500', 'fill-current');
+                
+                // Efecto de latido rápido
+                btn.classList.add('scale-125');
+                setTimeout(() => btn.classList.remove('scale-125'), 200);
+                
+                Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Guardado en Favoritos ❤️', showConfirmButton: false, timer: 1500 });
+            } else {
+                // Si ya está, lo quitamos
+                misFavoritos.splice(index, 1);
+                icono.classList.add('text-gray-400');
+                icono.classList.remove('text-rose-500', 'fill-current');
+            }
+            
+            // Guardamos la lista en la memoria del navegador
+            localStorage.setItem('favoritos_sj', JSON.stringify(misFavoritos));
         }
 
     </script>
