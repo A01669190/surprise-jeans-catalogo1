@@ -1587,6 +1587,22 @@ def enviar_pedido(pedido_id: int, guia_data: dict, background_tasks: BackgroundT
 
     return {"mensaje": "Pedido enviado y en proceso de notificación"}
 
+
+@app.patch("/pedidos/{pedido_id}/entregar")
+def marcar_pedido_entregado(pedido_id: int, db: Session = Depends(get_db)):
+    # 1. Buscamos el pedido en la base de datos
+    pedido = db.query(Pedido).filter(Pedido.id == pedido_id).first()
+    
+    # 2. Si no existe, mandamos error
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido no encontrado")
+        
+    # 3. Cambiamos el estatus a ENTREGADO y guardamos
+    pedido.estatus = "ENTREGADO"
+    db.commit()
+    
+    return {"mensaje": "Pedido entregado con éxito"}
+
 @app.get("/reset-db-total")
 def reset_db_total():
     # Borrado forzado usando instrucción CASCADE de PostgreSQL
