@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from pydantic import BaseModel
 from typing import Literal
+from typing import List, Optional
 
 class CategoriaBase(BaseModel):
     nombre: str
@@ -28,7 +29,7 @@ class PantalonRespuesta(BaseModel):
     precio: float
     tallas: List[VarianteResponse] = []
     imagen_url: str
-    categoria_id: int
+    categoria_id: Optional[int] = None
     stock: int
     promedio_estrellas: float = 0.0  # ⚡ NUEVO
     total_resenas: int = 0          # ⚡ NUEVO
