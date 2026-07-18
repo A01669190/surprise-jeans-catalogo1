@@ -327,7 +327,6 @@ def generar_recibo_virtual(correo_cliente, folio_interno, items_comprados, total
             fecha_iso = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
             # 4. Armar y cobrar el ticket final
-            # 4. Armar y cobrar el ticket final
             recibo = {
                 "receipt_number": f"WEB-{folio_interno:04d}",
                 "receipt_type": "SALE",

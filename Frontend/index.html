@@ -562,16 +562,57 @@
             }
         });
 
+        // ⚡ NUEVA FUNCIÓN: Crea los botones leyendo las categorías de tu base de datos
+        function renderizarCategoriasDinamicas() {
+            const contenedor = document.getElementById('contenedor-filtros');
+            if(!contenedor) return;
+
+            // 1. Extraemos las categorías únicas de los pantalones que sí existen
+            const categoriasUnicas = new Set();
+            catalogoCompleto.forEach(p => {
+                let nombreCat = "";
+                // Soporta si el backend manda el puro nombre o manda el objeto completo
+                if (typeof p.categoria === 'string') nombreCat = p.categoria;
+                else if (typeof p.categoria === 'object' && p.categoria !== null) nombreCat = p.categoria.nombre;
+
+                if (nombreCat && nombreCat.trim() !== "") {
+                    categoriasUnicas.add(nombreCat.trim());
+                }
+            });
+
+            // 2. Creamos el botón "Todos" obligatorio
+            let htmlBotones = `
+                <button onclick="filtrarCategoria('Todos', this)" class="btn-categoria px-6 py-2.5 rounded-full bg-indigo-600 text-white text-sm font-bold shadow-md whitespace-nowrap transition-all transform hover:scale-105 active:scale-95">
+                    Todos
+                </button>
+            `;
+
+            // 3. Generamos los botones dinámicos conectados a tu Admin
+            categoriasUnicas.forEach(cat => {
+                htmlBotones += `
+                    <button onclick="filtrarCategoria('${cat}', this)" class="btn-categoria px-6 py-2.5 rounded-full bg-white text-gray-600 border border-gray-200 text-sm font-bold shadow-sm hover:bg-indigo-50 whitespace-nowrap transition-all transform hover:scale-105 active:scale-95">
+                        ${cat}
+                    </button>
+                `;
+            });
+
+            // 4. Reemplazamos los botones de adorno por los reales
+            contenedor.innerHTML = htmlBotones;
+        }
+
         async function cargarCatalogo() {
             try {
-                // ⚡ Agregamos el límite para que traiga el texto de todos, pero sin saturar las fotos
                 const respuesta = await fetch(`${API_URL}/pantalones?limit=1000`);
                 catalogoCompleto = await respuesta.json();
+                
+                // ⚡ AQUÍ ACTIVAMOS LOS BOTONES DINÁMICOS
+                renderizarCategoriasDinamicas(); 
+                
                 renderizarCatalogo(catalogoCompleto);
             } catch (error) {
-            document.getElementById('grid-pantalones').innerHTML = '<p class="text-center text-rose-500 col-span-full">Error al cargar la colección.</p>';
+                document.getElementById('grid-pantalones').innerHTML = '<p class="text-center text-rose-500 col-span-full">Error al cargar la colección.</p>';
             }
-        } 
+        }
 
         async function iniciarCambioPassword() {
             const token = localStorage.getItem('token_cliente_sj');
@@ -637,31 +678,28 @@
         // LÓGICA DE FILTROS RÁPIDOS
         // ==========================================
         function filtrarCategoria(categoriaSeleccionada, botonPresionado) {
-            // 1. Reiniciar los colores de todos los botones a blanco/gris
             const todosLosBotones = document.querySelectorAll('.btn-categoria');
             todosLosBotones.forEach(btn => {
                 btn.className = "btn-categoria px-6 py-2.5 rounded-full bg-white text-gray-600 border border-gray-200 text-sm font-bold shadow-sm hover:bg-indigo-50 whitespace-nowrap transition-all transform hover:scale-105 active:scale-95";
             });
 
-            // 2. Pintar de azul brillante el botón que se acaba de presionar
             botonPresionado.className = "btn-categoria px-6 py-2.5 rounded-full bg-indigo-600 text-white text-sm font-bold shadow-md whitespace-nowrap transition-all transform hover:scale-105 active:scale-95";
 
-            // 3. Filtrar los pantalones en pantalla
-            // (Borramos lo que haya en la barra de búsqueda para que no choquen)
             const inputBusqueda = document.getElementById('buscador-tienda');
-             if(inputBusqueda) inputBusqueda.value = "";
+            if(inputBusqueda) inputBusqueda.value = "";
 
             if (categoriaSeleccionada === 'Todos') {
-                // Mostramos la lista completa
                 renderizarCatalogo(catalogoCompleto);
             } else {
-                // Buscamos la palabra en el nombre o en el código del pantalón
-                const pantalonesFiltrados = catalogoCompleto.filter(p => 
-                    p.nombre.toLowerCase().includes(categoriaSeleccionada.toLowerCase()) || 
-                    (p.categoria && p.categoria.toLowerCase().includes(categoriaSeleccionada.toLowerCase()))
-                );
+                // ⚡ EL FIX: Filtro exacto conectado a la base de datos
+                const pantalonesFiltrados = catalogoCompleto.filter(p => {
+                    let nombreCat = "";
+                    if (typeof p.categoria === 'string') nombreCat = p.categoria;
+                    else if (typeof p.categoria === 'object' && p.categoria !== null) nombreCat = p.categoria.nombre;
+                    
+                    return nombreCat.toLowerCase() === categoriaSeleccionada.toLowerCase();
+                });
                 
-                // Si la categoría existe pero está vacía, mostramos el mensaje de error normal
                 if(pantalonesFiltrados.length === 0) {
                     document.getElementById('grid-pantalones').innerHTML = `
                         <div class="col-span-full text-center py-20">
@@ -1061,7 +1099,19 @@
             }
             
             actualizarUICarrito();
-            abrirCarrito(); // ⚡ Opcional: Abre la bolsa automáticamente al comprar
+            
+            // ⚡ EL FIX: Notificación silenciosa en la esquina en lugar de abrir el carrito de golpe
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'success',
+                title: 'Añadido a la bolsa',
+                showConfirmButton: false,
+                timer: 1500,
+                background: '#10b981', // Verde esmeralda para que se vea premium
+                color: '#ffffff',
+                iconColor: '#ffffff'
+            });
         }
 
         function actualizarUICarrito() {
