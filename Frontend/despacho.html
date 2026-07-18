@@ -22,6 +22,18 @@
                 <button onclick="cerrarSesion()" class="text-sm font-bold text-rose-500 hover:text-rose-700 ml-4">Salir</button>
                 <button onclick="lanzarRecuperacion()" class="bg-amber-400 hover:bg-amber-500 text-stone-900 font-bold py-2 px-4 rounded-xl shadow-sm transition-colors text-sm ml-2">🛒 Recuperar Ventas</button>
             </div>
+            <div id="nav-botones" class="hidden flex gap-4">
+                <button onclick="cambiarPestana('pedidos')" id="tab-pedidos" class="bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg text-sm shadow">Pedidos</button>
+                <button onclick="cambiarPestana('inventario')" id="tab-inventario" class="bg-white text-gray-600 border border-gray-300 font-bold py-2 px-6 rounded-lg text-sm hover:bg-gray-50 transition-colors">Inventario</button>
+                <button onclick="cerrarSesion()" class="text-sm font-bold text-rose-500 hover:text-rose-700 ml-4">Salir</button>
+                <button onclick="lanzarRecuperacion()" class="bg-amber-400 hover:bg-amber-500 text-stone-900 font-bold py-2 px-4 rounded-xl shadow-sm transition-colors text-sm ml-2">🛒 Recuperar Ventas</button>
+                
+                <!-- ⚡ NUEVO BOTÓN DE EXCEL ⚡ -->
+                <button onclick="descargarReporteExcel()" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-xl shadow-sm transition-colors text-sm ml-2 flex items-center gap-2">
+                    <span class="text-lg">📊</span> Descargar Excel
+                </button>
+            </div>
+
         </header>
 
         <div id="pantalla-login" class="bg-white p-8 rounded-2xl shadow-sm border border-gray-200 max-w-sm mx-auto mt-20">
@@ -64,6 +76,7 @@
         // ⚡ WEBSOCKETS: Sonido y Conexión
         const sonidoDin = new Audio('https://www.myinstants.com/media/sounds/ding-sound-effect_2.mp3');
         let socket = null;
+        let historialPedidos = []; // Guardará los datos para el Excel
 
         function conectarTúnelEnVivo() {
             const wsUrl = API_URL.replace('https://', 'wss://').replace('http://', 'ws://') + '/ws/despacho';
@@ -224,12 +237,15 @@
         // PEDIDOS Y PDF
         // ==========================================
         async function cargarPedidos() {
-            try {
-                const res = await fetch(`${API_URL}/pedidos-admin`, { headers: { 'Authorization': `Bearer ${tokenPrivado}` } });
-                if (res.ok) renderizarPedidos(await res.json());
-                else cerrarSesion();
-            } catch (e) { console.error(e); }
-        }
+        try {
+            const res = await fetch(`${API_URL}/pedidos-admin`, { headers: { 'Authorization': `Bearer ${tokenPrivado}` } });
+            if (res.ok) {
+                historialPedidos = await res.json(); // ⚡ AQUÍ GUARDAMOS LOS DATOS EN LA MEMORIA
+                renderizarPedidos(historialPedidos);
+            }
+            else cerrarSesion();
+        } catch (e) { console.error(e); }
+    }
 
         function renderizarPedidos(pedidos) {
             const grid = document.getElementById('grid-pedidos');
@@ -433,6 +449,61 @@
         function marcarAgotado(id) {
             document.getElementById(`stock-${id}`).value = 0;
             guardarCambiosPantalon(id);
+        }
+
+    // ==========================================
+        // GENERADOR DE REPORTES (EXCEL / CSV)
+        // ==========================================
+        function descargarReporteExcel() {
+            if (!historialPedidos || historialPedidos.length === 0) {
+                Swal.fire('Sin datos', 'No hay pedidos en la pantalla para generar el reporte.', 'info');
+                return;
+            }
+
+            // 1. Iniciamos el archivo con un "BOM" para que Excel detecte los acentos y las 'Ñ' de México.
+            let csvContent = "\uFEFF"; 
+            
+            // 2. Escribimos los títulos de las columnas
+            csvContent += "FOLIO,ESTATUS,CLIENTE,TELEFONO,DIRECCION,ARTICULOS,TOTAL PAGADO\n";
+
+            // 3. Llenamos las filas con los datos de los pedidos
+            historialPedidos.forEach(p => {
+                let folio = p.folio;
+                let estatus = p.estatus;
+                // Limpiamos comas en los textos para no romper las columnas del Excel
+                let cliente = p.cliente ? p.cliente.replace(/,/g, "") : "N/A";
+                let telefono = p.telefono ? p.telefono.replace(/,/g, "") : "N/A";
+                let direccion = p.direccion_completa ? p.direccion_completa.replace(/,/g, "") : "N/A";
+                
+                // Juntamos todos los artículos de ropa en un solo texto (Ej: 1x Mom Jeans + 2x Skinny)
+                let articulos = p.detalles.map(d => `${d.cantidad}x ${d.nombre}`).join(" + ");
+                let total = p.total || 0;
+
+                // Agregamos la fila al archivo
+                csvContent += `${folio},${estatus},${cliente},${telefono},${direccion},${articulos},$${total.toFixed(2)}\n`;
+            });
+
+            // 4. Creamos el archivo "invisible" y forzamos la descarga en el navegador
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            
+            // Generamos un nombre dinámico con la fecha de hoy
+            const hoy = new Date().toISOString().split('T')[0]; 
+            
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Corte_Caja_SurpriseJeans_${hoy}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            Swal.fire({ 
+                icon: 'success', 
+                title: '¡Reporte Generado!', 
+                text: 'Tu archivo CSV se ha descargado. Puedes abrirlo directamente con Excel.', 
+                timer: 3000, 
+                showConfirmButton: false 
+            });
         }
     </script>
 </body>
