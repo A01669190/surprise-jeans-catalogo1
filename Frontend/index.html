@@ -105,57 +105,49 @@
         </div>
     </header>
 
-    <section class="bg-rose-50 py-16 text-center px-4 border-y border-rose-100">
-        <h2 class="text-4xl font-serif mb-3 text-stone-800">Realza tu figura</h2>
-        <p class="text-stone-500 mb-8 max-w-lg mx-auto text-sm">Descubre nuestra nueva colección. El fit perfecto diseñado para ti, directo de fábrica.</p>
-        <div class="max-w-xl mx-auto relative shadow-lg rounded-full">
-            <input type="text" id="buscador-tienda" autocomplete="off" name="busqueda" data-lpignore="true" placeholder="¿Qué modelo buscas? (Ej. Skinny, Mom...)" class="w-full border-none p-4 rounded-full pl-14 focus:outline-none focus:ring-4 focus:ring-rose-200 transition-all text-sm">                   
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-5 top-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+    <!-- ⚡ NUEVA PORTADA (HERO BANNER) ⚡ -->
+    <section class="relative bg-stone-900 pt-20 pb-16 md:pt-32 md:pb-24 text-center px-4 border-y border-stone-800 overflow-hidden">
+        <!-- Imagen de Fondo y Capa Oscura -->
+        <div class="absolute inset-0 z-0">
+            <!-- 📸 AQUÍ PUEDES PONER LA FOTO DE TUS MODELOS O DE YESSICA -->
+            <img src="https://ibb.co/6RnDPPr5" alt="Colección Surprise Jeans" class="w-full h-full object-cover opacity-60">
+            <!-- Degradado para que el texto se lea perfecto -->
+            <div class="absolute inset-0 bg-gradient-to-t from-stone-900 via-stone-900/40 to-transparent"></div>
         </div>
-        <div class="max-w-4xl mx-auto mt-6 px-4">
-            <div class="flex overflow-x-auto pb-4 gap-3 hide-scroll-bar justify-start md:justify-center" id="contenedor-filtros">
-                
-                <button onclick="filtrarCategoria('Todos', this)" class="btn-categoria px-6 py-2.5 rounded-full bg-indigo-600 text-white text-sm font-bold shadow-md whitespace-nowrap transition-all transform hover:scale-105 active:scale-95">
-                    Todos
-                </button>
-                
-                <button onclick="filtrarCategoria('Mom', this)" class="btn-categoria px-6 py-2.5 rounded-full bg-white text-gray-600 border border-gray-200 text-sm font-bold shadow-sm hover:bg-indigo-50 whitespace-nowrap transition-all transform hover:scale-105 active:scale-95">
-                    Mom Jeans
-                </button>
-                
-                <button onclick="filtrarCategoria('Skinny', this)" class="btn-categoria px-6 py-2.5 rounded-full bg-white text-gray-600 border border-gray-200 text-sm font-bold shadow-sm hover:bg-indigo-50 whitespace-nowrap transition-all transform hover:scale-105 active:scale-95">
-                    Skinny
-                </button>
-                
-                <button onclick="filtrarCategoria('Wide Leg', this)" class="btn-categoria px-6 py-2.5 rounded-full bg-white text-gray-600 border border-gray-200 text-sm font-bold shadow-sm hover:bg-indigo-50 whitespace-nowrap transition-all transform hover:scale-105 active:scale-95">
-                    Wide Leg
-                </button>
-                
-                <button onclick="filtrarCategoria('Straight', this)" class="btn-categoria px-6 py-2.5 rounded-full bg-white text-gray-600 border border-gray-200 text-sm font-bold shadow-sm hover:bg-indigo-50 whitespace-nowrap transition-all transform hover:scale-105 active:scale-95">
-                    Straight
-                </button>
-                
-                <button onclick="filtrarCategoria('Cargo', this)" class="btn-categoria px-6 py-2.5 rounded-full bg-white text-gray-600 border border-gray-200 text-sm font-bold shadow-sm hover:bg-indigo-50 whitespace-nowrap transition-all transform hover:scale-105 active:scale-95">
-                    Cargo
-                </button>
 
+        <!-- Contenido Frontal -->
+        <div class="relative z-10">
+            <h2 class="text-5xl md:text-7xl font-black mb-4 text-white uppercase tracking-tighter drop-shadow-lg">Realza tu <span class="text-indigo-400">figura</span></h2>
+            <p class="text-gray-200 mb-10 max-w-lg mx-auto text-sm md:text-base font-medium drop-shadow-md">Descubre nuestra nueva colección. El fit perfecto diseñado para ti, directo de fábrica.</p>
+            
+            <!-- Buscador Elegante (Estilo Apple) -->
+            <div class="max-w-2xl mx-auto relative shadow-2xl rounded-full transform transition-transform hover:scale-[1.02]">
+                <input type="text" id="buscador-tienda" autocomplete="off" name="busqueda" data-lpignore="true" placeholder="¿Qué modelo buscas? (Ej. Skinny, Mom...)" class="w-full border-none bg-white/95 backdrop-blur-md p-4 md:p-5 rounded-full pl-14 focus:outline-none focus:ring-4 focus:ring-indigo-500 transition-all text-sm md:text-base text-gray-800 font-medium">                   
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-5 top-4 md:top-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
             </div>
 
-        <!-- ⚡ NUEVO: FILTRO MÁGICO DE TALLAS -->
-        <div class="flex overflow-x-auto pb-4 gap-2 hide-scroll-bar justify-start md:justify-center mt-2 border-t border-rose-100 pt-4" id="contenedor-tallas">
-            <span class="text-xs font-black text-rose-300 uppercase tracking-widest flex items-center mr-2">Talla:</span>
-            <button onclick="filtrarPorTalla('Todas', this)" class="btn-talla-filtro bg-stone-900 text-white px-4 h-9 rounded-full text-xs font-black shadow-md transition-all transform hover:scale-110">Todas</button>
-            <button onclick="filtrarPorTalla('3', this)" class="btn-talla-filtro bg-white text-gray-500 border border-gray-200 w-9 h-9 rounded-full text-xs font-bold shadow-sm hover:bg-stone-100 transition-all transform hover:scale-110">3</button>
-            <button onclick="filtrarPorTalla('5', this)" class="btn-talla-filtro bg-white text-gray-500 border border-gray-200 w-9 h-9 rounded-full text-xs font-bold shadow-sm hover:bg-stone-100 transition-all transform hover:scale-110">5</button>
-            <button onclick="filtrarPorTalla('7', this)" class="btn-talla-filtro bg-white text-gray-500 border border-gray-200 w-9 h-9 rounded-full text-xs font-bold shadow-sm hover:bg-stone-100 transition-all transform hover:scale-110">7</button>
-            <button onclick="filtrarPorTalla('9', this)" class="btn-talla-filtro bg-white text-gray-500 border border-gray-200 w-9 h-9 rounded-full text-xs font-bold shadow-sm hover:bg-stone-100 transition-all transform hover:scale-110">9</button>
-            <button onclick="filtrarPorTalla('11', this)" class="btn-talla-filtro bg-white text-gray-500 border border-gray-200 w-9 h-9 rounded-full text-xs font-bold shadow-sm hover:bg-stone-100 transition-all transform hover:scale-110">11</button>
-            <button onclick="filtrarPorTalla('13', this)" class="btn-talla-filtro bg-white text-gray-500 border border-gray-200 w-9 h-9 rounded-full text-xs font-bold shadow-sm hover:bg-stone-100 transition-all transform hover:scale-110">13</button>
-            <button onclick="filtrarPorTalla('15', this)" class="btn-talla-filtro bg-white text-gray-500 border border-gray-200 w-9 h-9 rounded-full text-xs font-bold shadow-sm hover:bg-stone-100 transition-all transform hover:scale-110">15</button>
-        </div>
+            <!-- Contenedores de Filtros (Los botones blancos resaltarán increíble) -->
+            <div class="max-w-4xl mx-auto mt-10 px-4">
+                <!-- Filtros Dinámicos de JavaScript -->
+                <div class="flex overflow-x-auto pb-4 gap-3 hide-scroll-bar justify-start md:justify-center" id="contenedor-filtros">
+                </div>
 
+                <!-- Filtro de Tallas -->
+                <div class="flex overflow-x-auto pb-4 gap-2 hide-scroll-bar justify-start md:justify-center mt-2 border-t border-white/20 pt-6" id="contenedor-tallas">
+                    <span class="text-xs font-black text-indigo-300 uppercase tracking-widest flex items-center mr-2 drop-shadow-md">Talla:</span>
+                    <button onclick="filtrarPorTalla('Todas', this)" class="btn-talla-filtro bg-stone-900 text-white px-4 h-9 rounded-full text-xs font-black shadow-md transition-all transform hover:scale-110">Todas</button>
+                    <button onclick="filtrarPorTalla('3', this)" class="btn-talla-filtro bg-white text-gray-500 border border-gray-200 w-9 h-9 rounded-full text-xs font-bold shadow-sm hover:bg-stone-100 transition-all transform hover:scale-110">3</button>
+                    <button onclick="filtrarPorTalla('5', this)" class="btn-talla-filtro bg-white text-gray-500 border border-gray-200 w-9 h-9 rounded-full text-xs font-bold shadow-sm hover:bg-stone-100 transition-all transform hover:scale-110">5</button>
+                    <button onclick="filtrarPorTalla('7', this)" class="btn-talla-filtro bg-white text-gray-500 border border-gray-200 w-9 h-9 rounded-full text-xs font-bold shadow-sm hover:bg-stone-100 transition-all transform hover:scale-110">7</button>
+                    <button onclick="filtrarPorTalla('9', this)" class="btn-talla-filtro bg-white text-gray-500 border border-gray-200 w-9 h-9 rounded-full text-xs font-bold shadow-sm hover:bg-stone-100 transition-all transform hover:scale-110">9</button>
+                    <button onclick="filtrarPorTalla('11', this)" class="btn-talla-filtro bg-white text-gray-500 border border-gray-200 w-9 h-9 rounded-full text-xs font-bold shadow-sm hover:bg-stone-100 transition-all transform hover:scale-110">11</button>
+                    <button onclick="filtrarPorTalla('13', this)" class="btn-talla-filtro bg-white text-gray-500 border border-gray-200 w-9 h-9 rounded-full text-xs font-bold shadow-sm hover:bg-stone-100 transition-all transform hover:scale-110">13</button>
+                    <button onclick="filtrarPorTalla('15', this)" class="btn-talla-filtro bg-white text-gray-500 border border-gray-200 w-9 h-9 rounded-full text-xs font-bold shadow-sm hover:bg-stone-100 transition-all transform hover:scale-110">15</button>
+                </div>
+            </div>
+        </div>
     </section>
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
