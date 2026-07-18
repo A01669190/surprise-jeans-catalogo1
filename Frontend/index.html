@@ -18,6 +18,44 @@
     <script src="https://cdn.tailwindcss.com"></script>
     
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- ⚡ OCULTAR BARRA DE SCROLL EN CARRUSELES ⚡ -->
+    <style>
+        .hide-scroll-bar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .hide-scroll-bar::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+
+    <!-- ⚡ PÍXELES DE RASTREO (META & TIKTOK) - Arquitectura Base ⚡ -->
+    <!-- Meta Pixel Code -->
+    <script>
+    !function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+    n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];
+    s.parentNode.insertBefore(t,s)}(window, document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
+    // 🚨 EL DÍA QUE HAGAN PUBLICIDAD, QUITAN LAS DOS DIAGONALES DE ABAJO Y PONEN SU ID:
+    // fbq('init', 'TU_ID_DE_META_AQUI'); 
+    // fbq('track', 'PageView');
+    </script>
+    
+    <!-- TikTok Pixel Code -->
+    <script>
+    !function (w, d, t) {
+      w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};var o=document.createElement("script");o.type="text/javascript",o.async=!0,o.src=i+"?sdkid="+e+"&lib="+t;var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};
+      // 🚨 EL DÍA QUE HAGAN PUBLICIDAD EN TIKTOK, QUITAN LAS DIAGONALES DE ABAJO Y PONEN SU ID:
+      // ttq.load('TU_ID_DE_TIKTOK_AQUI');
+      // ttq.page();
+    }(window, document, 'ttq');
+    </script>
+
 </head>
 
 <body class="bg-gray-50 text-gray-800 font-sans relative pb-20">
@@ -33,28 +71,51 @@
                 </button>
             </div>
             
-            <h3 class="font-bold text-gray-800 mb-4 border-b border-gray-100 pb-2">Nuestras Referencias ⭐</h3>
-            <p class="text-xs text-gray-500 mb-4">Más de 500 envíos seguros a todo México.</p>
+            <h3 class="font-bold text-gray-800 mb-4 border-b border-gray-100 pb-2">Ellas ya usan Surprise 💖</h3>
+            <p class="text-xs text-gray-500 mb-4">El fit perfecto, directo a tu clóset.</p>
             
-            <div class="space-y-4 text-sm text-gray-600">
-                <div class="bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
-                    <p class="italic">"Excelente calidad, me llegaron mis 12 paquetes hasta Monterrey sin problema. Super atentos en WhatsApp."</p>
-                    <p class="text-right font-black text-indigo-900 mt-2 text-xs">- Mariana V.</p>
+            <!-- Feed Vertical de Fotos -->
+            <div class="space-y-4">
+                <!-- Tarjeta 1 -->
+                <div class="relative w-full h-64 rounded-2xl overflow-hidden shadow-sm border border-gray-100 group cursor-pointer">
+                    <img src="https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&q=80&w=600" alt="Clienta 1" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700 ease-out">
+                    <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-stone-900/90 via-stone-900/40 to-transparent p-4 pt-12">
+                        <p class="text-white font-black text-xs tracking-wide">@sofia_mtz</p>
+                        <p class="text-stone-200 text-[10px] mt-1 font-medium leading-relaxed">"El mejor fit que he probado. Super recomendados chicas."</p>
+                    </div>
                 </div>
-                <div class="bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
-                    <p class="italic">"La mezclilla estira padrísimo y horma súper bien. Hice mi pedido menudeo y me llegó por FedEx al día siguiente."</p>
-                    <p class="text-right font-black text-indigo-900 mt-2 text-xs">- Sofía G.</p>
+
+                <!-- Tarjeta 2 -->
+                <div class="relative w-full h-64 rounded-2xl overflow-hidden shadow-sm border border-gray-100 group cursor-pointer">
+                    <img src="https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?auto=format&fit=crop&q=80&w=600" alt="Clienta 2" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700 ease-out">
+                    <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-stone-900/90 via-stone-900/40 to-transparent p-4 pt-12">
+                        <p class="text-white font-black text-xs tracking-wide">@valeria.style</p>
+                        <p class="text-stone-200 text-[10px] mt-1 font-medium leading-relaxed">"Amo la calidad de esta mezclilla. Horman divino."</p>
+                    </div>
                 </div>
-                <div class="bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
-                    <p class="italic">"Llevo 6 meses surtiendo mi boutique con ustedes y mis clientas aman el corte colombiano. 100% confiable."</p>
-                    <p class="text-right font-black text-indigo-900 mt-2 text-xs">- Boutique 'Estilo', GDL.</p>
+
+                <!-- Tarjeta 3 -->
+                <div class="relative w-full h-64 rounded-2xl overflow-hidden shadow-sm border border-gray-100 group cursor-pointer">
+                    <img src="https://images.unsplash.com/photo-1604136172384-a1e50882e3c0?auto=format&fit=crop&q=80&w=600" alt="Clienta 3" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700 ease-out">
+                    <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-stone-900/90 via-stone-900/40 to-transparent p-4 pt-12">
+                        <p class="text-white font-black text-xs tracking-wide">@karen_gdl</p>
+                        <p class="text-stone-200 text-[10px] mt-1 font-medium leading-relaxed">"100% confiables. Hice mi pedido y llegó rapidísimo a GDL."</p>
+                    </div>
                 </div>
             </div>
 
-            <div class="mt-8 pt-6 border-t border-gray-100 text-center">
-                <p class="text-xs text-gray-400 mb-2">¿Tienes dudas sobre tu envío?</p>
-                <a href="https://wa.me/525513220695" target="_blank" class="inline-block bg-green-500 text-white font-bold text-xs px-4 py-2 rounded-full hover:bg-green-600 transition-colors">
-                    Contactar Soporte
+            <!-- Botones a Redes Sociales (Facebook y TikTok) -->
+            <div class="mt-4 flex flex-col gap-2 text-center">
+                <!-- Facebook YSK -->
+                <a href="https://www.facebook.com/yskcollectionjeans/?locale=es_LA" target="_blank" class="inline-flex items-center justify-center gap-2 text-blue-600 font-bold text-[11px] hover:text-blue-800 transition-colors bg-blue-50 px-4 py-2.5 rounded-xl hover:bg-blue-100 w-full shadow-sm">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                    Ver novedades en Facebook
+                </a>
+                
+                <!-- TikTok YSK -->
+                <a href="https://www.tiktok.com/@surprisejeans_ysk?_r=1&_t=ZS-9890TLc3Si7" target="_blank" class="inline-flex items-center justify-center gap-2 text-stone-800 font-bold text-[11px] hover:text-black transition-colors bg-gray-100 px-4 py-2.5 rounded-xl hover:bg-gray-200 w-full shadow-sm">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V9.4a6.84 6.84 0 00-1-.05A6.33 6.33 0 005 20.1a6.34 6.34 0 0010.86-4.43v-7a8.16 8.16 0 004.77 1.52v-3.4a4.85 4.85 0 01-1-.1z"/></svg>
+                    Ver videos en TikTok
                 </a>
             </div>
         </div>
@@ -139,9 +200,15 @@
                 <button onclick="filtrarPorTalla('15', this)" class="btn-talla-filtro bg-white text-gray-500 border border-gray-200 w-9 h-9 rounded-full text-xs font-bold shadow-sm hover:bg-rose-50 transition-all transform hover:scale-110">15</button>
             </div>
         </div>
-    </section>
+    </section> <!-- Aquí termina tu portada rosa -->
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <!-- ESTE ES TU CATÁLOGO INFINITO -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 bg-gray-50 border-t border-gray-200">
+        <div class="flex justify-between items-end mb-8">
+            <h2 class="text-2xl font-black text-stone-800">Catálogo Completo</h2>
+            <p class="text-xs text-stone-500 font-bold uppercase tracking-widest hidden md:block">Directo de Fábrica</p>
+        </div>
+
         <div id="grid-pantalones" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
             <p class="text-center col-span-full text-stone-500 font-bold py-10 animate-pulse">Cargando colección...</p>
         </div>
@@ -401,8 +468,11 @@
         </div>
     </div>
 
-    <div class="fixed bottom-6 left-6 z-50 flex flex-col items-start">
-        <div id="faq-window" class="hidden bg-white w-80 sm:w-96 rounded-2xl shadow-2xl border border-gray-200 overflow-hidden mb-4 transition-all duration-300">
+    <!-- ========================================== -->
+    <!-- ⚡ ASISTENTE ROBOT (Movido a la Derecha) ⚡ -->
+    <!-- ========================================== -->
+    <div class="fixed bottom-36 md:bottom-24 right-6 z-[35] flex flex-col items-end">
+        <div id="faq-window" class="hidden bg-white w-80 sm:w-96 rounded-2xl shadow-2xl border border-gray-200 overflow-hidden mb-4 transition-all duration-300 origin-bottom-right">
             <!-- Encabezado de la ventana del robot -->
             <div class="bg-indigo-400 p-4 flex justify-between items-center text-white shadow-md">
                 <div class="flex items-center gap-3">
@@ -415,6 +485,7 @@
                 <button onclick="toggleFaq()" class="hover:text-rose-300 font-bold text-2xl leading-none">&times;</button>
             </div>
             <div class="p-4 h-96 overflow-y-auto space-y-3 bg-gray-50 text-sm">
+                
                 <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
                     <button onclick="toggleRespuesta('res-1')" class="w-full text-left font-bold text-gray-700 p-3 hover:bg-indigo-50 transition-colors flex justify-between items-center">
                         📍 ¿Dónde están ubicados? <span class="text-indigo-400">▾</span>
@@ -467,8 +538,9 @@
                 </div>
             </div>
         </div>
-<!-- Botón flotante -->
-        <button onclick="toggleFaq()" class="bg-indigo-400 hover:bg-indigo-500 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-2xl transition-transform hover:scale-110 mr-auto">            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <!-- Botón flotante -->
+        <button onclick="toggleFaq()" class="bg-indigo-400 hover:bg-indigo-500 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-2xl transition-transform hover:scale-110 ml-auto">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
             </svg>
         </button>
@@ -600,7 +672,7 @@
     <!-- ========================================== -->
     <!-- ⚡ NOTIFICACIÓN FOMO (Prueba Social) ⚡ -->
     <!-- ========================================== -->
-    <div id="fomo-notification" class="fixed bottom-24 left-6 z-[100] transform -translate-x-[150%] transition-transform duration-500 ease-out shadow-2xl rounded-2xl bg-white border border-gray-200 p-3 flex items-center gap-3 w-72 cursor-pointer hover:bg-rose-50 transition-colors">
+    <div id="fomo-notification" class="fixed bottom-20 md:bottom-6 left-6 z-[35] transform -translate-x-[150%] transition-transform duration-500 ease-out shadow-2xl rounded-2xl bg-white border border-gray-200 p-3 flex items-center gap-3 w-72 cursor-pointer hover:bg-rose-50 transition-colors">
         <div class="relative flex-shrink-0">
             <img id="fomo-img" src="" class="w-12 h-16 object-cover rounded-xl shadow-sm border border-gray-100">
             <span class="absolute -top-2 -right-2 bg-rose-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-md animate-bounce">🔥</span>
@@ -658,6 +730,8 @@
                 document.getElementById('recibo-mp').innerText = paymentId;
                 document.getElementById('recibo-fecha').innerHTML = `${ahora.toLocaleDateString('es-MX', opcionesFecha)}<br>${ahora.toLocaleTimeString('es-MX', opcionesHora)}`;
 
+                rastrearEvento('Compra', { valor: 0 }); // El valor exacto lo calcularán del backend luego
+
                 carrito = [];
                 actualizarUICarrito();
                 document.getElementById('modal-recibo').classList.remove('hidden');
@@ -668,6 +742,31 @@
                 window.history.replaceState({}, document.title, "/");
             }
         });
+
+        // ==========================================
+        // ⚡ MOTOR DE RASTREO (PÍXELES DE MARKETING)
+        // ==========================================
+        function rastrearEvento(evento, detalles = {}) {
+            try {
+                // Dispara a Meta (Facebook/Instagram)
+                if (typeof fbq === 'function') {
+                    if(evento === 'Compra') fbq('track', 'Purchase', { value: detalles.valor, currency: 'MXN' });
+                    else if(evento === 'AgregarCarrito') fbq('track', 'AddToCart', { content_name: detalles.nombre, value: detalles.precio, currency: 'MXN' });
+                    else if(evento === 'IniciarCheckout') fbq('track', 'InitiateCheckout');
+                }
+                
+                // Dispara a TikTok
+                if (typeof ttq === 'object' && ttq.track) {
+                    if(evento === 'Compra') ttq.track('CompletePayment', { value: detalles.valor, currency: 'MXN' });
+                    else if(evento === 'AgregarCarrito') ttq.track('AddToCart', { content_name: detalles.nombre, value: detalles.precio, currency: 'MXN' });
+                    else if(evento === 'IniciarCheckout') ttq.track('InitiateCheckout');
+                }
+                
+                console.log(`📡 Radar Marketing: Evento '${evento}' registrado en espera.`);
+            } catch(e) {
+                // Falla silenciosa para no romper la tienda si bloquean los anuncios
+            }
+        }
 
 
         // ⚡ FUNCIONES DEL PORTAL DE RASTREO
@@ -1448,6 +1547,8 @@
             }
             
             actualizarUICarrito();
+
+            rastrearEvento('AgregarCarrito', { nombre: pantalon.nombre, precio: pantalon.precio });
             
             // ==========================================
             // ⚡ 1. MICRO-ANIMACIÓN DEL BOTÓN (Verde Esmeralda)
@@ -1677,6 +1778,8 @@
 
         async function abrirCheckout() {
             if (carrito.length === 0) { alert("Tu carrito está vacío."); return; }
+
+            rastrearEvento('IniciarCheckout');
             
             // Limpiamos los cupones viejos al abrir
             cuponActivo = null;
