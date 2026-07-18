@@ -60,11 +60,13 @@ async function cargarCategoriasEnSelect() {
         
         const select = document.getElementById('categoria');
         const selectEdit = document.getElementById('edit-categoria'); 
+        const selectMagico = document.getElementById('categoria-magica'); // ⚡ NUEVO
         const listaAdmin = document.getElementById('lista-categorias-admin'); 
         
         // Limpiamos los contenedores
         if(select) select.innerHTML = ''; 
         if(selectEdit) selectEdit.innerHTML = '';
+        if(selectMagico) selectMagico.innerHTML = ''; // ⚡ NUEVO
         if(listaAdmin) listaAdmin.innerHTML = ''; 
 
         categorias.forEach(cat => {
@@ -82,6 +84,14 @@ async function cargarCategoriasEnSelect() {
                 opcionEdit.textContent = cat.nombre;
                 selectEdit.appendChild(opcionEdit); 
             }
+
+            if(selectMagico) {
+                const opcionMagica = document.createElement('option');
+                opcionMagica.value = cat.nombre; // Pasamos el nombre directo para el Excel virtual
+                opcionMagica.textContent = cat.nombre;
+                selectMagico.appendChild(opcionMagica);
+            }
+
             // Llenar Etiquetas Visuales
             if(listaAdmin) {
                 const li = document.createElement('li');
@@ -171,7 +181,7 @@ if(formExcel) {
             const data = await respuesta.json();
             
             if (respuesta.ok) { 
-                alert(`¡Éxito! ${data.mensaje}`); 
+                alert(`¡Éxito! ${data.mensaje}\n\n⚠️ NOTA: La web se actualizó al instante. Loyverse se está sincronizando en segundo plano, dale un par de minutos para que aparezcan en la tablet.`); 
                 cargarCategoriasEnSelect(); 
                 cargarInventarioAdmin(); 
             } else {
@@ -497,6 +507,9 @@ async function procesarFotosMagicas() {
 
     // ⚡ 1. Agregamos "Color" a los encabezados del Excel Virtual
     let csvVirtual = "Codigo,Nombre,Precio,Stock,Categoria,Color,Foto_URL\n";
+    // ⚡ Tomamos la categoría que Yessica eligió en el menú
+    const selectorMagico = document.getElementById('categoria-magica');
+    const categoriaElegida = selectorMagico ? selectorMagico.value : "Nuevos";
     let exitos = 0;
 
     try {
@@ -533,8 +546,8 @@ async function procesarFotosMagicas() {
             
             if (dataImg.success) {
                 const urlDirecta = dataImg.data.url;
-                // ⚡ 3. Inyectamos la variable "color" en la fila del Excel Virtual
-                csvVirtual += `${sku},${nombre},${precio},0,Nuevos,${color},${urlDirecta}\n`;
+                // ⚡ 3. Inyectamos la variable "categoriaElegida" en vez de forzar "Nuevos"
+                csvVirtual += `${sku},${nombre},${precio},0,${categoriaElegida},${color},${urlDirecta}\n`;
                 exitos++;
             }
         }
