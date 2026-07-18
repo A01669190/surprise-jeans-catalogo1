@@ -301,6 +301,11 @@
         });
         observerLogin.observe(document.getElementById('panel-login'), { attributes: true, attributeFilter: ['class'] });
 
+        // ⚡ REVISIÓN RÁPIDA: Por si Denzel ya tenía sesión iniciada
+        if (document.getElementById('panel-login').classList.contains('hidden')) {
+            document.getElementById('nav-admin').classList.remove('hidden');
+        }
+
         // Variables globales para destruir las gráficas viejas si cambian de pestaña
         let chartInventario = null;
         let chartTallas = null;
