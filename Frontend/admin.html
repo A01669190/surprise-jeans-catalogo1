@@ -252,14 +252,18 @@
             <!-- Gráfica de Barras: Top Modelos con más inventario -->
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <h3 class="text-sm font-black text-gray-800 mb-4 uppercase tracking-wide">Top 5: Modelos con mayor inventario</h3>
-                <canvas id="graficaInventario" height="200"></canvas>
+                <!-- ⚡ LA CURA DEL LAG: Un contenedor con "relative" y altura fija ("h-64") -->
+                <div class="relative h-64 w-full"> 
+                    <canvas id="graficaInventario"></canvas>
+                </div>
             </div>
             
             <!-- Gráfica de Pastel: Distribución de Tallas -->
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <h3 class="text-sm font-black text-gray-800 mb-4 uppercase tracking-wide">Distribución Global de Tallas</h3>
-                <div class="flex justify-center">
-                    <canvas id="graficaTallas" height="200"></canvas>
+                <!-- ⚡ LA CURA DEL LAG: Un contenedor con "relative" y altura fija ("h-64") -->
+                <div class="relative h-64 w-full flex justify-center">
+                    <canvas id="graficaTallas"></canvas>
                 </div>
             </div>
         </div>
@@ -290,14 +294,13 @@
             }
         }
 
-        // ⚡ VIGILANTE A PRUEBA DE BALAS
-        setInterval(() => {
-            const login = document.getElementById('panel-login');
-            const nav = document.getElementById('nav-admin');
-            
-            // Si admin.js oculta el login de cualquier manera (por clase o por estilo), forzamos mostrar el menú
-            if (login.classList.contains('hidden') || login.style.display === 'none' || getComputedStyle(login).display === 'none') {
-                nav.classList.remove('hidden');
+        // ⚡ VIGILANTE OPTIMIZADO (Cero Lag)
+        const checkLogin = setInterval(() => {
+            // En vez de analizar todo el diseño web, solo buscamos si existe la llave VIP en la memoria
+            if (sessionStorage.getItem('token_vip')) {
+                document.getElementById('nav-admin').classList.remove('hidden');
+                // Una vez que encuentra la llave y muestra el menú, ¡se apaga a sí mismo para liberar memoria!
+                clearInterval(checkLogin); 
             }
         }, 500);
 
