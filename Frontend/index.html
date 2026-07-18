@@ -1051,7 +1051,6 @@
             const fin = indiceRenderizado + LIMITE_POR_CARGA;
             const lote = pantalonesActuales.slice(indiceRenderizado, fin);
             
-            // Quitamos al vigilante viejo para que no se duplique
             const centinelaViejo = document.getElementById('centinela-scroll');
             if (centinelaViejo) {
                 observadorScroll.unobserve(centinelaViejo);
@@ -1072,8 +1071,7 @@
                 const botonAccion = estaAgotado
                     ? `<button disabled class="w-full bg-gray-200 text-gray-400 font-bold py-3 rounded-xl cursor-not-allowed text-sm uppercase tracking-wider mt-auto">Sin existencias</button>`
                     : `<button onclick="agregarAlCarrito(${p.id})" class="w-full bg-stone-100 hover:bg-stone-900 text-stone-900 hover:text-white font-bold py-3 rounded-xl transition-colors text-sm shadow-sm mt-auto">Añadir a la bolsa</button>`;
-                       <button onclick="abrirAsistenteTallas()" class="w-full bg-indigo-50 text-indigo-700 font-bold py-3 rounded-xl mt-2 border border-indigo-200 hover:bg-indigo-100 transition-all text-xs uppercase tracking-wider">
-                             📏 ¿No sabes tu talla? Pruébate el Fit Perfecto</button>
+
                 const colorPantalon = p.tallas && p.tallas.length > 0 ? p.tallas[0].color : 'Original';
                 const badgeColor = colorPantalon !== 'Original' 
                     ? `<span class="inline-block bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ml-2 align-middle">${colorPantalon}</span>` 
@@ -1124,6 +1122,8 @@
                         </div>
                         
                         ${botonesTallas}
+                        <button onclick="abrirAsistenteTallas()" class="w-full bg-indigo-50 text-indigo-700 font-bold py-3 rounded-xl mt-2 border border-indigo-200 hover:bg-indigo-100 transition-all text-xs uppercase tracking-wider">
+                             📏 ¿No sabes tu talla?</button>
                         ${botonAccion}
                     </div>
                 `;
@@ -1132,7 +1132,6 @@
 
             indiceRenderizado = fin;
 
-            // Si aún faltan pantalones por dibujar, ponemos un nuevo vigilante al final
             if (indiceRenderizado < pantalonesActuales.length) {
                 const centinela = document.createElement('div');
                 centinela.id = 'centinela-scroll';
