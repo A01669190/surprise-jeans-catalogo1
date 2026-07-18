@@ -27,7 +27,7 @@
     <div id="menu-lateral" class="fixed inset-y-0 left-0 w-80 bg-white shadow-2xl transform -translate-x-full transition-transform duration-300 z-50 overflow-y-auto">
         <div class="p-6">
             <div class="flex justify-between items-center mb-8">
-                <h2 class="text-2xl font-black text-indigo-600 italic tracking-tighter">Surprise<span class="text-sm font-normal text-gray-400">Jeans</span></h2>
+                <h2 class="text-2xl font-black text-indigo-400 italic tracking-tighter">Surprise<span class="text-sm font-normal text-gray-400">Jeans</span></h2>
                 <button onclick="cerrarMenuLateral()" class="text-gray-400 hover:text-rose-500">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
@@ -68,7 +68,7 @@
             </button>
             
             <div class="flex-shrink-0 flex items-center justify-center">
-                <h1 class="text-2xl font-black text-indigo-600 italic tracking-tighter cursor-pointer">Surprise<span class="text-sm font-normal text-gray-400">Jeans</span></h1>
+                <h1 class="text-2xl font-black text-indigo-400 italic tracking-tighter cursor-pointer">Surprise<span class="text-sm font-normal text-gray-400">Jeans</span></h1>
             </div>
 
             <div class="flex items-center space-x-5">
@@ -233,7 +233,7 @@
         <!-- Columna Izquierda: Formulario (Blanco) -->
         <div class="w-full md:w-3/5 h-full overflow-y-auto bg-white p-6 md:p-12 lg:px-32 flex flex-col">
             <div class="flex-1 max-w-xl w-full mx-auto">
-                <h2 class="text-3xl font-black text-indigo-600 italic tracking-tighter mb-8">Surprise<span class="text-sm font-normal text-gray-400 block -mt-1">Jeans</span></h2>
+                <h2 class="text-3xl font-black text-indigo-400 italic tracking-tighter mb-8">Surprise<span class="text-sm font-normal text-gray-400 block -mt-1">Jeans</span></h2>
                 
                 <!-- Navegación -->
                 <nav class="flex text-xs text-gray-500 font-medium mb-8 gap-2">
@@ -402,7 +402,8 @@
 
     <div class="fixed bottom-6 left-6 z-50 flex flex-col items-start">
         <div id="faq-window" class="hidden bg-white w-80 sm:w-96 rounded-2xl shadow-2xl border border-gray-200 overflow-hidden mb-4 transition-all duration-300">
-            <div class="bg-indigo-600 p-4 flex justify-between items-center text-white shadow-md">
+            <!-- Encabezado de la ventana del robot -->
+            <div class="bg-indigo-400 p-4 flex justify-between items-center text-white shadow-md">
                 <div class="flex items-center gap-3">
                     <span class="text-2xl">🤖</span>
                     <div>
@@ -465,8 +466,8 @@
                 </div>
             </div>
         </div>
-        <button onclick="toggleFaq()" class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-2xl transition-transform hover:scale-110 mr-auto">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+<!-- Botón flotante -->
+        <button onclick="toggleFaq()" class="bg-indigo-400 hover:bg-indigo-500 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-2xl transition-transform hover:scale-110 mr-auto">            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
             </svg>
         </button>
@@ -771,6 +772,7 @@
 
 
         // ⚡ NUEVA FUNCIÓN: Crea los botones con colores pastel (Lila suave)
+        // ⚡ NUEVA FUNCIÓN: Crea los botones y ordena "Nuevos" al principio
         function renderizarCategoriasDinamicas() {
             const contenedor = document.getElementById('contenedor-filtros');
             if(!contenedor) return;
@@ -781,15 +783,25 @@
                 if (nombreCat && nombreCat.trim() !== "") categoriasUnicas.add(nombreCat.trim());
             });
 
-            // 1. Botón "Todos" (Estado Activo - Pastel)
+            // ⚡ ORDEN DE CATEGORÍAS
+            let arregloCategorias = Array.from(categoriasUnicas);
+            
+            // Buscamos si existe "Nuevos" y lo forzamos al principio
+            const indiceNuevos = arregloCategorias.findIndex(cat => cat.toLowerCase() === 'nuevos');
+            if (indiceNuevos !== -1) {
+                const etiquetaNuevos = arregloCategorias.splice(indiceNuevos, 1)[0];
+                arregloCategorias.unshift(etiquetaNuevos); // Lo inserta de primero en la fila
+            }
+
+            // 1. Botón "Todos" (Lila suave)
             let htmlBotones = `
-                <button onclick="filtrarCategoria('Todos', this)" class="btn-categoria px-6 py-2.5 rounded-full bg-indigo-100 text-indigo-600 border border-indigo-200 text-sm font-black shadow-sm whitespace-nowrap transition-all transform hover:scale-105 active:scale-95">
+                <button onclick="filtrarCategoria('Todos', this)" class="btn-categoria px-6 py-2.5 rounded-full bg-indigo-100 text-indigo-500 border border-indigo-200 text-sm font-black shadow-sm whitespace-nowrap transition-all transform hover:scale-105 active:scale-95">
                     Todos
                 </button>
             `;
 
-            // 2. Botones Dinámicos (Estado Inactivo - Blanco y gris suave)
-            categoriasUnicas.forEach(cat => {
+            // 2. Botones Dinámicos (Respetando el nuevo orden)
+            arregloCategorias.forEach(cat => {
                 htmlBotones += `
                     <button onclick="filtrarCategoria('${cat}', this)" class="btn-categoria px-6 py-2.5 rounded-full bg-white text-gray-500 border border-gray-200 text-sm font-bold shadow-sm hover:bg-indigo-50 hover:text-indigo-400 whitespace-nowrap transition-all transform hover:scale-105 active:scale-95">
                         ${cat}
