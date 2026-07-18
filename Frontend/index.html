@@ -184,6 +184,14 @@
                 <ul id="lista-carrito" class="space-y-6">
                     <p class="text-center text-stone-400 text-sm mt-10">Aún no has agregado ningún modelo.</p>
                 </ul>
+                
+                <!-- ⚡ NUEVO: KIT DE CONVERSIÓN (Ventas Cruzadas) ⚡ -->
+                <div id="contenedor-cross-sell" class="mt-8 pt-6 border-t border-gray-100 hidden">
+                    <h4 class="text-[11px] font-black text-stone-400 uppercase tracking-widest mb-4">✨ Completa tu look</h4>
+                    <div id="lista-cross-sell" class="flex gap-4 overflow-x-auto pb-4 hide-scroll-bar">
+                        <!-- Aquí se inyectarán las sugerencias mágicamente -->
+                    </div>
+                </div>
             </div>
             
             <!-- TOTAL Y BOTÓN DE CHECKOUT -->
@@ -1457,6 +1465,47 @@
 
             badge.innerText = cantidadTotal;
             totalEl.innerText = `$${total.toFixed(2)}`;
+            renderizarCrossSell();
+        }
+
+        // ==========================================
+        // ⚡ MOTOR DE VENTAS CRUZADAS (Cross-Sell)
+        // ==========================================
+        function renderizarCrossSell() {
+            const contenedor = document.getElementById('contenedor-cross-sell');
+            const lista = document.getElementById('lista-cross-sell');
+            
+            // Si el carrito está vacío, escondemos las sugerencias
+            if (carrito.length === 0) {
+                contenedor.classList.add('hidden');
+                return;
+            }
+
+            // Filtramos los pantalones que SÍ tienen stock y que NO están ya en el carrito
+            const disponibles = catalogoCompleto.filter(p => p.stock > 0 && !carrito.some(item => item.id === p.id));
+            
+            // Si ya agregó todo el catálogo (o no hay sugerencias), lo ocultamos
+            if (disponibles.length === 0) {
+                contenedor.classList.add('hidden');
+                return;
+            }
+
+            // Mezclamos el catálogo y tomamos 3 opciones al azar
+            const sugerencias = disponibles.sort(() => 0.5 - Math.random()).slice(0, 3);
+            
+            lista.innerHTML = '';
+            sugerencias.forEach(s => {
+                lista.innerHTML += `
+                    <div class="min-w-[140px] bg-white border border-gray-100 rounded-2xl p-2 shadow-sm flex flex-col cursor-pointer hover:shadow-lg transition-all" onclick="cerrarCarrito(); verDetalles(${s.id}, '${s.nombre.replace(/'/g, "\\'")}', '${s.imagen_url}', ${s.precio});">
+                        <img src="${s.imagen_url}" class="w-full h-36 object-cover rounded-xl mb-3">
+                        <p class="text-[10px] font-bold text-stone-800 truncate" title="${s.nombre}">${s.nombre}</p>
+                        <p class="text-sm font-black text-indigo-600 mb-2">$${s.precio}</p>
+                        <button class="text-[10px] bg-stone-50 text-stone-900 border border-stone-200 font-bold px-3 py-2 rounded-xl w-full hover:bg-stone-900 hover:text-white transition-colors uppercase tracking-wider mt-auto">Ver modelo</button>
+                    </div>
+                `;
+            });
+            
+            contenedor.classList.remove('hidden');
         }
 
         function cambiarCantidad(index, delta) {
