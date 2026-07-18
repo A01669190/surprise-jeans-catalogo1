@@ -1818,11 +1818,26 @@
                         // ... (tus otras variables de calle, colonia, etc. se quedan igual) ...
 
                         // Activar la caja de puntos si tiene más de 0
-                        if(perfil.puntos && perfil.puntos > 0) {
+                        // Activar la caja de puntos y validar el mínimo de $250
+                        if(perfil.puntos !== undefined) {
                             document.getElementById('caja-surprise-points').classList.remove('hidden');
-                            document.getElementById('chk-puntos-disponibles').innerText = `$${perfil.puntos.toFixed(2)}`;
-                            document.getElementById('chk-usar-puntos').checked = false; // Resetear el switch
-                            window.puntosCliente = perfil.puntos; // Guardamos global para calcular
+                            const puntos = perfil.puntos;
+                            window.puntosCliente = puntos; // Guardamos global para el cálculo
+
+                            const switchPuntos = document.getElementById('chk-usar-puntos');
+                            const displayPuntos = document.getElementById('chk-puntos-disponibles');
+
+                            if (puntos >= 250) {
+                                // Si tiene más de 250, permitimos activar el switch
+                                displayPuntos.innerText = `$${puntos.toFixed(2)}`;
+                                switchPuntos.disabled = false;
+                                switchPuntos.checked = false;
+                            } else {
+                                // Si tiene menos, bloqueamos el switch y avisamos cuánto falta
+                                displayPuntos.innerHTML = `<span class="text-gray-400">$${puntos.toFixed(2)} (Mínimo $250 para usar)</span>`;
+                                switchPuntos.disabled = true;
+                                switchPuntos.checked = false;
+                            }
                         } else {
                             document.getElementById('caja-surprise-points').classList.add('hidden');
                             window.puntosCliente = 0;
