@@ -366,6 +366,19 @@
                         <option value="Zacatecas">Zacatecas</option>
                     </select>
 
+                    <!-- Menú de Paqueterías -->
+                    <h3 class="text-xl font-bold text-gray-900 mb-4 mt-8">Método de Envío</h3>
+                    <div class="mb-4">
+                        <select id="chk-paqueteria" onchange="renderizarResumenCheckout()" class="w-full p-3.5 rounded-md border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-600 outline-none shadow-sm bg-white cursor-pointer text-gray-600">
+                            <option value="estandar_250" selected>Envío Estándar (FedEx / Estafeta) - $250.00 MXN</option>
+                            <option value="autobus_150">Envío Regional (Castores / Autobús) - $150.00 MXN</option>
+                            <option value="local_0">Recoger en Tienda (Eje 1 Nte. 15) - ¡Gratis!</option>
+                        </select>
+                        <p id="msg-envio-gratis" class="text-xs text-emerald-600 font-bold mt-2 hidden">
+                            🎉 ¡Felicidades! Tienes envío gratis por llevar 6 o más prendas.
+                        </p>
+                    </div>
+
                     <input type="text" id="chk-referencias" placeholder="Referencias (Ej. Casa blanca con zaguán negro)" class="w-full p-3.5 rounded-md border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-600 outline-none shadow-sm">
                 </div>
 
@@ -416,9 +429,9 @@
                         <span>Descuento</span>
                         <span id="chk-descuento-monto">-$0.00</span>
                     </div>
-                    <div class="flex justify-between">
+                    <div class="flex justify-between items-center">
                         <span>Envío</span>
-                        <span class="text-xs text-gray-500">Calculado en el siguiente paso</span>
+                        <span id="chk-costo-envio" class="font-bold text-indigo-600">$0.00</span>
                     </div>
                 </div>
                 
@@ -1858,6 +1871,31 @@
             document.getElementById('chk-subtotal').innerText = `$${subtotal.toFixed(2)}`;
             
             // Aplicar cálculos de descuento en tiempo real
+            // Contar cuántos pantalones llevan en total
+            let piezasTotales = 0;
+            carrito.forEach(item => piezasTotales += item.cantidad);
+
+            // Calcular costo de paquetería
+            const selectPaqueteria = document.getElementById('chk-paqueteria');
+            let costoEnvio = 250; // Por defecto
+            
+            if (selectPaqueteria) {
+                const opcion = selectPaqueteria.value;
+                if (opcion === 'estandar_250') costoEnvio = 250;
+                if (opcion === 'autobus_150') costoEnvio = 150;
+                if (opcion === 'local_0') costoEnvio = 0;
+                
+                // ⚡ REGLA DE ORO: Envío gratis a partir de 6 piezas (Excepto recolección local que ya es 0)
+                const msgGratis = document.getElementById('msg-envio-gratis');
+                if (piezasTotales >= 6 && opcion !== 'local_0') {
+                    costoEnvio = 0;
+                    if(msgGratis) msgGratis.classList.remove('hidden');
+                } else {
+                    if(msgGratis) msgGratis.classList.add('hidden');
+                }
+            }
+
+            // Aplicar cálculos de descuento del cupón
             let totalFinal = subtotal;
             if (cuponActivo) {
                 const descuentoMonto = subtotal * (cuponActivo.porcentaje / 100);
@@ -1866,15 +1904,23 @@
                 document.getElementById('fila-descuento').classList.remove('hidden');
             }
 
-            // Descuento extra por Surprise Points
+            // Descuento extra por Puntos
             const switchPuntos = document.getElementById('chk-usar-puntos');
             if(switchPuntos && switchPuntos.checked && window.puntosCliente > 0) {
                 totalFinal = totalFinal - window.puntosCliente;
                 if(totalFinal < 0) totalFinal = 0;
             }
 
+            // Sumamos el envío al final
+            totalFinal = totalFinal + costoEnvio;
+
+            // Actualizamos la interfaz
+            const uiCostoEnvio = document.getElementById('chk-costo-envio');
+            if (uiCostoEnvio) {
+                uiCostoEnvio.innerText = costoEnvio === 0 ? '¡GRATIS!' : `$${costoEnvio.toFixed(2)}`;
+            }
+            
             document.getElementById('chk-total').innerText = `$${totalFinal.toFixed(2)}`;
-        }
 
         function cerrarCheckout() {
             document.getElementById('modal-checkout').classList.add('hidden');
@@ -2070,11 +2116,12 @@
                     nombre: item.nombre, 
                     precio: parseFloat(item.precio), 
                     cantidad: parseInt(item.cantidad),
-                    sku_variante: item.sku_variante, // ⚡ ¡ESTO ERA LO QUE FALTABA!
-                    talla: item.talla                // ⚡ ¡Y ESTO TAMBIÉN!
+                    sku_variante: item.sku_variante, 
+                    talla: item.talla                
                 })),
                 cupon: cuponActivo ? cuponActivo.codigo : null,
-                usar_puntos: document.getElementById('chk-usar-puntos') ? document.getElementById('chk-usar-puntos').checked : false
+                usar_puntos: document.getElementById('chk-usar-puntos') ? document.getElementById('chk-usar-puntos').checked : false, // <--- ¡AQUÍ VA LA COMA!
+                paqueteria: document.getElementById('chk-paqueteria').value
             };
             const headers = { 'Content-Type': 'application/json' };
             const token = localStorage.getItem('token_cliente_sj');
