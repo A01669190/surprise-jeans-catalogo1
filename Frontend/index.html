@@ -556,8 +556,7 @@
             
             <div id="form-rastreo" class="space-y-4">
                 <input type="text" id="rastreo-folio" placeholder="Ej. SJ-0045" class="w-full p-4 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-600 uppercase font-bold text-gray-700">
-                <input type="email" id="rastreo-correo" placeholder="Correo con el que compraste" class="w-full p-4 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-600">
-                
+                <input type="text" id="rastreo-contacto" placeholder="Teléfono o Correo de compra" class="w-full p-4 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-600">
                 <button onclick="buscarPaquete()" class="w-full bg-stone-900 hover:bg-stone-800 text-white font-black py-4 rounded-xl shadow-lg transition-all flex justify-center items-center gap-2">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                     Buscar Pedido
@@ -618,15 +617,15 @@
             document.getElementById('modal-rastreo').classList.remove('hidden');
             document.getElementById('resultado-rastreo').classList.add('hidden');
             document.getElementById('rastreo-folio').value = '';
-            document.getElementById('rastreo-correo').value = '';
+            document.getElementById('rastreo-contacto').value = ''; // Actualizado
         }
 
         async function buscarPaquete() {
             const folio = document.getElementById('rastreo-folio').value.trim().toUpperCase();
-            const correo = document.getElementById('rastreo-correo').value.trim();
+            const contacto = document.getElementById('rastreo-contacto').value.trim(); // Actualizado
 
-            if (!folio || !correo) {
-                Swal.fire('Atención', 'Ingresa tu folio y correo.', 'warning');
+            if (!folio || !contacto) {
+                Swal.fire('Atención', 'Ingresa tu folio y tu teléfono o correo.', 'warning');
                 return;
             }
 
@@ -636,14 +635,14 @@
             btn.disabled = true;
 
             try {
-                // Consulta a tu servidor
-                const respuesta = await fetch(`${API_URL}/rastrear-pedido?folio=${folio}&correo=${correo}`);
+                // ⚡ Consulta a tu servidor (Actualizado a contacto)
+                const respuesta = await fetch(`${API_URL}/rastrear-pedido?folio=${folio}&contacto=${contacto}`);
                 
                 if (respuesta.ok) {
                     const pedido = await respuesta.json();
                     dibujarLineaTiempo(pedido);
                 } else {
-                    Swal.fire('No encontrado', 'No encontramos un pedido con esos datos. Revisa bien tu folio (Ej. SJ-0045).', 'error');
+                    Swal.fire('No encontrado', 'No encontramos un pedido con esos datos. Revisa bien tu folio (Ej. SJ-0045) y tu número.', 'error');
                 }
             } catch (error) {
                 Swal.fire('Error', 'Problema de conexión con la base de datos.', 'error');

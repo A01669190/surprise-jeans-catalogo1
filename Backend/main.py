@@ -9,6 +9,8 @@ from reportlab.graphics.barcode import code128
 from reportlab.lib.units import mm
 from database import SessionLocal
 from fastapi import APIRouter, Depends, HTTPException
+from models import Pedido
+from sqlalchemy import or_
 import asyncio
 import socket
 import logging
@@ -590,32 +592,30 @@ def obtener_mis_pedidos(correo: str = Depends(verificar_token_cliente), db: Sess
     return resultado
 
 @app.get("/rastrear-pedido")
-def rastrear_pedido(folio: str, correo: str, db: Session = Depends(get_db)):
-    # 1. Limpiamos el texto que metió el cliente (Ej: "SJ-0045" o "sj-45" -> 45)
+def rastrear_pedido(folio: str, contacto: str, db: Session = Depends(get_db)):
+    # 1. Limpiamos el texto del folio
     try:
-        # Quitamos "SJ-", lo pasamos a mayúsculas por si acaso, y convertimos a número
         pedido_id = int(folio.upper().replace("SJ-", ""))
     except ValueError:
         raise HTTPException(status_code=400, detail="Formato de folio inválido. Usa SJ-0000.")
 
-    # 2. Buscamos en la base de datos empatando el ID y el correo_cliente exacto
+    # 2. Buscamos el pedido usando el ID y comprobamos si coincide el correo O el teléfono
     pedido = db.query(Pedido).filter(
         Pedido.id == pedido_id,
-        Pedido.correo_cliente == correo
+        or_(Pedido.correo_cliente == contacto, Pedido.telefono == contacto)
     ).first()
     
-    # 3. Si no existe o se equivocaron de correo, mandamos error 404
+    # 3. Si no existe, error 404
     if not pedido:
-        raise HTTPException(status_code=404, detail="Pedido no encontrado o correo incorrecto")
+        raise HTTPException(status_code=404, detail="Pedido no encontrado o dato de contacto incorrecto")
         
-    # 4. Formateamos la respuesta EXACTAMENTE como la espera tu frontend
+    # 4. Formateamos la respuesta
     return {
-        "folio": f"SJ-{pedido.id:04d}", # Reconstruimos el folio bonito
+        "folio": f"SJ-{pedido.id:04d}",
         "estatus": pedido.estatus,
-        "guia": pedido.guia_rastreo,    # Mapeado a tu columna guia_rastreo
-        # Los dejamos como None por ahora hasta que conectemos Skydropx al 100%
-        "tracking_number": None, 
-        "tracking_url": None     
+        "guia": pedido.guia_rastreo,
+        "tracking_number": getattr(pedido, 'tracking_number', None), 
+        "tracking_url": getattr(pedido, 'tracking_url', None)     
     }
 
 @app.post("/pantalones/{pantalon_id}/resenas")
