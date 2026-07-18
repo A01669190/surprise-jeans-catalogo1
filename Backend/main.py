@@ -824,11 +824,8 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
     # 3. Enviamos el archivo listo para imprimir
     return Response(content=buffer.getvalue(), media_type="application/pdf")
 
-# ==========================================
-# 5. EL CEREBRO FINANCIERO (WEBHOOKS) 🧠
-# ==========================================
 async def robot_respaldos_diarios():
-    """ Despierta cada 24 horas para hacer un backup de la base de datos """
+    """ Despierta cada 24 horas para hacer un backup y ENVIARLO POR CORREO a salvo de Render """
     while True:
         # 86400 segundos = 24 horas
         await asyncio.sleep(86400) 
@@ -838,27 +835,43 @@ async def robot_respaldos_diarios():
             clientes = db.query(models.Cliente).all()
             
             fecha = datetime.datetime.now().strftime("%Y-%m-%d")
-            nombre_archivo = f"respaldo_sj_{fecha}.json"
             
             respaldo = {
                 "fecha_respaldo": fecha,
                 "total_pedidos": len(pedidos),
                 "total_clientes": len(clientes),
-                "pedidos": [{"id": p.id, "folio": p.folio, "total": p.total, "estatus": p.estatus} for p in pedidos],
+                "pedidos": [{"id": p.id, "folio": getattr(p, 'folio', p.id), "total": p.total, "estatus": p.estatus} for p in pedidos],
                 "clientes": [{"id": c.id, "nombre": c.nombre_completo, "correo": c.correo} for c in clientes]
             }
             
-            with open(nombre_archivo, "w", encoding="utf-8") as f:
-                json.dump(respaldo, f, ensure_ascii=False, indent=4)
+            # Convertimos el diccionario a un archivo en memoria
+            archivo_json = json.dumps(respaldo, ensure_ascii=False, indent=4).encode('utf-8')
+            
+            # ⚡ ENVIAMOS POR CORREO PARA NO DEPENDER DEL DISCO DE RENDER
+            msg = MIMEMultipart()
+            msg["Subject"] = f"🛡️ Respaldo Diario Automático - {fecha}"
+            msg["From"] = f"Surprise Jeans <{os.getenv('GMAIL_USER')}>"
+            msg["To"] = os.getenv('GMAIL_USER') # Te lo envías a ti mismo
+            
+            msg.attach(MIMEText("Adjunto el respaldo de seguridad de hoy. Este archivo está a salvo de los reinicios de Render.", "plain"))
+            
+            adjunto = MIMEApplication(archivo_json, Name=f"respaldo_sj_{fecha}.json")
+            adjunto['Content-Disposition'] = f'attachment; filename="respaldo_sj_{fecha}.json"'
+            msg.attach(adjunto)
+            
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as servidor:
+                servidor.login(os.getenv("GMAIL_USER"), os.getenv("GMAIL_PASSWORD"))
+                servidor.sendmail(os.getenv("GMAIL_USER"), os.getenv("GMAIL_USER"), msg.as_string())
                 
-            print(f"🛡️✅ Bóveda asegurada: {nombre_archivo} creado con éxito.")
+            print(f"🛡️✅ Bóveda asegurada: Respaldo diario enviado por correo con éxito.")
         except Exception as e:
-            print(f"❌ Error al crear el respaldo: {e}")
+            print(f"❌ Error al crear el respaldo diario: {e}")
         finally:
             try:
                 db.close()
             except:
                 pass
+
 
 # Cuando tengas tu cuenta, las pondrás en las variables de entorno de Render
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN", "")
