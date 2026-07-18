@@ -622,7 +622,11 @@
 
         function abrirAsistenteTallas() {
     document.getElementById('modal-asistente').classList.remove('hidden');
-}
+}           
+
+        function abrirAsistenteTallas() {
+            document.getElementById('modal-asistente').classList.remove('hidden');
+        }
 
         function calcularTalla() {
             const cintura = parseFloat(document.getElementById('medida-cintura').value);
@@ -1121,9 +1125,6 @@
                             <p class="text-xs ${estaAgotado ? 'text-red-500 font-bold' : 'text-stone-400 font-medium'}">Total: ${p.stock}</p>
                         </div>
                         
-                        ${botonesTallas}
-                        <button onclick="abrirAsistenteTallas()" class="w-full bg-indigo-50 text-indigo-700 font-bold py-3 rounded-xl mt-2 border border-indigo-200 hover:bg-indigo-100 transition-all text-xs uppercase tracking-wider">
-                             📏 ¿No sabes tu talla?</button>
                         ${botonAccion}
                     </div>
                 `;
@@ -1667,6 +1668,7 @@
                     `;
                 }
 
+                // ... dentro de la función verDetalles ...
                 Swal.fire({
                     html: `
                         <div class="text-left mt-2">
@@ -1676,10 +1678,17 @@
                             <h2 class="text-xl font-black text-stone-900 leading-tight">${nombre}</h2>
                             <p class="text-3xl text-indigo-600 font-black my-2">$${precio}</p>
                             ${botonesTallasModal}
+                            
+                            <!-- ⚡ AQUÍ LO AGREGAMOS: Solo aparece cuando ven el detalle -->
+                            <button onclick="abrirAsistenteTallas()" class="w-full bg-indigo-50 text-indigo-700 font-bold py-3 rounded-xl mt-2 border border-indigo-200 hover:bg-indigo-100 transition-all text-xs uppercase tracking-wider mb-2">
+                                📏 ¿No sabes tu talla? Pruébate el Fit Perfecto
+                            </button>
+
                             <button onclick="agregarAlCarrito(${id}); Swal.close();" class="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-3.5 rounded-xl mt-2 shadow-lg transition-all">AÑADIR A LA BOLSA</button>
                             ${htmlRecomendados}
                         </div>
                     `,
+                    // ... el resto del código del Swal ...
                     showConfirmButton: false,
                     showCloseButton: true,
                     customClass: { popup: 'rounded-3xl' }
