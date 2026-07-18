@@ -953,8 +953,13 @@
                     : '';
 
                 // ⚡ EL FIX: Ya no hay diagonales invertidas rompiendo el código
+                // ⚡ DIBUJAMOS LOS BOTONES DE TALLAS SI HAY STOCK
                 let botonesTallas = '';
                 if (p.tallas && p.tallas.length > 0 && !estaAgotado) {
+                    
+                    // ⚡ EL FIX: Ordenamos las tallas numéricamente de menor a mayor
+                    p.tallas.sort((a, b) => parseInt(a.talla) - parseInt(b.talla));
+                    
                     botonesTallas = `
                         <div class="mt-3 mb-4 border-t border-gray-100 pt-3">
                             <p class="text-[10px] uppercase text-gray-500 font-bold mb-2 tracking-wider">Selecciona tu talla:</p>
@@ -1489,10 +1494,14 @@
                     htmlRecomendados += `</div>`;
                 }
 
-                // ⚡ EL FIX: Sin diagonales invertidas
+                // ⚡ DIBUJAMOS LOS BOTONES DE TALLAS DENTRO DEL POPUP
                 const pantalon = catalogoCompleto.find(p => p.id === id);
                 let botonesTallasModal = '';
                 if (pantalon && pantalon.tallas && pantalon.tallas.length > 0 && pantalon.stock > 0) {
+                    
+                    // ⚡ EL FIX: Ordenamos las tallas numéricamente de menor a mayor
+                    pantalon.tallas.sort((a, b) => parseInt(a.talla) - parseInt(b.talla));
+                    
                     botonesTallasModal = `
                         <div class="mt-4 mb-2">
                             <p class="text-[10px] uppercase text-gray-500 font-bold mb-2 tracking-wider">Selecciona tu talla:</p>
