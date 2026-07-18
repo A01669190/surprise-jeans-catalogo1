@@ -60,7 +60,7 @@
         </div>
     </div>
     
-   <header class="bg-white border-b border-gray-100 sticky top-0 z-40 shadow-sm">
+   <header class="sticky top-0 z-[100] bg-white/80 backdrop-blur-md border-b border-gray-100 transition-all duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
             
             <button onclick="abrirMenuLateral()" class="text-gray-500 hover:text-indigo-600 transition-colors focus:outline-none">
@@ -1253,26 +1253,38 @@
                 div.className = 'bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 group flex flex-col relative';
                 
                 div.innerHTML = `
-                    <div class="relative overflow-hidden aspect-[3/4] bg-gray-50">
+                    <div class="relative overflow-hidden aspect-[3/4] bg-stone-100 cursor-pointer" onclick="verDetalles(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', '${p.imagen_url}', ${p.precio})">
                         ${etiquetaAgotado}
-                        <img src="${p.imagen_url}" loading="lazy" onclick="verDetalles(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', '${p.imagen_url}', ${p.precio})" alt="${p.nombre}" class="w-full h-full object-cover cursor-pointer ${filtroImagen}">
-                        <div class="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-black text-indigo-600 shadow-sm">
+                        <img src="${p.imagen_url}" loading="lazy" alt="${p.nombre}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 ${filtroImagen}">
+                        
+                        <div class="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-[10px] font-black text-indigo-600 shadow-sm tracking-wider">
                             [${p.codigo || 'S/C'}]
                         </div>
+
+                        <!-- ⚡ Botón Deslizante (Aparece al pasar el ratón en la PC) -->
+                        <div class="absolute inset-x-0 bottom-0 p-4 opacity-0 translate-y-4 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0 hidden md:block z-10">
+                            ${botonAccion.replace('mt-auto', 'shadow-xl')}
+                        </div>
                     </div>
-                    <div class="p-5 flex flex-col flex-grow">
+                    
+                    <!-- Texto Minimalista de Lujo -->
+                    <div class="p-4 flex flex-col flex-grow bg-white text-left">
                         ${ratingDOM}
-                        <h3 class="font-bold text-stone-800 text-lg uppercase leading-tight mb-2 flex items-center flex-wrap" title="${p.nombre}">
+                        <h3 class="font-bold text-stone-900 text-sm uppercase tracking-wide mt-1 leading-tight line-clamp-2" title="${p.nombre}">
                             ${p.nombre} ${badgeColor}
                         </h3>
-                        <div class="flex justify-between items-end mb-1">
-                            <p class="text-2xl font-black text-stone-900">$${p.precio}</p>
-                            <p class="text-xs ${estaAgotado ? 'text-red-500 font-bold' : 'text-stone-400 font-medium'}">Total: ${p.stock}</p>
+                        <div class="flex justify-between items-end mt-2">
+                            <p class="text-sm font-medium text-stone-500">$${p.precio.toFixed(2)} MXN</p>
+                            <p class="text-[10px] uppercase font-bold tracking-wider ${estaAgotado ? 'text-rose-500' : 'text-stone-400'}">Disp: ${p.stock}</p>
                         </div>
                         
-                        ${botonAccion}
+                        <!-- ⚡ El botón fijo solo aparece en celulares (Porque no tienen "hover") -->
+                        <div class="block md:hidden mt-3">
+                            ${botonAccion}
+                        </div>
                     </div>
                 `;
+                  
                 grid.appendChild(div);
             });
 
