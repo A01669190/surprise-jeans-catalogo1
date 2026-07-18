@@ -883,11 +883,13 @@ async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, 
         if total_final <= 0 or pedido_req.cupon == "VENTA-PRESENCIAL":
             nuevo_pedido.estatus = "PAGADO"
             
-            # ⚡ EL FIX 1/2: REGALAMOS PUNTOS SOLO AQUÍ PORQUE LA COMPRA FUE GRATIS O PRESENCIAL (CERRADA)
+            # ⚡ PUNTOS
             if cliente_db:
                 cliente_db.puntos += puntos_ganados
                 db.commit()
 
+            # ⚡ RECIBO VIRTUAL
+            items_para_recibo = []
             for detalle in nuevo_pedido.detalles:
                 if detalle.sku_variante: 
                     variante_db = db.query(models.VarianteTalla).filter(models.VarianteTalla.sku == detalle.sku_variante).first()
@@ -897,8 +899,18 @@ async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, 
                         if variante_db.pantalon:
                             variante_db.pantalon.stock -= detalle.cantidad 
                             
-                        loyverse_sync.descontar_stock_loyverse(detalle.sku_variante, variante_db.stock)    
-                        db.commit()
+                        items_para_recibo.append({
+                            "sku": detalle.sku_variante,
+                            "cantidad": detalle.cantidad,
+                            "precio": detalle.precio_unitario
+                        })
+            
+            if items_para_recibo:
+                loyverse_sync.generar_recibo_virtual(nuevo_pedido.correo_cliente, nuevo_pedido.id, items_para_recibo, nuevo_pedido.total)
+                
+            db.commit()
+            
+            # ... lo demás se queda igual (WebSocket y correos) ...
             
             # Avisamos a las pantallas del despacho
             try:
@@ -960,25 +972,32 @@ async def webhook_mercadopago(request: Request, background_tasks: BackgroundTask
                     pedido_db.estatus = "PAGADO"
                     pedido_db.pago_id = str(pago_id) # ⚡ GUARDAMOS LA LLAVE AQUÍ
                     lista_ropa = []
+                    # ⚡ EL FIX 3.0: RECIBOS VIRTUALES COMPLETOS
+                    items_para_recibo = []
                     
-                    # ⚡ EL FIX: DESCONTAMOS TALLAS EXACTAS EN LOYVERSE
                     for detalle in pedido_db.detalles:
                         if detalle.sku_variante: 
                             variante_db = db.query(models.VarianteTalla).filter(models.VarianteTalla.sku == detalle.sku_variante).first()
-                            
                             if variante_db and variante_db.stock >= detalle.cantidad:
-                                # Descuenta en la base de datos
+                                # Descuenta localmente en tu servidor web
                                 variante_db.stock -= detalle.cantidad
                                 if variante_db.pantalon:
                                     variante_db.pantalon.stock -= detalle.cantidad 
                                 
-                                # Descuenta en Loyverse
-                                loyverse_sync.descontar_stock_loyverse(detalle.sku_variante, variante_db.stock)
+                                # Guardamos el item para el recibo de Loyverse
+                                items_para_recibo.append({
+                                    "sku": detalle.sku_variante,
+                                    "cantidad": detalle.cantidad,
+                                    "precio": detalle.precio_unitario
+                                })
                         
-                        # Preparamos la info de la ropa para el correo
                         nombre_base = detalle.pantalon.nombre if detalle.pantalon else "Modelo"
                         nombre_final = f"{nombre_base} (Talla {detalle.talla})" if detalle.talla else nombre_base
                         lista_ropa.append({"cantidad": detalle.cantidad, "nombre": nombre_final, "precio": detalle.precio_unitario})
+                    
+                    # 🎉 DISPARAMOS EL RECIBO VIRTUAL EN LOYVERSE 🎉
+                    if items_para_recibo:
+                        loyverse_sync.generar_recibo_virtual(pedido_db.correo_cliente, pedido_db.id, items_para_recibo, pedido_db.total)
                     
                     db.commit()
                     
