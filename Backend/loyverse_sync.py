@@ -336,7 +336,8 @@ def generar_recibo_virtual(correo_cliente, folio_interno, items_comprados, total
             if customer_id:
                 recibo["customer_id"] = customer_id
 
-            payload = json.dumps({"receipts": [recibo]}).encode("utf-8")
+            # ⚡ EL FIX: Le mandamos el recibo directamente, sin la "caja" extra
+            payload = json.dumps(recibo).encode("utf-8")
             req_receipt = urllib.request.Request("https://api.loyverse.com/v1.0/receipts", data=payload, method="POST")
             req_receipt.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
             req_receipt.add_header("Content-Type", "application/json")
