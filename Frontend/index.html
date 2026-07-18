@@ -2261,6 +2261,17 @@
             }
         }
 
+
+        // ==========================================
+        // ⚡ SINCRONIZACIÓN ENTRE PESTAÑAS (Cross-Tab Sync)
+        // ==========================================
+        window.addEventListener('storage', function(e) {
+            // Si el cliente inicia o cierra sesión en otra pestaña, recargamos esta automáticamente
+            if (e.key === 'token_cliente_sj' || e.key === 'nombre_cliente_sj') {
+                window.location.reload();
+            }
+        });
+
     </script>
     
     
