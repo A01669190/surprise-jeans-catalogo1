@@ -789,6 +789,7 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
 # 5. EL CEREBRO FINANCIERO (WEBHOOKS) 🧠
 # ==========================================
 
+
 @app.post("/crear-pago-seguro")
 async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, db: Session = Depends(get_db)):
     try:
@@ -875,15 +876,18 @@ async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, 
             lista_ropa.append({"cantidad": item.cantidad, "nombre": f"{item.nombre} (Talla {item.talla})", "precio": round(precio_final, 2)})
         db.commit()
         
+        # Calculamos los puntos, pero NO los guardamos en la base de datos todavía
         puntos_ganados = total_final * 0.05
-        if cliente_db:
-            cliente_db.puntos += puntos_ganados
-            db.commit()
 
         # 🚨 LA MAGIA: BYPASS DE INVENTARIO Y LOYVERSE 🚨
         if total_final <= 0 or pedido_req.cupon == "VENTA-PRESENCIAL":
             nuevo_pedido.estatus = "PAGADO"
             
+            # ⚡ EL FIX 1/2: REGALAMOS PUNTOS SOLO AQUÍ PORQUE LA COMPRA FUE GRATIS O PRESENCIAL (CERRADA)
+            if cliente_db:
+                cliente_db.puntos += puntos_ganados
+                db.commit()
+
             for detalle in nuevo_pedido.detalles:
                 if detalle.sku_variante: 
                     variante_db = db.query(models.VarianteTalla).filter(models.VarianteTalla.sku == detalle.sku_variante).first()
@@ -936,12 +940,6 @@ async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, 
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-    respuesta = sdk.preference().create(preference_data)
-    if respuesta["status"] != 201:
-        raise HTTPException(status_code=400, detail="Mercado Pago bloqueó la solicitud.")
-
-    return {"link_pago": respuesta["response"]["init_point"]}
-
 @app.post("/webhook/mercadopago")
 async def webhook_mercadopago(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     datos = await request.json()
@@ -963,50 +961,55 @@ async def webhook_mercadopago(request: Request, background_tasks: BackgroundTask
                     pedido_db.pago_id = str(pago_id) # ⚡ GUARDAMOS LA LLAVE AQUÍ
                     lista_ropa = []
                     
+                    # ⚡ EL FIX: DESCONTAMOS TALLAS EXACTAS EN LOYVERSE
                     for detalle in pedido_db.detalles:
-                        pantalon_db = db.query(models.Pantalon).filter(models.Pantalon.id == detalle.pantalon_id).first()
+                        if detalle.sku_variante: 
+                            variante_db = db.query(models.VarianteTalla).filter(models.VarianteTalla.sku == detalle.sku_variante).first()
+                            
+                            if variante_db and variante_db.stock >= detalle.cantidad:
+                                # Descuenta en la base de datos
+                                variante_db.stock -= detalle.cantidad
+                                if variante_db.pantalon:
+                                    variante_db.pantalon.stock -= detalle.cantidad 
+                                
+                                # Descuenta en Loyverse
+                                loyverse_sync.descontar_stock_loyverse(detalle.sku_variante, variante_db.stock)
                         
-                        # VERIFICAMOS Y DESCONTAMOS STOCK
-                        if pantalon_db and pantalon_db.stock >= detalle.cantidad:
-                            # 1. Descuenta en tu base de datos web
-                            pantalon_db.stock -= detalle.cantidad
-                            
-                            # 2. ⚡ VÍA 2: Descuenta en Loyverse enviando el STOCK FINAL absoluto
-                            loyverse_sync.descontar_stock_loyverse(pantalon_db.codigo, pantalon_db.stock)
-                            
-                        if pantalon_db:
-                            lista_ropa.append({"cantidad": detalle.cantidad, "nombre": pantalon_db.nombre, "precio": detalle.precio_unitario})
+                        # Preparamos la info de la ropa para el correo
+                        nombre_base = detalle.pantalon.nombre if detalle.pantalon else "Modelo"
+                        nombre_final = f"{nombre_base} (Talla {detalle.talla})" if detalle.talla else nombre_base
+                        lista_ropa.append({"cantidad": detalle.cantidad, "nombre": nombre_final, "precio": detalle.precio_unitario})
                     
-                    # AQUÍ ESTABA EL ERROR: db.commit() ya tiene su propio renglón nuevamente
                     db.commit()
                     
                     # Sonido Din por WebSocket
-                    await manager.broadcast("NUEVO_PEDIDO")
+                    import asyncio
+                    try:
+                        loop = asyncio.get_event_loop()
+                        loop.create_task(manager.broadcast("NUEVO_PEDIDO"))
+                    except:
+                        pass
 
-                    background_tasks.add_task(procesar_logistica_asincrona, pedido_db.id)
+                    try:
+                        background_tasks.add_task(procesar_logistica_asincrona, pedido_db.id)
+                    except:
+                        pass
                     
-                    # 📧 ENVIAR CORREO Y GESTIONAR PUNTOS (SOLO PAGOS APROBADOS)
+                    # 🎁 GESTIÓN DE SURPRISE POINTS (SOLO PAGOS APROBADOS)
                     cliente_db = db.query(models.Cliente).filter(models.Cliente.correo == pedido_db.correo_cliente).first()
-                    
-                    correo_final = pedido_db.correo_cliente
-                    nombre_final = pedido_db.nombre_cliente
                     puntos_ganados = pedido_db.total * 0.05
                     
                     if cliente_db:
-                        # 1. Detectar si usó puntos (Si el total pagado es menor a la suma del precio de sus artículos)
-                        suma_articulos = sum(d.precio_unitario * d.cantidad for d in pedido_db.detalles)
-                        puntos_usados = suma_articulos - pedido_db.total
-                        
-                        # 2. Si usó puntos, los restamos de su bóveda
-                        if puntos_usados > 0:
-                            cliente_db.puntos = max(0, cliente_db.puntos - puntos_usados)
-                            
-                        # 3. Le sumamos los nuevos puntos generados por esta compra
+                        # Solo SUMAMOS los puntos ganados (Lo que gastó ya se descontó antes)
                         cliente_db.puntos += puntos_ganados
                         db.commit()
                     
-                    if correo_final:
-                        enviar_correo_recibo(correo_final, nombre_final, f"{pedido_db.id:04d}", pedido_db.total, lista_ropa, puntos_ganados)
+                    # 📧 ENVIAR CORREO
+                    if pedido_db.correo_cliente:
+                        try:
+                            enviar_correo_recibo(pedido_db.correo_cliente, pedido_db.nombre_cliente, f"{pedido_db.id:04d}", pedido_db.total, lista_ropa, puntos_ganados)
+                        except:
+                            pass
 
     return {"status": "procesado"}
 
