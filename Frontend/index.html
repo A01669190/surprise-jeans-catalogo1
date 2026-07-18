@@ -612,6 +612,20 @@
             <!-- Línea de Tiempo Mágica -->
             <div id="resultado-rastreo" class="hidden mt-8 border-t border-gray-100 pt-6"></div>
         </div>
+    <!-- ========================================== -->
+    <!-- ⚡ NOTIFICACIÓN FOMO (Prueba Social) ⚡ -->
+    <!-- ========================================== -->
+    <div id="fomo-notification" class="fixed bottom-24 left-6 z-[100] transform -translate-x-[150%] transition-transform duration-500 ease-out shadow-2xl rounded-2xl bg-white border border-gray-200 p-3 flex items-center gap-3 w-72 cursor-pointer hover:bg-rose-50 transition-colors">
+        <div class="relative flex-shrink-0">
+            <img id="fomo-img" src="" class="w-12 h-16 object-cover rounded-xl shadow-sm border border-gray-100">
+            <span class="absolute -top-2 -right-2 bg-rose-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-md animate-bounce">🔥</span>
+        </div>
+        <div class="flex-1 min-w-0">
+            <p id="fomo-text" class="text-[10px] text-gray-500 font-medium leading-tight mb-0.5">Alguien en Monterrey compró</p>
+            <p id="fomo-product" class="text-xs font-black text-stone-800 truncate">Jeans Estrellas</p>
+            <p class="text-[9px] text-indigo-500 font-bold mt-1">Hace <span id="fomo-time">2</span> min</p>
+        </div>
+        <button onclick="cerrarFomo(event)" class="absolute top-2 right-2 text-gray-300 hover:text-rose-500 text-xl leading-none transition-colors">&times;</button>
     </div>
 
     <script>
@@ -2270,6 +2284,72 @@
             if (e.key === 'token_cliente_sj' || e.key === 'nombre_cliente_sj') {
                 window.location.reload();
             }
+        });
+
+        // ==========================================
+        // ⚡ MOTOR DE FOMO (Prueba Social)
+        // ==========================================
+        const ciudadesFOMO = ['Monterrey', 'CDMX', 'Guadalajara', 'Veracruz', 'Tijuana', 'Mérida', 'Puebla', 'Querétaro', 'León', 'Cancún', 'Aguascalientes'];
+        let fomoTimeout;
+
+        function mostrarNotificacionFOMO() {
+            // Validamos que haya inventario cargado para mostrar
+            if (!catalogoCompleto || catalogoCompleto.length === 0) return;
+            
+            const notificacion = document.getElementById('fomo-notification');
+            if (!notificacion) return;
+
+            // 1. Elegimos un producto al azar (Preferentemente con stock)
+            let disponibles = catalogoCompleto.filter(p => p.stock > 0);
+            if(disponibles.length === 0) disponibles = catalogoCompleto; 
+            const productoAleatorio = disponibles[Math.floor(Math.random() * disponibles.length)];
+            
+            // 2. Generamos datos "falsos" pero creíbles
+            const ciudadAleatoria = ciudadesFOMO[Math.floor(Math.random() * ciudadesFOMO.length)];
+            const minutosAleatorios = Math.floor(Math.random() * 12) + 1; 
+            const viendoAleatorio = Math.floor(Math.random() * 6) + 2;
+            
+            const opcionesTexto = [
+                `Alguien en <b>${ciudadAleatoria}</b> acaba de comprar`,
+                `¡Venta rápida en <b>${ciudadAleatoria}</b>! Se llevaron`,
+                `Hay <b>${viendoAleatorio}</b> personas viendo`
+            ];
+            const textoElegido = opcionesTexto[Math.floor(Math.random() * opcionesTexto.length)];
+
+            // 3. Llenamos la tarjeta flotante
+            document.getElementById('fomo-img').src = productoAleatorio.imagen_url;
+            document.getElementById('fomo-text').innerHTML = textoElegido;
+            document.getElementById('fomo-product').innerText = productoAleatorio.nombre;
+            document.getElementById('fomo-time').innerText = minutosAleatorios;
+
+            // 4. Si hacen clic en la tarjeta, los lleva al producto
+            notificacion.onclick = (e) => {
+                if (e.target.tagName.toLowerCase() !== 'button') {
+                    verDetalles(productoAleatorio.id, productoAleatorio.nombre.replace(/'/g, "\\'"), productoAleatorio.imagen_url, productoAleatorio.precio);
+                }
+            };
+
+            // 5. Animación de entrada (desliza hacia adentro)
+            notificacion.classList.remove('-translate-x-[150%]');
+            
+            // 6. Ocultar la tarjeta después de 5 segundos
+            clearTimeout(fomoTimeout);
+            fomoTimeout = setTimeout(() => {
+                cerrarFomo();
+                // Programar la siguiente aparición (entre 15 y 30 segundos después)
+                setTimeout(mostrarNotificacionFOMO, Math.random() * 15000 + 15000);
+            }, 5000);
+        }
+
+        function cerrarFomo(e) {
+            if(e) e.stopPropagation();
+            const notificacion = document.getElementById('fomo-notification');
+            if(notificacion) notificacion.classList.add('-translate-x-[150%]');
+        }
+
+        // Arrancamos el motor automáticamente 6 segundos después de que el cliente entra a la página
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(mostrarNotificacionFOMO, 6000);
         });
 
     </script>
