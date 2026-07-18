@@ -8,6 +8,7 @@ from logistica_sync import generar_guia_envio
 from reportlab.graphics.barcode import code128
 from reportlab.lib.units import mm
 from database import SessionLocal
+import asyncio
 import socket
 import logging
 import smtplib
@@ -789,9 +790,34 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
 # 5. EL CEREBRO FINANCIERO (WEBHOOKS) 🧠
 # ==========================================
 
+async def auto_destruir_abandonado(pedido_id: int):
+    """ Bomba de tiempo: Espera 30 minutos y si no hay pago, destruye el carrito """
+    await asyncio.sleep(1800) # 1800 segundos = 30 minutos
+    
+    try:
+        db = SessionLocal() 
+        pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
+        
+        if pedido and pedido.estatus == "PENDIENTE":
+            db.delete(pedido)
+            db.commit()
+            
+            # Hacemos sonar la campana para que desaparezca de tu pantalla Admin
+            try:
+                loop = asyncio.get_event_loop()
+                loop.create_task(manager.broadcast("NUEVO_PEDIDO"))
+            except:
+                pass
+    except Exception as e:
+        pass
+    finally:
+        try:
+            db.close()
+        except:
+            pass
 
 @app.post("/crear-pago-seguro")
-async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, db: Session = Depends(get_db)):
+async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     try:
         # 1. CÁLCULO DE TOTALES Y APLICACIÓN DE CUPONES
         total_pedido = 0.0
@@ -862,6 +888,9 @@ async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, 
         db.commit()
         db.refresh(nuevo_pedido)
 
+        # ⚡ ENCENDEMOS LA BOMBA DE TIEMPO DE 30 MINUTOS
+        background_tasks.add_task(auto_destruir_abandonado, nuevo_pedido.id)
+
         lista_ropa = []
         for item in pedido_req.items:
             precio_final = float(item.precio) * (1.0 - (descuento_porc / 100.0))
@@ -909,8 +938,6 @@ async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, 
                 loyverse_sync.generar_recibo_virtual(nuevo_pedido.correo_cliente, nuevo_pedido.id, items_para_recibo, nuevo_pedido.total)
                 
             db.commit()
-            
-            # ... lo demás se queda igual (WebSocket y correos) ...
             
             # Avisamos a las pantallas del despacho
             try:
@@ -1709,3 +1736,12 @@ def probar_guia_skydropx(
         "mensaje": f"🚀 Disparando sistema logístico para el pedido {pedido.id}...",
         "instruccion": "Revisa la terminal (consola) de tu Mac en unos segundos para ver el link de la guía."
     }
+
+@app.delete("/pedidos/{pedido_id}")
+def eliminar_pedido_abandonado(pedido_id: int, db: Session = Depends(get_db)):
+    pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
+    if pedido:
+        db.delete(pedido)
+        db.commit()
+        return {"mensaje": "Carrito fantasma eliminado"}
+    raise HTTPException(status_code=404)

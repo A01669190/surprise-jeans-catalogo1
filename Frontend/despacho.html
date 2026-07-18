@@ -243,6 +243,7 @@
                 const esPagado = p.estatus === "PAGADO";
                 const esEnviado = p.estatus === "ENVIADO";
                 
+                
                 let colorBadge = "bg-gray-100 text-gray-700 border-gray-200";
                 if (p.estatus === "PAGADO") colorBadge = "bg-emerald-100 text-emerald-700 border-emerald-200";
                 if (p.estatus === "PENDIENTE") colorBadge = "bg-amber-100 text-amber-700 border-amber-200";
@@ -257,6 +258,9 @@
                 
                 const btnEntregado = esEnviado ? `<button onclick="marcarEntregado(${p.id})" class="text-[10px] font-bold text-teal-700 bg-teal-100 border border-teal-200 px-4 py-2 rounded-lg shadow-sm hover:bg-teal-200 transition-colors uppercase tracking-wider flex items-center gap-1 mt-2 w-full justify-center"><span class="text-sm">🏁</span> Marcar como Entregado</button>` : '';
 
+                // ⚡ EL NUEVO BOTÓN PARA LOS CARRITOS FANTASMAS
+                const esPendiente = p.estatus === "PENDIENTE" || p.estatus === "RECORDATORIO_ENVIADO";
+                const btnEliminar = esPendiente ? `<button onclick="borrarAbandonado(${p.id})" class="text-[10px] font-bold text-rose-700 bg-rose-100 border border-rose-200 px-4 py-2 rounded-lg shadow-sm hover:bg-rose-200 transition-colors uppercase tracking-wider flex items-center gap-1 mt-2 w-full justify-center"><span class="text-sm">🗑️</span> Borrar Abandonado</button>` : '';
                 grid.innerHTML += `
                     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
                         <div class="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
@@ -270,6 +274,7 @@
                                 ${btnPDF}
                                 ${btnWhatsApp}
                                 ${btnEntregado}
+                                ${btnEliminar} <!-- ⚡ AQUÍ LO IMPRIMES -->
                             </div>
                             <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Artículos comprados:</p>
                             <ul class="mb-2">${listaRopa}</ul>
@@ -313,6 +318,33 @@
                         setTimeout(() => { window.open(urlWA, '_blank'); cargarPedidos(); }, 1500);
                     }
                 } catch (e) { Swal.fire({icon: 'error', title: 'Error', text: 'Error de conexión.'}); }
+            }
+        }
+
+        async function borrarAbandonado(id) {
+            const result = await Swal.fire({
+                title: '¿Fulminar carrito fantasma?',
+                text: 'Esta acción borrará el pedido permanentemente de tu sistema.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#e11d48',
+                confirmButtonText: 'Sí, borrarlo'
+            });
+
+            if (result.isConfirmed) {
+                Swal.showLoading();
+                try {
+                    const res = await fetch(`${API_URL}/pedidos/${id}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${tokenPrivado}` }
+                    });
+                    if (res.ok) {
+                        Swal.fire({ icon: 'success', title: '¡Eliminado!', showConfirmButton: false, timer: 1000 });
+                        cargarPedidos();
+                    }
+                } catch(e) { 
+                    Swal.fire('Error', 'Fallo de conexión', 'error'); 
+                }
             }
         }
 
