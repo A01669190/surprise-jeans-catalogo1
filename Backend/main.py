@@ -1577,7 +1577,7 @@ def enviar_pedido(pedido_id: int, guia_data: dict, background_tasks: BackgroundT
     db.commit()
 
     # ⚡ ARMAMOS EL MENSAJE AUTOMÁTICO
-    mensaje = f"¡Hola! 👋 Somos de *Surprise Jeans*.\n\nTe avisamos que tu pedido *{pedido.folio}* ya va en camino hacia ti 🚀.\n\n"
+    mensaje = f"¡Hola! 👋 Somos de *Surprise Jeans*.\n\nTe avisamos que tu pedido *SJ-{pedido.id:04d}* ya va en camino hacia ti 🚀.\n\n"
     if pedido.guia:
         mensaje += f"📦 Tu número de rastreo es: *{pedido.guia}*\n\n"
     mensaje += "¡Gracias por tu compra!"
