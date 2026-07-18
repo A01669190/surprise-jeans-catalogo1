@@ -290,21 +290,16 @@
             }
         }
 
-        // Para que aparezca el menú superior cuando el login sea exitoso,
-        // esto interceptará la función original de tu admin.js sin romperla
-        const observerLogin = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                if (mutation.target.classList.contains('hidden')) {
-                    document.getElementById('nav-admin').classList.remove('hidden');
-                }
-            });
-        });
-        observerLogin.observe(document.getElementById('panel-login'), { attributes: true, attributeFilter: ['class'] });
-
-        // ⚡ REVISIÓN RÁPIDA: Por si Denzel ya tenía sesión iniciada
-        if (document.getElementById('panel-login').classList.contains('hidden')) {
-            document.getElementById('nav-admin').classList.remove('hidden');
-        }
+        // ⚡ VIGILANTE A PRUEBA DE BALAS
+        setInterval(() => {
+            const login = document.getElementById('panel-login');
+            const nav = document.getElementById('nav-admin');
+            
+            // Si admin.js oculta el login de cualquier manera (por clase o por estilo), forzamos mostrar el menú
+            if (login.classList.contains('hidden') || login.style.display === 'none' || getComputedStyle(login).display === 'none') {
+                nav.classList.remove('hidden');
+            }
+        }, 500);
 
         // Variables globales para destruir las gráficas viejas si cambian de pestaña
         let chartInventario = null;
@@ -379,8 +374,6 @@
             }
         }
     </script>
-
-    
 
     <script src="admin.js?v=4.0"></script>
 </body>
