@@ -21,21 +21,14 @@
                 <button onclick="cambiarPestana('inventario')" id="tab-inventario" class="bg-white text-gray-600 border border-gray-300 font-bold py-2 px-6 rounded-lg text-sm hover:bg-gray-50 transition-colors">Inventario</button>
                 <button onclick="cerrarSesion()" class="text-sm font-bold text-rose-500 hover:text-rose-700 ml-4">Salir</button>
                 <button onclick="lanzarRecuperacion()" class="bg-amber-400 hover:bg-amber-500 text-stone-900 font-bold py-2 px-4 rounded-xl shadow-sm transition-colors text-sm ml-2">🛒 Recuperar Ventas</button>
-            </div>
-            <div id="nav-botones" class="hidden flex gap-4">
-                <button onclick="cambiarPestana('pedidos')" id="tab-pedidos" class="bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg text-sm shadow">Pedidos</button>
-                <button onclick="cambiarPestana('inventario')" id="tab-inventario" class="bg-white text-gray-600 border border-gray-300 font-bold py-2 px-6 rounded-lg text-sm hover:bg-gray-50 transition-colors">Inventario</button>
-                <button onclick="cerrarSesion()" class="text-sm font-bold text-rose-500 hover:text-rose-700 ml-4">Salir</button>
-                <button onclick="lanzarRecuperacion()" class="bg-amber-400 hover:bg-amber-500 text-stone-900 font-bold py-2 px-4 rounded-xl shadow-sm transition-colors text-sm ml-2">🛒 Recuperar Ventas</button>
                 
-                <!-- ⚡ NUEVO BOTÓN DE EXCEL ⚡ -->
+                <!-- ⚡ AQUÍ DEBE ESTAR EL NUEVO BOTÓN ⚡ -->
                 <button onclick="descargarReporteExcel()" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-xl shadow-sm transition-colors text-sm ml-2 flex items-center gap-2">
                     <span class="text-lg">📊</span> Descargar Excel
                 </button>
             </div>
-
         </header>
-
+        
         <div id="pantalla-login" class="bg-white p-8 rounded-2xl shadow-sm border border-gray-200 max-w-sm mx-auto mt-20">
             <h2 class="text-xl font-bold text-center mb-6">Acceso a Almacén</h2>
             <input type="password" id="pass" placeholder="Contraseña Maestra" class="w-full p-3 border rounded-lg mb-4 outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
