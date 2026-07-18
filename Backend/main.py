@@ -52,6 +52,7 @@ import jwt
 from datetime import datetime, timedelta
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import BackgroundTasks
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="API Surprise Jeans - Fortificada")
@@ -829,6 +830,49 @@ async def robot_respaldos_diarios():
             except:
                 pass
 
+# Cuando tengas tu cuenta, las pondrás en las variables de entorno de Render
+WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN", "")
+WHATSAPP_PHONE_ID = os.getenv("WHATSAPP_PHONE_ID", "")
+
+def enviar_whatsapp_api(telefono_destino, texto_mensaje):
+    """ Función maestra para disparar mensajes de WhatsApp por Meta API """
+    # Si las variables están vacías, no hace nada (modo dormido)
+    if not WHATSAPP_TOKEN or not WHATSAPP_PHONE_ID:
+        print("⚠️ WhatsApp API apagada. Faltan credenciales.")
+        return 
+
+    # Limpiamos el teléfono (quitamos espacios y aseguramos que tenga la lada de México)
+    telefono_limpio = "".join(filter(str.isdigit, str(telefono_destino)))
+    if len(telefono_limpio) == 10:
+        telefono_limpio = "52" + telefono_limpio 
+
+    url = f"https://graph.facebook.com/v18.0/{WHATSAPP_PHONE_ID}/messages"
+    
+    headers = {
+        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": telefono_limpio,
+        "type": "text",
+        "text": {
+            "preview_url": False,
+            "body": texto_mensaje
+        }
+    }
+    
+    try:
+        req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
+        urllib.request.urlopen(req)
+        print(f"✅ WA enviado silenciosamente a {telefono_limpio}")
+    except Exception as e:
+        # Extraemos el error exacto que nos dé Facebook
+        error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
+        print(f"❌ Error WhatsApp API: {error_msg}")
+
 async def auto_destruir_abandonado(pedido_id: int):
     """ Bomba de tiempo: Espera 30 minutos y si no hay pago, destruye el carrito """
     await asyncio.sleep(1800) # 1800 segundos = 30 minutos
@@ -1490,25 +1534,28 @@ def obtener_pedidos_admin(request: Request, db: Session = Depends(get_db), token
         
     return resultado
 
-@app.patch("/pedidos/{pedido_id}/entregar")
-def marcar_pedido_entregado(pedido_id: int, db: Session = Depends(get_db), token: str = Depends(verificar_token)):
+@app.patch("/pedidos/{pedido_id}/enviar")
+def enviar_pedido(pedido_id: int, guia_data: dict, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    # Buscamos el pedido
     pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido no encontrado")
-    
-    # Cambiamos el estatus al final del ciclo
-    pedido.estatus = "ENTREGADO"
-    db.commit()
-    
-    # Avisamos en tiempo real a las pantallas conectadas
-    import asyncio
-    try:
-        loop = asyncio.get_event_loop()
-        loop.create_task(manager.broadcast("NUEVO_PEDIDO"))
-    except:
-        pass
         
-    return {"mensaje": "Pedido actualizado a ENTREGADO con éxito"}
+    # Actualizamos base de datos
+    pedido.estatus = "ENVIADO"
+    pedido.guia = guia_data.get("guia", "")
+    db.commit()
+
+    # ⚡ ARMAMOS EL MENSAJE AUTOMÁTICO
+    mensaje = f"¡Hola! 👋 Somos de *Surprise Jeans*.\n\nTe avisamos que tu pedido *{pedido.folio}* ya va en camino hacia ti 🚀.\n\n"
+    if pedido.guia:
+        mensaje += f"📦 Tu número de rastreo es: *{pedido.guia}*\n\n"
+    mensaje += "¡Gracias por tu compra!"
+
+    # ⚡ LE DECIMOS AL ROBOT QUE LO MANDE EN SEGUNDO PLANO
+    background_tasks.add_task(enviar_whatsapp_api, pedido.telefono, mensaje)
+
+    return {"mensaje": "Pedido enviado y en proceso de notificación"}
 
 @app.get("/reset-db-total")
 def reset_db_total():
