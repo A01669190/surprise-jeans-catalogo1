@@ -30,9 +30,10 @@ class PantalonRespuesta(BaseModel):
     tallas: List[VarianteResponse] = []
     imagen_url: str
     categoria_id: Optional[int] = None
+    categoria: Optional[CategoriaRespuesta] = None  # ⚡ ESTA ES LA LÍNEA MÁGICA
     stock: int
-    promedio_estrellas: float = 0.0  # ⚡ NUEVO
-    total_resenas: int = 0          # ⚡ NUEVO
+    promedio_estrellas: float = 0.0 
+    total_resenas: int = 0          
     class Config:
         from_attributes = True
 
