@@ -789,141 +789,152 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
 # 5. EL CEREBRO FINANCIERO (WEBHOOKS) 🧠
 # ==========================================
 
-
 @app.post("/crear-pago-seguro")
 async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, db: Session = Depends(get_db)):
-    # 1. CÁLCULO DE TOTALES Y APLICACIÓN DE CUPONES
-    total_pedido = 0.0
-    descuento_porc = 0.0
+    try:
+        # 1. CÁLCULO DE TOTALES Y APLICACIÓN DE CUPONES
+        total_pedido = 0.0
+        descuento_porc = 0.0
 
-    if pedido_req.cupon:
-        cupon_db = db.query(models.Cupon).filter(models.Cupon.codigo == pedido_req.cupon).first()
-        if cupon_db and cupon_db.activo:
-            descuento_porc = cupon_db.porcentaje
+        if pedido_req.cupon:
+            cupon_db = db.query(models.Cupon).filter(models.Cupon.codigo == pedido_req.cupon).first()
+            if cupon_db and cupon_db.activo:
+                descuento_porc = cupon_db.porcentaje
+            
+            if pedido_req.cupon == "VENTA-PRESENCIAL":
+                descuento_porc = 100.0
+
+        items_para_banco = []
         
-        if pedido_req.cupon == "VENTA-PRESENCIAL":
-            descuento_porc = 100.0
+        for item in pedido_req.items:
+            total_item = float(item.precio) * item.cantidad 
+            total_pedido += total_item
+            
+            precio_con_descuento = float(item.precio) * (1.0 - (descuento_porc / 100.0))
+            items_para_banco.append({
+                "title": f"[{item.codigo}] {item.nombre}",
+                "quantity": item.cantidad, 
+                "unit_price": round(precio_con_descuento, 2),
+                "currency_id": "MXN"
+            })
 
-    items_para_banco = []
-    
-    for item in pedido_req.items:
-        # ⚡ CORREGIDO: Usando item.cantidad como lo dicta tu schemas.py
-        total_item = float(item.precio) * item.cantidad 
-        total_pedido += total_item
-        
-        precio_con_descuento = float(item.precio) * (1.0 - (descuento_porc / 100.0))
-        items_para_banco.append({
-            "title": f"[{item.codigo}] {item.nombre}",
-            "quantity": item.cantidad, # La llave quantity se queda en inglés solo para Mercado Pago
-            "unit_price": round(precio_con_descuento, 2),
-            "currency_id": "MXN"
-        })
+        # 2. SISTEMA DE USUARIOS
+        auth_header = request.headers.get("Authorization")
+        cliente_db = None
+        puntos_a_descontar = 0.0
 
-    # 2. SISTEMA DE USUARIOS
-    auth_header = request.headers.get("Authorization")
-    cliente_db = None
-    puntos_a_descontar = 0.0
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            try:
+                payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+                cliente_db = db.query(models.Cliente).filter(models.Cliente.correo == payload.get("sub")).first()
+                if cliente_db:
+                    cliente_db.telefono = pedido_req.envio.telefono
+                    cliente_db.calle_numero = pedido_req.envio.calle_numero
+                    cliente_db.colonia = pedido_req.envio.colonia
+                    cliente_db.ciudad = pedido_req.envio.ciudad
+                    cliente_db.estado = pedido_req.envio.estado
+                    cliente_db.codigo_postal = pedido_req.envio.cp
+                    cliente_db.referencias_domicilio = pedido_req.envio.referencias
+                    
+                    if pedido_req.usar_puntos and cliente_db.puntos > 0:
+                        puntos_a_descontar = cliente_db.puntos
+                        cliente_db.puntos = 0.0 
+                    db.commit()
+            except:
+                pass
 
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header.split(" ")[1]
-        try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            cliente_db = db.query(models.Cliente).filter(models.Cliente.correo == payload.get("sub")).first()
-            if cliente_db:
-                cliente_db.telefono = pedido_req.envio.telefono
-                cliente_db.calle_numero = pedido_req.envio.calle_numero
-                cliente_db.colonia = pedido_req.envio.colonia
-                cliente_db.ciudad = pedido_req.envio.ciudad
-                cliente_db.estado = pedido_req.envio.estado
-                cliente_db.codigo_postal = pedido_req.envio.cp
-                cliente_db.referencias_domicilio = pedido_req.envio.referencias
-                
-                if pedido_req.usar_puntos and cliente_db.puntos > 0:
-                    puntos_a_descontar = cliente_db.puntos
-                    cliente_db.puntos = 0.0 
-                db.commit()
-        except:
-            pass
+        # 3. CÁLCULO DEL TOTAL FINAL ANTES DE CREAR EL PEDIDO
+        total_final = total_pedido * (1.0 - (descuento_porc / 100.0)) - puntos_a_descontar
+        total_final = max(0.0, total_final) 
 
-    # 3.5 CÁLCULO DEL TOTAL FINAL ANTES DE CREAR EL PEDIDO
-    total_final = total_pedido * (1.0 - (descuento_porc / 100.0)) - puntos_a_descontar
-    total_final = max(0.0, total_final) # Evitamos que un error de cupones cause un cobro negativo
-
-    # 4. CREAR PEDIDO
-    nuevo_pedido = models.Pedido(
-        correo_cliente=cliente_db.correo if cliente_db else None,
-        nombre_cliente=pedido_req.envio.nombre, telefono=pedido_req.envio.telefono,
-        calle_numero=pedido_req.envio.calle_numero, colonia=pedido_req.envio.colonia,
-        ciudad=pedido_req.envio.ciudad, estado=pedido_req.envio.estado,
-        codigo_postal=pedido_req.envio.cp, referencias=pedido_req.envio.referencias,
-        total=total_final, estatus="PENDIENTE"
-    )
-    db.add(nuevo_pedido)
-    db.commit()
-    db.refresh(nuevo_pedido)
-
-    lista_ropa = []
-    for item in pedido_req.items:
-        precio_final = float(item.precio) * (1.0 - (descuento_porc / 100.0))
-        db.add(models.DetallePedido(
-            pedido_id=nuevo_pedido.id, 
-            pantalon_id=item.id, 
-            cantidad=item.cantidad, 
-            precio_unitario=round(precio_final, 2),
-            sku_variante=item.sku_variante, # ⚡ ESTO ES CLAVE
-            talla=item.talla                # ⚡ ESTO TAMBIÉN
-        ))
-        lista_ropa.append({"cantidad": item.cantidad, "nombre": f"{item.nombre} (Talla {item.talla})", "precio": round(precio_final, 2)})
-    db.commit()
-    
-    puntos_ganados = total_final * 0.05
-    if cliente_db:
-        cliente_db.puntos += puntos_ganados
+        # 4. CREAR PEDIDO
+        nuevo_pedido = models.Pedido(
+            correo_cliente=cliente_db.correo if cliente_db else None,
+            nombre_cliente=pedido_req.envio.nombre, telefono=pedido_req.envio.telefono,
+            calle_numero=pedido_req.envio.calle_numero, colonia=pedido_req.envio.colonia,
+            ciudad=pedido_req.envio.ciudad, estado=pedido_req.envio.estado,
+            codigo_postal=pedido_req.envio.cp, referencias=pedido_req.envio.referencias,
+            total=total_final, estatus="PENDIENTE"
+        )
+        db.add(nuevo_pedido)
         db.commit()
+        db.refresh(nuevo_pedido)
 
-    # 🚨 LA MAGIA: BYPASS DE INVENTARIO Y LOYVERSE 🚨
+        lista_ropa = []
+        for item in pedido_req.items:
+            precio_final = float(item.precio) * (1.0 - (descuento_porc / 100.0))
+            db.add(models.DetallePedido(
+                pedido_id=nuevo_pedido.id, 
+                pantalon_id=item.id, 
+                cantidad=item.cantidad, 
+                precio_unitario=round(precio_final, 2),
+                sku_variante=item.sku_variante, 
+                talla=item.talla                
+            ))
+            lista_ropa.append({"cantidad": item.cantidad, "nombre": f"{item.nombre} (Talla {item.talla})", "precio": round(precio_final, 2)})
+        db.commit()
+        
+        puntos_ganados = total_final * 0.05
+        if cliente_db:
+            cliente_db.puntos += puntos_ganados
+            db.commit()
+
+        # 🚨 LA MAGIA: BYPASS DE INVENTARIO Y LOYVERSE 🚨
         if total_final <= 0 or pedido_req.cupon == "VENTA-PRESENCIAL":
             nuevo_pedido.estatus = "PAGADO"
             
             for detalle in nuevo_pedido.detalles:
-                # ⚡ EL FIX: Usamos el SKU exacto con talla y color
                 if detalle.sku_variante: 
                     variante_db = db.query(models.VarianteTalla).filter(models.VarianteTalla.sku == detalle.sku_variante).first()
                     
                     if variante_db and variante_db.stock >= detalle.cantidad:
-                        # 1. Descontamos stock de la talla
                         variante_db.stock -= detalle.cantidad
-                        # 2. Descontamos stock del total del pantalón padre
                         if variante_db.pantalon:
                             variante_db.pantalon.stock -= detalle.cantidad 
                             
-                        # 3. Le avisamos a Loyverse usando precisión láser
                         loyverse_sync.descontar_stock_loyverse(detalle.sku_variante, variante_db.stock)    
                         db.commit()
             
-            await manager.broadcast("NUEVO_PEDIDO")
-            # ... el resto del código del correo y el return se queda igual ...
-        
-        if cliente_db:
-            enviar_correo_recibo(cliente_db.correo, cliente_db.nombre_completo, f"{nuevo_pedido.id:04d}", total_final, lista_ropa, puntos_ganados)
+            # Avisamos a las pantallas del despacho
+            try:
+                import asyncio
+                loop = asyncio.get_event_loop()
+                loop.create_task(manager.broadcast("NUEVO_PEDIDO"))
+            except:
+                pass
             
-        id_pago = "TIENDA-FISICA" if pedido_req.cupon == "VENTA-PRESENCIAL" else "CUPON-GRATIS"
-        return {"link_pago": f"https://surprisejeanysk.com/?pago=exito&payment_id={id_pago}&external_reference={nuevo_pedido.id}"}
+            # Escudo protector para que el correo no rompa la compra si falla
+            if cliente_db:
+                try:
+                    enviar_correo_recibo(cliente_db.correo, cliente_db.nombre_completo, f"{nuevo_pedido.id:04d}", total_final, lista_ropa, puntos_ganados)
+                except:
+                    pass
+                
+            id_pago = "TIENDA-FISICA" if pedido_req.cupon == "VENTA-PRESENCIAL" else "CUPON-GRATIS"
+            return {"link_pago": f"https://surprisejeanysk.com/?pago=exito&payment_id={id_pago}&external_reference={nuevo_pedido.id}"}
 
-    # 5. MERCADO PAGO NORMAL
-    preference_data = {
-        "items": items_para_banco,
-        "metadata": {"pedido_interno_id": nuevo_pedido.id}, 
-        "external_reference": str(nuevo_pedido.id),
-        "back_urls": {
-            "success": "https://surprisejeanysk.com/?pago=exito",
-            "failure": "https://surprisejeanysk.com/?pago=fallo",
-            "pending": "https://surprisejeanysk.com/?pago=pendiente"
-        },
-        "auto_return": "approved",
-        "notification_url": "https://surprise-jeans-api-denz.onrender.com/webhook/mercadopago",
-        "statement_descriptor": "SURPRISE JEANS" 
-    }
+        # 5. MERCADO PAGO NORMAL
+        preference_data = {
+            "items": items_para_banco,
+            "metadata": {"pedido_interno_id": nuevo_pedido.id}, 
+            "external_reference": str(nuevo_pedido.id),
+            "back_urls": {
+                "success": "https://surprisejeanysk.com/?pago=exito",
+                "failure": "https://surprisejeanysk.com/?pago=fallo",
+                "pending": "https://surprisejeanysk.com/?pago=pendiente"
+            },
+            "auto_return": "approved",
+            "notification_url": "https://surprise-jeans-api-denz.onrender.com/webhook/mercadopago",
+            "statement_descriptor": "SURPRISE JEANS" 
+        }
+        
+        preference_response = sdk.preference().create(preference_data)
+        return {"link_pago": preference_response["response"]["init_point"]}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
     respuesta = sdk.preference().create(preference_data)
     if respuesta["status"] != 201:
