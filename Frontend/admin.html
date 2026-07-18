@@ -6,6 +6,8 @@
     <title>Panel Admin | Surprise Jeans</title>
     <link rel="icon" type="image/png" href="https://ibb.co/vxLDWnbj?v=2">
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- ⚡ NUEVO: Motor de Gráficas Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-gray-200 p-4 sm:p-8 font-sans relative">
     
@@ -23,7 +25,20 @@
         </div>
     </div>
 
-    <div class="max-w-md mx-auto space-y-6">
+    <!-- ⚡ MENÚ DE NAVEGACIÓN SUPERIOR -->
+    <div id="nav-admin" class="max-w-5xl mx-auto mb-6 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center hidden">
+        <div>
+            <h1 class="text-xl font-black text-indigo-600">Admin <span class="text-gray-900">Surprise Jeans</span></h1>
+            <p class="text-[10px] text-gray-500 uppercase tracking-widest">Centro de Mando</p>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="cambiarPestanaAdmin('catalogo')" id="tab-catalogo" class="bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg text-sm shadow transition-colors">📦 Catálogo</button>
+            <button onclick="cambiarPestanaAdmin('dashboard')" id="tab-dashboard" class="bg-white text-gray-600 border border-gray-300 font-bold py-2 px-6 rounded-lg text-sm hover:bg-gray-50 transition-colors">📊 Estadísticas</button>
+        </div>
+    </div>
+
+    <!-- ⚡ PESTAÑA 1: GESTIÓN DE CATÁLOGO (Lo que ya tenías) -->
+    <div id="vista-catalogo" class="max-w-md mx-auto space-y-6">
         
         <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
             <h2 class="text-xl font-black text-gray-800 mb-4">1. Administrar Categorías</h2>
@@ -202,7 +217,163 @@
                 </button>
             </form>
         </div>
+    </div> <!-- Este div cierra la vista-catalogo -->
+
+    <!-- ⚡ PESTAÑA 2: DASHBOARD VISUAL (Nuevo) -->
+    <div id="vista-dashboard" class="max-w-5xl mx-auto hidden space-y-6">
+        
+        <!-- Tarjetas de Resumen Rápido -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+                <div class="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center text-2xl shadow-inner">👖</div>
+                <div>
+                    <p class="text-xs text-gray-400 font-bold uppercase tracking-wider">Total de Modelos</p>
+                    <p id="dash-total-modelos" class="text-2xl font-black text-gray-800">0</p>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+                <div class="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center text-2xl shadow-inner">📦</div>
+                <div>
+                    <p class="text-xs text-gray-400 font-bold uppercase tracking-wider">Piezas en Stock</p>
+                    <p id="dash-total-stock" class="text-2xl font-black text-gray-800">0</p>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+                <div class="w-14 h-14 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center text-2xl shadow-inner">⚠️</div>
+                <div>
+                    <p class="text-xs text-gray-400 font-bold uppercase tracking-wider">Modelos Agotados</p>
+                    <p id="dash-agotados" class="text-2xl font-black text-rose-600">0</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Zona de Gráficas Mágicas -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Gráfica de Barras: Top Modelos con más inventario -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <h3 class="text-sm font-black text-gray-800 mb-4 uppercase tracking-wide">Top 5: Modelos con mayor inventario</h3>
+                <canvas id="graficaInventario" height="200"></canvas>
+            </div>
+            
+            <!-- Gráfica de Pastel: Distribución de Tallas -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <h3 class="text-sm font-black text-gray-800 mb-4 uppercase tracking-wide">Distribución Global de Tallas</h3>
+                <div class="flex justify-center">
+                    <canvas id="graficaTallas" height="200"></canvas>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <!-- ⚡ MOTOR DE LAS GRÁFICAS -->
+    <script>
+        // Sistema de Pestañas
+        function cambiarPestanaAdmin(pestana) {
+            const btnCatalogo = document.getElementById('tab-catalogo');
+            const btnDashboard = document.getElementById('tab-dashboard');
+            const vistaCatalogo = document.getElementById('vista-catalogo');
+            const vistaDashboard = document.getElementById('vista-dashboard');
+            
+            if(pestana === 'catalogo') {
+                btnCatalogo.className = "bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg text-sm shadow transition-colors";
+                btnDashboard.className = "bg-white text-gray-600 border border-gray-300 font-bold py-2 px-6 rounded-lg text-sm hover:bg-gray-50 transition-colors";
+                vistaCatalogo.classList.remove('hidden');
+                vistaDashboard.classList.add('hidden');
+            } else {
+                btnDashboard.className = "bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg text-sm shadow transition-colors";
+                btnCatalogo.className = "bg-white text-gray-600 border border-gray-300 font-bold py-2 px-6 rounded-lg text-sm hover:bg-gray-50 transition-colors";
+                vistaDashboard.classList.remove('hidden');
+                vistaCatalogo.classList.add('hidden');
+                
+                // Dibujamos las gráficas solo cuando abren la pestaña para que se vean frescas
+                renderizarDashboard();
+            }
+        }
+
+        // Para que aparezca el menú superior cuando el login sea exitoso,
+        // esto interceptará la función original de tu admin.js sin romperla
+        const observerLogin = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.target.classList.contains('hidden')) {
+                    document.getElementById('nav-admin').classList.remove('hidden');
+                }
+            });
+        });
+        observerLogin.observe(document.getElementById('panel-login'), { attributes: true, attributeFilter: ['class'] });
+
+        // Variables globales para destruir las gráficas viejas si cambian de pestaña
+        let chartInventario = null;
+        let chartTallas = null;
+
+        async function renderizarDashboard() {
+            try {
+                // Hacemos una llamada rápida a tu API para traer el catálogo actual
+                const respuesta = await fetch('https://surprise-jeans-api-denz.onrender.com/pantalones?limit=1000');
+                const catalogo = await respuesta.json();
+                
+                // 1. Llenamos las tarjetas de resumen
+                let totalStock = 0;
+                let agotados = 0;
+                catalogo.forEach(p => {
+                    totalStock += p.stock;
+                    if (p.stock === 0) agotados++;
+                });
+                
+                document.getElementById('dash-total-modelos').innerText = catalogo.length;
+                document.getElementById('dash-total-stock').innerText = totalStock;
+                document.getElementById('dash-agotados').innerText = agotados;
+
+                // 2. Preparamos datos para la Gráfica de Barras (Top 5 inventario)
+                const topInventario = [...catalogo].sort((a, b) => b.stock - a.stock).slice(0, 5);
+                const nombresBar = topInventario.map(p => p.nombre.substring(0, 15) + '...');
+                const stockBar = topInventario.map(p => p.stock);
+
+                if(chartInventario) chartInventario.destroy(); // Limpiamos canvas previo
+                const ctxBar = document.getElementById('graficaInventario').getContext('2d');
+                chartInventario = new Chart(ctxBar, {
+                    type: 'bar',
+                    data: {
+                        labels: nombresBar,
+                        datasets: [{
+                            label: 'Piezas en bodega',
+                            data: stockBar,
+                            backgroundColor: '#4f46e5', // Indigo 600
+                            borderRadius: 6
+                        }]
+                    },
+                    options: { scales: { y: { beginAtZero: true } }, responsive: true, maintainAspectRatio: false }
+                });
+
+                // 3. Preparamos datos para la Gráfica de Pastel (Tallas)
+                let conteoTallas = { '3':0, '5':0, '7':0, '9':0, '11':0, '13':0, '15':0 };
+                catalogo.forEach(p => {
+                    if(p.tallas && p.tallas.length > 0) {
+                        p.tallas.forEach(t => {
+                            if(conteoTallas[t.talla] !== undefined) conteoTallas[t.talla] += t.stock;
+                        });
+                    }
+                });
+
+                if(chartTallas) chartTallas.destroy();
+                const ctxPie = document.getElementById('graficaTallas').getContext('2d');
+                chartTallas = new Chart(ctxPie, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Talla 3', 'Talla 5', 'Talla 7', 'Talla 9', 'Talla 11', 'Talla 13', 'Talla 15'],
+                        datasets: [{
+                            data: Object.values(conteoTallas),
+                            backgroundColor: ['#f43f5e', '#f97316', '#eab308', '#22c55e', '#0ea5e9', '#6366f1', '#a855f7'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+
+            } catch (error) {
+                console.error("No se pudo cargar la data para el dashboard", error);
+            }
+        }
+    </script>
 
     
 
