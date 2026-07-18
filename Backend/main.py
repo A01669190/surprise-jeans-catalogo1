@@ -56,6 +56,13 @@ from fastapi import WebSocket, WebSocketDisconnect
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="API Surprise Jeans - Fortificada")
 
+@app.on_event("startup")
+async def iniciar_tareas_fondo():
+    import asyncio
+    loop = asyncio.get_event_loop()
+    loop.create_task(robot_respaldos_diarios())
+    print("🤖 Robot de respaldos inicializado.")
+
 # ==========================================
 # 📝 SISTEMA DE LOGS PROFESIONAL (Caja Negra)
 # ==========================================
@@ -789,6 +796,38 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
 # ==========================================
 # 5. EL CEREBRO FINANCIERO (WEBHOOKS) 🧠
 # ==========================================
+async def robot_respaldos_diarios():
+    """ Despierta cada 24 horas para hacer un backup de la base de datos """
+    while True:
+        # 86400 segundos = 24 horas
+        await asyncio.sleep(86400) 
+        try:
+            db = SessionLocal()
+            pedidos = db.query(models.Pedido).all()
+            clientes = db.query(models.Cliente).all()
+            
+            fecha = datetime.datetime.now().strftime("%Y-%m-%d")
+            nombre_archivo = f"respaldo_sj_{fecha}.json"
+            
+            respaldo = {
+                "fecha_respaldo": fecha,
+                "total_pedidos": len(pedidos),
+                "total_clientes": len(clientes),
+                "pedidos": [{"id": p.id, "folio": p.folio, "total": p.total, "estatus": p.estatus} for p in pedidos],
+                "clientes": [{"id": c.id, "nombre": c.nombre_completo, "correo": c.correo} for c in clientes]
+            }
+            
+            with open(nombre_archivo, "w", encoding="utf-8") as f:
+                json.dump(respaldo, f, ensure_ascii=False, indent=4)
+                
+            print(f"🛡️✅ Bóveda asegurada: {nombre_archivo} creado con éxito.")
+        except Exception as e:
+            print(f"❌ Error al crear el respaldo: {e}")
+        finally:
+            try:
+                db.close()
+            except:
+                pass
 
 async def auto_destruir_abandonado(pedido_id: int):
     """ Bomba de tiempo: Espera 30 minutos y si no hay pago, destruye el carrito """
