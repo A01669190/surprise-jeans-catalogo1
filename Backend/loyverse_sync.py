@@ -284,6 +284,12 @@ def generar_recibo_virtual(correo_cliente, folio_interno, items_comprados, total
             req_pos.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
             pos_id = json.loads(urllib.request.urlopen(req_pos).read().decode('utf-8'))["pos_devices"][0]["id"]
 
+            # ⚡ EL FIX 1: Pedimos el método de pago configurado en tu tienda
+            req_pay = urllib.request.Request("https://api.loyverse.com/v1.0/payment_types")
+            req_pay.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
+            payment_type_id = json.loads(urllib.request.urlopen(req_pay).read().decode('utf-8'))["payment_types"][0]["id"]
+            
+
             # 2. Buscar al cliente para pegarlo al ticket
             customer_id = None
             if correo_cliente:
@@ -321,6 +327,7 @@ def generar_recibo_virtual(correo_cliente, folio_interno, items_comprados, total
             fecha_iso = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
             # 4. Armar y cobrar el ticket final
+            # 4. Armar y cobrar el ticket final
             recibo = {
                 "receipt_number": f"WEB-{folio_interno:04d}",
                 "receipt_type": "SALE",
@@ -330,7 +337,14 @@ def generar_recibo_virtual(correo_cliente, folio_interno, items_comprados, total
                 "receipt_date": fecha_iso,
                 "total_money": total_pagado,
                 "net_amount": total_pagado,
-                "line_items": line_items
+                "line_items": line_items,
+                # ⚡ EL FIX 2: Le decimos cómo nos pagó
+                "payments": [
+                    {
+                        "payment_type_id": payment_type_id,
+                        "money_amount": total_pagado
+                    }
+                ]
             }
 
             if customer_id:
