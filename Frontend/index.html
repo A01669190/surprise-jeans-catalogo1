@@ -522,8 +522,7 @@
     </div>
 
     <!-- AQUÍ EMPIEZA EL MODAL ASISTENTE (LIBRE) -->
-    <div id="modal-asistente" class="fixed inset-0 bg-stone-900 bg-opacity-75 z-[70] hidden flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+    <div id="modal-asistente" class="fixed inset-0 bg-stone-900 bg-opacity-75 z-[9999] hidden flex items-center justify-center p-4">        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
             <h3 class="text-xl font-black text-stone-900 mb-2">Asistente de Talla 📏</h3>
             <p class="text-xs text-stone-500 mb-6">Ingresa tus medidas en centímetros para encontrar tu match perfecto.</p>
             
@@ -628,32 +627,49 @@
             const cadera = parseFloat(document.getElementById('medida-cadera').value);
 
             if (!cintura || !cadera) {
-                Swal.fire('Atención', 'Por favor ingresa ambas medidas.', 'warning');
+                // Ocultar temporalmente para que la alerta de error no quede por detrás
+                document.getElementById('modal-asistente').classList.add('hidden');
+                Swal.fire('Atención', 'Por favor ingresa ambas medidas.', 'warning').then(() => {
+                    document.getElementById('modal-asistente').classList.remove('hidden');
+                });
                 return;
             }
 
-            // Algoritmo de Tallas (Ajusta estos rangos según tus patrones reales)
-            let tallaSugerida = "Consulta con Yessica en WhatsApp";
+            // ⚡ CLAVE: Ocultamos el asistente ANTES de mostrar el resultado
+            document.getElementById('modal-asistente').classList.add('hidden');
+
+            // Nuevo algoritmo más profesional
+            let tallaSugerida = "";
             
-            if (cintura <= 65 && cadera <= 88) tallaSugerida = "3";
-            else if (cintura <= 68 && cadera <= 92) tallaSugerida = "5";
-            else if (cintura <= 72 && cadera <= 96) tallaSugerida = "7";
-            else if (cintura <= 76 && cadera <= 100) tallaSugerida = "9";
-            else if (cintura <= 80 && cadera <= 104) tallaSugerida = "11";
-            else if (cintura <= 84 && cadera <= 108) tallaSugerida = "13";
-            else if (cintura <= 88 && cadera <= 112) tallaSugerida = "15";
+            if (cintura > 120) {
+                tallaSugerida = "Medida irreal (Revisa tus números)";
+            } else if (cintura <= 65) {
+                tallaSugerida = "3";
+            } else if (cintura <= 68) {
+                tallaSugerida = "5";
+            } else if (cintura <= 72) {
+                tallaSugerida = "7";
+            } else if (cintura <= 76) {
+                tallaSugerida = "9";
+            } else if (cintura <= 80) {
+                tallaSugerida = "11";
+            } else if (cintura <= 84) {
+                tallaSugerida = "13";
+            } else if (cintura <= 92) {
+                tallaSugerida = "15";
+            } else {
+                tallaSugerida = "Talla Especial"; 
+            }
 
             Swal.fire({
                 title: '¡Tu Fit Perfecto!',
                 html: `<div class="py-4">
                         <p class="text-sm">Basado en tus medidas, tu talla ideal es:</p>
-                        <p class="text-5xl font-black text-indigo-600 my-4">${tallaSugerida}</p>
+                        <p class="text-4xl font-black text-indigo-600 my-4">${tallaSugerida}</p>
                         <p class="text-[10px] text-stone-400">Recuerda que nuestra mezclilla estira, esta es una sugerencia basada en nuestro corte estándar.</p>
                     </div>`,
                 confirmButtonText: '¡Entendido!',
                 confirmButtonColor: '#4f46e5'
-            }).then(() => {
-                document.getElementById('modal-asistente').classList.add('hidden');
             });
         }
 
