@@ -279,7 +279,8 @@ def generar_recibo_virtual(correo_cliente, folio_interno, items_comprados, total
             req_emp.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
             employee_id = json.loads(urllib.request.urlopen(req_emp).read().decode('utf-8'))["employees"][0]["id"]
 
-            req_pos = urllib.request.Request("https://api.loyverse.com/v1.0/pos")
+            # ⚡ EL FIX: La ruta correcta es pos_devices
+            req_pos = urllib.request.Request("https://api.loyverse.com/v1.0/pos_devices")
             req_pos.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
             pos_id = json.loads(urllib.request.urlopen(req_pos).read().decode('utf-8'))["pos_devices"][0]["id"]
 
