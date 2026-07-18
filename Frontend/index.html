@@ -2429,8 +2429,8 @@
             clearTimeout(fomoTimeout);
             fomoTimeout = setTimeout(() => {
                 cerrarFomo();
-                // Programar la siguiente aparición (entre 15 y 30 segundos después)
-                setTimeout(mostrarNotificacionFOMO, Math.random() * 15000 + 15000);
+                // ⚡ Programar la siguiente aparición (entre 45 y 90 segundos después)
+                setTimeout(mostrarNotificacionFOMO, Math.random() * 45000 + 45000);
             }, 5000);
         }
 
@@ -2440,9 +2440,9 @@
             if(notificacion) notificacion.classList.add('-translate-x-[150%]');
         }
 
-        // Arrancamos el motor automáticamente 6 segundos después de que el cliente entra a la página
+        // ⚡ Arrancamos el motor automáticamente 15 segundos después de que entran a la página
         document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(mostrarNotificacionFOMO, 6000);
+            setTimeout(mostrarNotificacionFOMO, 15000);
         });
 
     </script>
