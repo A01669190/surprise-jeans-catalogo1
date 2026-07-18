@@ -111,10 +111,11 @@
         <h2 class="text-4xl md:text-6xl font-serif mb-4 text-stone-800 tracking-tight">Realza tu figura</h2>
         <p class="text-stone-500 mb-10 max-w-lg mx-auto text-sm md:text-base font-medium">Descubre nuestra nueva colección. El fit perfecto diseñado para ti, directo de fábrica.</p>
         
-        <!-- Buscador Elegante (Lupa corregida y alineada) -->
+        <!-- Buscador Elegante (Lupa corregida al 100%) -->
         <div class="max-w-2xl mx-auto relative shadow-xl rounded-full transform transition-transform hover:scale-[1.02]">
-            <input type="text" id="buscador-tienda" autocomplete="off" name="busqueda" data-lpignore="true" placeholder="¿Qué modelo buscas? (Ej. Skinny, Mom...)" class="w-full border-none bg-white p-4 md:p-5 rounded-full pl-16 focus:outline-none focus:ring-4 focus:ring-rose-200 transition-all text-sm md:text-base text-gray-800 font-medium">                   
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-6 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <!-- Usamos py (arriba/abajo) y pl/pr (lados) por separado para que no choquen -->
+            <input type="text" id="buscador-tienda" autocomplete="off" name="busqueda" data-lpignore="true" placeholder="¿Qué modelo buscas? (Ej. Skinny, Mom...)" class="w-full border-none bg-white py-4 md:py-5 pr-6 pl-14 md:pl-16 rounded-full focus:outline-none focus:ring-4 focus:ring-rose-200 transition-all text-sm md:text-base text-gray-800 font-medium">                   
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-5 md:left-6 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
         </div>
