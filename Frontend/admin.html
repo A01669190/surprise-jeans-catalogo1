@@ -251,7 +251,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Gráfica de Barras: Top Modelos con más inventario -->
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 class="text-sm font-black text-gray-800 mb-4 uppercase tracking-wide">Top 5: Modelos con mayor inventario</h3>
+                <h3 class="text-sm font-black text-gray-800 mb-4 uppercase tracking-wide">Top 5: Modelos más vendidos 🔥</h3>
                 <!-- ⚡ LA CURA DEL LAG: Un contenedor con "relative" y altura fija ("h-64") -->
                 <div class="relative h-64 w-full"> 
                     <canvas id="graficaInventario"></canvas>
@@ -310,11 +310,17 @@
 
         async function renderizarDashboard() {
             try {
-                // Hacemos una llamada rápida a tu API para traer el catálogo actual
-                const respuesta = await fetch('https://surprise-jeans-api-denz.onrender.com/pantalones?limit=1000');
-                const catalogo = await respuesta.json();
+                // 1. Traemos el catálogo (para las tarjetas y las tallas)
+                const respuestaCatalogo = await fetch('https://surprise-jeans-api-denz.onrender.com/pantalones?limit=1000');
+                const catalogo = await respuestaCatalogo.json();
                 
-                // 1. Llenamos las tarjetas de resumen
+                // 2. Traemos las ventas reales (usando la llave maestra)
+                const respuestaVentas = await fetch('https://surprise-jeans-api-denz.onrender.com/pedidos-admin', {
+                    headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token_vip')}` }
+                });
+                const pedidos = respuestaVentas.ok ? await respuestaVentas.json() : [];
+                
+                // Llenamos las tarjetas de resumen
                 let totalStock = 0;
                 let agotados = 0;
                 catalogo.forEach(p => {
@@ -326,28 +332,44 @@
                 document.getElementById('dash-total-stock').innerText = totalStock;
                 document.getElementById('dash-agotados').innerText = agotados;
 
-                // 2. Preparamos datos para la Gráfica de Barras (Top 5 inventario)
-                const topInventario = [...catalogo].sort((a, b) => b.stock - a.stock).slice(0, 5);
-                const nombresBar = topInventario.map(p => p.nombre.substring(0, 15) + '...');
-                const stockBar = topInventario.map(p => p.stock);
+                // ⚡ MAGIA DE VENTAS: Contamos cuántas veces se vendió cada modelo
+                let contadorVentas = {};
+                pedidos.forEach(pedido => {
+                    // Solo contamos los pedidos que ya se pagaron, enviaron o entregaron
+                    if (pedido.estatus !== 'PENDIENTE' && pedido.estatus !== 'RECORDATORIO_ENVIADO') {
+                        pedido.detalles.forEach(item => {
+                            if (!contadorVentas[item.nombre]) contadorVentas[item.nombre] = 0;
+                            contadorVentas[item.nombre] += item.cantidad;
+                        });
+                    }
+                });
+
+                // Convertimos el conteo a una lista y sacamos los 5 ganadores
+                const topVentas = Object.entries(contadorVentas)
+                    .map(([nombre, cantidad]) => ({ nombre, cantidad }))
+                    .sort((a, b) => b.cantidad - a.cantidad)
+                    .slice(0, 5);
+
+                const nombresBar = topVentas.map(v => v.nombre.substring(0, 15) + '...');
+                const ventasBar = topVentas.map(v => v.cantidad);
 
                 if(chartInventario) chartInventario.destroy(); // Limpiamos canvas previo
                 const ctxBar = document.getElementById('graficaInventario').getContext('2d');
                 chartInventario = new Chart(ctxBar, {
                     type: 'bar',
                     data: {
-                        labels: nombresBar,
+                        labels: nombresBar.length > 0 ? nombresBar : ['Sin ventas aún'],
                         datasets: [{
-                            label: 'Piezas en bodega',
-                            data: stockBar,
-                            backgroundColor: '#4f46e5', // Indigo 600
+                            label: 'Unidades Vendidas',
+                            data: ventasBar.length > 0 ? ventasBar : [0],
+                            backgroundColor: '#10b981', // Cambiamos a verde esmeralda (Dinero)
                             borderRadius: 6
                         }]
                     },
                     options: { scales: { y: { beginAtZero: true } }, responsive: true, maintainAspectRatio: false }
                 });
 
-                // 3. Preparamos datos para la Gráfica de Pastel (Tallas)
+                // Preparamos datos para la Gráfica de Pastel (Tallas)
                 let conteoTallas = { '3':0, '5':0, '7':0, '9':0, '11':0, '13':0, '15':0 };
                 catalogo.forEach(p => {
                     if(p.tallas && p.tallas.length > 0) {
