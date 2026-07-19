@@ -5,6 +5,7 @@ from fastapi.responses import Response
 from reportlab.pdfgen import canvas
 from datetime import datetime
 from logistica_sync import generar_guia_envio
+import threading
 from reportlab.graphics.barcode import code128
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import mm
@@ -337,8 +338,24 @@ def force_ipv4_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
 socket.getaddrinfo = force_ipv4_getaddrinfo
 
 # ==========================================
-# 🚨 MOTOR DE CORREOS GMAIL SMTP (SSL PUERTO 465) 🚨
+# 🚨 MOTOR DE CORREOS GMAIL SMTP (BLINDADO) 🚨
 # ==========================================
+def _enviar_async(correo_destino, asunto, html_content, gmail_user, gmail_password):
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = asunto
+    msg["From"] = f"Surprise Jeans <{gmail_user}>"
+    msg["To"] = correo_destino
+    msg.attach(MIMEText(html_content, "html"))
+
+    try:
+        # ⚡ BLINDAJE 1: Timeout de 4 segundos máximo (si Render lo bloquea, se rinde para no trabar el servidor)
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=4) as servidor:
+            servidor.login(gmail_user, gmail_password)
+            servidor.sendmail(gmail_user, correo_destino, msg.as_string())
+        print(f"📧 Correo SMTP enviado con éxito a: {correo_destino}")
+    except Exception as e:
+        print(f"❌ Correo bloqueado (Posible restricción de Render): {e}")
+
 def enviar_correo_gmail(correo_destino, asunto, html_content):
     gmail_user = os.getenv("GMAIL_USER", "denzellopezcabrera@gmail.com")
     gmail_password = os.getenv("GMAIL_PASSWORD", "") 
@@ -347,23 +364,12 @@ def enviar_correo_gmail(correo_destino, asunto, html_content):
         print("Advertencia: GMAIL_PASSWORD no está configurada.")
         return False
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = asunto
-    msg["From"] = f"Surprise Jeans <{gmail_user}>"
-    msg["To"] = correo_destino
-    msg.attach(MIMEText(html_content, "html"))
-
-    try:
-        # Hacemos la conexión usando nuestro túnel IPv4 forzado
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as servidor:
-            servidor.login(gmail_user, gmail_password)
-            servidor.sendmail(gmail_user, correo_destino, msg.as_string())
-        
-        print(f"📧 Correo SMTP enviado con éxito a: {correo_destino}")
-        return True
-    except Exception as e:
-        print(f"❌ Error al enviar correo por SMTP de Gmail: {e}")
-        return False
+    # ⚡ BLINDAJE 2: Disparamos el correo en un "hilo fantasma" paralelo. 
+    # Así la clienta no se queda viendo la pantalla de carga trabada si Render bloquea el puerto.
+    hilo = threading.Thread(target=_enviar_async, args=(correo_destino, asunto, html_content, gmail_user, gmail_password))
+    hilo.start()
+    
+    return True
     
 def enviar_correo_actualizacion_envio(correo_destino, nombre, folio, estatus_envio, guia, link_rastreo):
     mensajes = {
