@@ -1891,22 +1891,32 @@
             carrito.forEach(item => piezasTotales += item.cantidad);
 
             // Calcular costo de paquetería
+            // Calcular costo de paquetería
             const selectPaqueteria = document.getElementById('chk-paqueteria');
             let costoEnvio = 250; // Por defecto
             
             if (selectPaqueteria) {
                 const opcion = selectPaqueteria.value;
-                if (opcion === 'estandar_250') costoEnvio = 250;
-                if (opcion === 'autobus_150') costoEnvio = 150;
-                if (opcion === 'local_0') costoEnvio = 0;
-                
-                // ⚡ REGLA DE ORO: Envío gratis a partir de 6 piezas (Excepto recolección local que ya es 0)
                 const msgGratis = document.getElementById('msg-envio-gratis');
-                if (piezasTotales >= 6 && opcion !== 'local_0') {
-                    costoEnvio = 0;
-                    if(msgGratis) msgGratis.classList.remove('hidden');
-                } else {
+                
+                if (opcion === 'local_0') {
+                    costoEnvio = 0; // Recoger en tienda siempre es gratis
                     if(msgGratis) msgGratis.classList.add('hidden');
+                } else {
+                    // ⚡ LÓGICA DE ENVÍO SENCILLA (Sin calcular peso)
+                    if (piezasTotales >= 6) {
+                        // Envío Gratis a partir de 6 piezas
+                        costoEnvio = 0;
+                        if(msgGratis) {
+                            msgGratis.innerText = "🎉 ¡Felicidades! Tienes envío gratis por llevar 6 o más prendas.";
+                            msgGratis.className = "text-xs text-emerald-600 font-bold mt-2 block";
+                            msgGratis.classList.remove('hidden');
+                        }
+                    } else {
+                        // Costo normal (1 a 5 piezas)
+                        costoEnvio = opcion === 'autobus_150' ? 150 : 250;
+                        if(msgGratis) msgGratis.classList.add('hidden');
+                    }
                 }
             }
 
@@ -2218,6 +2228,7 @@
                             </div>
                         `;
                     }
+                    // ⚡ NUEVOS BOTONES DOBLES
                     botonPrincipalModal = `<button onclick="agregarAlCarrito(${id}, this); setTimeout(() => Swal.close(), 800);" class="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-3.5 rounded-xl mt-2 shadow-lg transition-all duration-300">AÑADIR A LA BOLSA</button>`;
                 } else {
                     // Si no hay stock, mostramos el botón de la campanita
@@ -2512,6 +2523,11 @@
         document.addEventListener('DOMContentLoaded', () => {
             setTimeout(mostrarNotificacionFOMO, 15000);
         });
+
+
+        // ==========================================
+        // ⚡ AUTOMATIZACIÓN DE MAYOREO (PAQUETE CERRADO)
+        // ==========================================
 
     </script>
     
