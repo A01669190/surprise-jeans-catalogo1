@@ -73,36 +73,40 @@
             </div>
             
             <h3 class="font-bold text-gray-800 mb-4 border-b border-gray-100 pb-2">Ellas ya usan Surprise 💖</h3>
-            <p class="text-xs text-gray-500 mb-4">El fit perfecto, directo a tu clóset.</p>
             
-            <!-- Feed Vertical de Fotos -->
-            <div class="space-y-4">
-                <!-- Tarjeta 1 -->
-                <div class="relative w-full h-64 rounded-2xl overflow-hidden shadow-sm border border-gray-100 group cursor-pointer">
-                    <img src="https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&q=80&w=600" alt="Clienta 1" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700 ease-out">
+            <!-- ⚡ CARRUSEL AUTOMÁTICO DE MODELOS -->
+            <div id="carrusel-lookbook" class="flex overflow-x-auto gap-4 snap-x snap-mandatory hide-scroll-bar scroll-smooth mb-8 pb-4">
+                
+                <div class="snap-center shrink-0 w-64 relative h-64 rounded-2xl overflow-hidden shadow-sm border border-gray-100 group">
+                    <img src="https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&q=80&w=600" class="w-full h-full object-cover">
                     <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-stone-900/90 via-stone-900/40 to-transparent p-4 pt-12">
                         <p class="text-white font-black text-xs tracking-wide">@sofia_mtz</p>
-                        <p class="text-stone-200 text-[10px] mt-1 font-medium leading-relaxed">"El mejor fit que he probado. Super recomendados chicas."</p>
+                        <p class="text-stone-200 text-[10px] mt-1 font-medium leading-relaxed">"El mejor fit que he probado."</p>
                     </div>
                 </div>
 
-                <!-- Tarjeta 2 -->
-                <div class="relative w-full h-64 rounded-2xl overflow-hidden shadow-sm border border-gray-100 group cursor-pointer">
-                    <img src="https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?auto=format&fit=crop&q=80&w=600" alt="Clienta 2" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700 ease-out">
+                <div class="snap-center shrink-0 w-64 relative h-64 rounded-2xl overflow-hidden shadow-sm border border-gray-100 group">
+                    <img src="https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?auto=format&fit=crop&q=80&w=600" class="w-full h-full object-cover">
                     <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-stone-900/90 via-stone-900/40 to-transparent p-4 pt-12">
                         <p class="text-white font-black text-xs tracking-wide">@valeria.style</p>
-                        <p class="text-stone-200 text-[10px] mt-1 font-medium leading-relaxed">"Amo la calidad de esta mezclilla. Horman divino."</p>
+                        <p class="text-stone-200 text-[10px] mt-1 font-medium leading-relaxed">"Amo la calidad de esta mezclilla."</p>
                     </div>
                 </div>
 
-                <!-- Tarjeta 3 -->
-                <div class="relative w-full h-64 rounded-2xl overflow-hidden shadow-sm border border-gray-100 group cursor-pointer">
-                    <img src="https://images.unsplash.com/photo-1604136172384-a1e50882e3c0?auto=format&fit=crop&q=80&w=600" alt="Clienta 3" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700 ease-out">
+                <div class="snap-center shrink-0 w-64 relative h-64 rounded-2xl overflow-hidden shadow-sm border border-gray-100 group">
+                    <img src="https://images.unsplash.com/photo-1604136172384-a1e50882e3c0?auto=format&fit=crop&q=80&w=600" class="w-full h-full object-cover">
                     <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-stone-900/90 via-stone-900/40 to-transparent p-4 pt-12">
                         <p class="text-white font-black text-xs tracking-wide">@karen_gdl</p>
-                        <p class="text-stone-200 text-[10px] mt-1 font-medium leading-relaxed">"100% confiables. Hice mi pedido y llegó rapidísimo a GDL."</p>
+                        <p class="text-stone-200 text-[10px] mt-1 font-medium leading-relaxed">"Llegó rapidísimo a GDL."</p>
                     </div>
                 </div>
+
+            </div>
+
+            <!-- ⚡ AQUÍ ABAJO SE QUEDA TU CONTENEDOR DE RESEÑAS DINÁMICAS -->
+            <p class="text-xs text-gray-500 mb-4 font-bold uppercase tracking-widest">Lo que dicen de nosotros</p>
+            <div id="carrusel-resenas" class="space-y-4">
+                <p class="text-xs text-gray-400 font-bold animate-pulse text-center my-6">Cargando reseñas verificadas...</p>
             </div>
 
             <!-- Botones a Redes Sociales (Facebook y TikTok) -->
@@ -1226,7 +1230,11 @@
                             return `
                             <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4 shadow-sm">
                                 <div class="flex justify-between items-center mb-3">
-                                    <p class="font-black text-sm text-indigo-900">${p.folio}</p>
+                                    <div class="flex items-center gap-2">
+                                        <p class="font-black text-sm text-indigo-900">${p.folio}</p>
+                                        <!-- ⚡ BOTÓN DE RECIBO PDF -->
+                                        <button onclick="descargarMiRecibo(${p.id}, '${p.folio}')" class="text-[10px] bg-white border border-gray-200 text-gray-600 font-bold px-2 py-1 rounded hover:bg-gray-100 hover:text-indigo-600 transition-colors shadow-sm flex items-center gap-1">📄 PDF</button>
+                                    </div>
                                     <p class="font-black text-gray-900">$${p.total.toFixed(2)}</p>
                                 </div>
                                 
@@ -1365,6 +1373,86 @@
             document.getElementById('menu-lateral').classList.add('-translate-x-full');
             document.getElementById('overlay-menu').classList.add('hidden');
         }
+
+        // ==========================================
+        // 📄 DESCARGA DE RECIBO PDF
+        // ==========================================
+        function descargarMiRecibo(pedidoId, folio) {
+            const token = localStorage.getItem('token_cliente_sj');
+            if(!token) return;
+
+            Swal.fire({ title: 'Generando PDF...', text: 'Preparando tu comprobante', allowOutsideClick: false, showConfirmButton: false });
+            Swal.showLoading();
+            
+            fetch(`${API_URL}/pedidos/${pedidoId}/recibo?token=${token}`)
+            .then(res => {
+                if(!res.ok) throw new Error("No se pudo generar");
+                return res.blob();
+            })
+            .then(blob => {
+                Swal.close();
+                // Truco de JS para forzar la descarga del PDF
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${folio}_SurpriseJeans.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(() => Swal.fire('Error', 'No pudimos generar el recibo en este momento.', 'error'));
+        }
+
+        // ==========================================
+        // 🌟 CARGADOR DE RESEÑAS (MENU LATERAL)
+        // ==========================================
+        async function cargarResenasMenu() {
+            try {
+                const res = await fetch(`${API_URL}/resenas/destacadas`);
+                if(res.ok) {
+                    const resenas = await res.json();
+                    const contenedor = document.getElementById('carrusel-resenas');
+                    
+                    if(resenas.length === 0) {
+                        contenedor.innerHTML = '<p class="text-[10px] text-gray-400 italic text-center py-4 bg-gray-50 rounded-xl">Aún no hay reseñas calificadas, ¡Sé la primera en dejar una! ⭐</p>';
+                        return;
+                    }
+                    
+                    contenedor.innerHTML = resenas.map(r => `
+                        <div class="relative w-full h-56 rounded-2xl overflow-hidden shadow-sm border border-gray-100 group cursor-pointer">
+                            <img src="${r.imagen}" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700 ease-out">
+                            
+                            <!-- Gradiente Oscuro -->
+                            <div class="absolute inset-0 bg-gradient-to-t from-stone-900 via-stone-900/60 to-transparent p-4 flex flex-col justify-end">
+                                <div class="flex gap-1 text-amber-400 text-[10px] mb-1.5 drop-shadow-md">
+                                    ${'⭐'.repeat(r.estrellas)}
+                                </div>
+                                <p class="text-white font-black text-xs tracking-wide leading-tight drop-shadow-md">
+                                    ${r.cliente} compró el ${r.modelo}
+                                </p>
+                                <p class="text-stone-200 text-[10px] mt-2 font-medium leading-relaxed italic line-clamp-3">
+                                    "${r.comentario}"
+                                </p>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch(e) {
+                console.log("Fallo al cargar reseñas", e);
+            }
+        }
+
+        // ⚡ TRUCO: Modificamos la función que abre el menú para que solo cargue las reseñas cuando lo abren (ahorra datos)
+        const oldAbrirMenu = abrirMenuLateral;
+        abrirMenuLateral = function() {
+            oldAbrirMenu();
+            const contenedor = document.getElementById('carrusel-resenas');
+            // Si tiene la palabra "Cargando", significa que no las hemos traído de Python aún
+            if(contenedor.innerHTML.includes('Cargando')) {
+                cargarResenasMenu();
+            }
+        };
 
         // ⚡ 1. EL VIGILANTE: Prepara la lista y activa el observador
         function renderizarCatalogo(listaPantalones) {
@@ -2522,6 +2610,24 @@
         // ⚡ Arrancamos el motor automáticamente 15 segundos después de que entran a la página
         document.addEventListener('DOMContentLoaded', () => {
             setTimeout(mostrarNotificacionFOMO, 15000);
+        });
+
+        // ==========================================
+        // ⚡ AUTO-SCROLL DEL LOOKBOOK (Imágenes estáticas)
+        // ==========================================
+        document.addEventListener('DOMContentLoaded', () => {
+            const lookbook = document.getElementById('carrusel-lookbook');
+            if (lookbook) {
+                setInterval(() => {
+                    // Si llega al final, se regresa al principio suavemente
+                    if (lookbook.scrollLeft + lookbook.clientWidth >= lookbook.scrollWidth - 10) {
+                        lookbook.scrollTo({ left: 0, behavior: 'smooth' });
+                    } else {
+                        // Si no, avanza el tamaño exacto de una foto
+                        lookbook.scrollBy({ left: 260, behavior: 'smooth' }); 
+                    }
+                }, 3500); // Cambia de foto cada 3.5 segundos
+            }
         });
 
 

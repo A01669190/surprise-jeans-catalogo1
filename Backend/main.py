@@ -6,6 +6,7 @@ from reportlab.pdfgen import canvas
 from datetime import datetime
 from logistica_sync import generar_guia_envio
 from reportlab.graphics.barcode import code128
+from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import mm
 from database import SessionLocal
 from fastapi import APIRouter, Depends, HTTPException
@@ -1902,3 +1903,117 @@ def eliminar_pedido_abandonado(pedido_id: int, db: Session = Depends(get_db)):
         db.commit()
         return {"mensaje": "Carrito fantasma eliminado"}
     raise HTTPException(status_code=404)
+
+# ==========================================
+# 📄 GENERADOR DE RECIBOS PDF (CLIENTAS)
+# ==========================================
+@app.get("/pedidos/{pedido_id}/recibo")
+def descargar_recibo_pdf(pedido_id: int, token: str, db: Session = Depends(get_db)):
+    # 1. Validamos que el cliente haya iniciado sesión
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("rol") != "cliente": raise Exception()
+        correo_cliente = payload.get("sub")
+    except:
+        raise HTTPException(status_code=401, detail="Token inválido")
+    
+    # 2. Verificamos que el pedido sea SUYO
+    pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id, models.Pedido.correo_cliente == correo_cliente).first()
+    if not pedido: raise HTTPException(status_code=404, detail="Pedido no encontrado o acceso denegado")
+    
+    # 3. Dibujamos el PDF Tamaño Carta
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+    ancho, alto = letter
+    
+    # Encabezado Corporativo
+    p.setFont("Helvetica-Bold", 26)
+    p.setFillColorRGB(0.31, 0.27, 0.90) # Tono Indigo 600
+    p.drawString(50, alto - 60, "Surprise Jeans")
+    
+    p.setFont("Helvetica", 10)
+    p.setFillColorRGB(0.5, 0.5, 0.5) # Gris
+    p.drawString(50, alto - 75, "El fit perfecto diseñado para ti, directo de fábrica.")
+    
+    # Datos del Recibo
+    p.setFont("Helvetica-Bold", 16)
+    p.setFillColorRGB(0, 0, 0)
+    p.drawString(ancho - 220, alto - 60, "RECIBO DE COMPRA")
+    p.setFont("Helvetica", 12)
+    p.drawString(ancho - 220, alto - 80, f"Folio: SJ-{pedido.id:04d}")
+    p.drawString(ancho - 220, alto - 95, f"Fecha: {pedido.fecha.strftime('%d/%m/%Y')}")
+    
+    # Información de Facturación/Envío
+    p.setFont("Helvetica-Bold", 12)
+    p.drawString(50, alto - 130, "Facturado y enviado a:")
+    p.setFont("Helvetica", 11)
+    p.drawString(50, alto - 145, pedido.nombre_cliente.upper())
+    p.drawString(50, alto - 160, f"Teléfono: {pedido.telefono}")
+    p.drawString(50, alto - 175, f"{pedido.calle_numero}, Col. {pedido.colonia}")
+    p.drawString(50, alto - 190, f"{pedido.ciudad}, {pedido.estado}. CP {pedido.codigo_postal}")
+    
+    # Tabla de Productos
+    y = alto - 240
+    p.setFont("Helvetica-Bold", 10)
+    p.setFillColorRGB(0.2, 0.2, 0.2)
+    p.drawString(50, y, "CANT.")
+    p.drawString(100, y, "DESCRIPCIÓN DEL MODELO")
+    p.drawString(ancho - 150, y, "P. UNITARIO")
+    p.drawString(ancho - 80, y, "SUBTOTAL")
+    
+    p.line(50, y - 5, ancho - 50, y - 5) # Línea divisoria
+    y -= 25
+    
+    # Llenamos la tabla
+    p.setFont("Helvetica", 10)
+    for detalle in pedido.detalles:
+        pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == detalle.pantalon_id).first()
+        nombre = f"{pantalon.nombre} (Talla {detalle.talla})" if pantalon else f"Modelo (Talla {detalle.talla})"
+        subtotal = detalle.cantidad * detalle.precio_unitario
+        
+        p.drawString(55, y, str(detalle.cantidad))
+        p.drawString(100, y, nombre[:45]) # Cortamos si es muy largo
+        p.drawString(ancho - 150, y, f"${detalle.precio_unitario:.2f}")
+        p.drawString(ancho - 80, y, f"${subtotal:.2f}")
+        y -= 20
+        
+    p.line(50, y, ancho - 50, y)
+    y -= 25
+    
+    # Total
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(ancho - 150, y, "TOTAL MXN:")
+    p.setFillColorRGB(0.06, 0.72, 0.50) # Verde esmeralda
+    p.drawString(ancho - 80, y, f"${pedido.total:.2f}")
+    
+    p.showPage()
+    p.save()
+    buffer.seek(0)
+    
+    return Response(content=buffer.getvalue(), media_type="application/pdf")
+
+# ==========================================
+# 🌟 CARRUSEL DE RESEÑAS EN VIVO (PRUEBA SOCIAL)
+# ==========================================
+@app.get("/resenas/destacadas")
+def obtener_resenas_destacadas(db: Session = Depends(get_db)):
+    # 1. Buscamos reseñas con 4 o 5 estrellas que SÍ tengan un comentario escrito
+    resenas = db.query(models.Resena, models.Cliente, models.Pantalon)\
+        .join(models.Cliente, models.Resena.cliente_id == models.Cliente.id)\
+        .join(models.Pantalon, models.Resena.pantalon_id == models.Pantalon.id)\
+        .filter(models.Resena.calificacion >= 4)\
+        .filter(models.Resena.comentario != None)\
+        .filter(models.Resena.comentario != "")\
+        .order_by(func.random())\
+        .limit(10).all() # Máximo 10 al azar
+    
+    resultado = []
+    for r, c, p in resenas:
+        resultado.append({
+            "estrellas": r.calificacion,
+            "comentario": r.comentario,
+            "cliente": c.nombre_completo.split(" ")[0], # Solo mostramos el primer nombre por privacidad
+            "modelo": p.nombre,
+            "imagen": p.imagen_url
+        })
+    return resultado
