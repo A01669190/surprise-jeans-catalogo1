@@ -104,9 +104,10 @@
             </div>
 
             <!-- ⚡ AQUÍ ABAJO SE QUEDA TU CONTENEDOR DE RESEÑAS DINÁMICAS -->
-            <p class="text-xs text-gray-500 mb-4 font-bold uppercase tracking-widest">Lo que dicen de nosotros</p>
-            <div id="carrusel-resenas" class="space-y-4">
-                <p class="text-xs text-gray-400 font-bold animate-pulse text-center my-6">Cargando reseñas verificadas...</p>
+            <h3 class="font-bold text-gray-800 mt-6 mb-4 border-b border-gray-100 pb-2 uppercase tracking-widest text-xs">Lo que dicen de nosotros</h3>
+            
+            <div id="carrusel-resenas" class="flex overflow-x-auto gap-4 snap-x snap-mandatory hide-scroll-bar scroll-smooth mb-4 pb-4">
+                <p class="text-xs text-gray-400 font-bold animate-pulse text-center my-6 w-full">Cargando reseñas verificadas...</p>
             </div>
 
             <!-- Botones a Redes Sociales (Facebook y TikTok) -->
@@ -1420,7 +1421,7 @@
                     }
                     
                     contenedor.innerHTML = resenas.map(r => `
-                        <div class="relative w-full h-56 rounded-2xl overflow-hidden shadow-sm border border-gray-100 group cursor-pointer">
+                        <div class="snap-center shrink-0 w-64 relative h-56 rounded-2xl overflow-hidden shadow-sm border border-gray-100 group cursor-pointer">
                             <img src="${r.imagen}" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700 ease-out">
                             
                             <!-- Gradiente Oscuro -->
@@ -2617,19 +2618,28 @@
         // ==========================================
         document.addEventListener('DOMContentLoaded', () => {
             const lookbook = document.getElementById('carrusel-lookbook');
-            if (lookbook) {
-                setInterval(() => {
-                    // Si llega al final, se regresa al principio suavemente
-                    if (lookbook.scrollLeft + lookbook.clientWidth >= lookbook.scrollWidth - 10) {
-                        lookbook.scrollTo({ left: 0, behavior: 'smooth' });
-                    } else {
-                        // Si no, avanza el tamaño exacto de una foto
-                        lookbook.scrollBy({ left: 260, behavior: 'smooth' }); 
-                    }
-                }, 3500); // Cambia de foto cada 3.5 segundos
-            }
-        });
+            const resenas = document.getElementById('carrusel-resenas');
 
+            function activarAutoScroll(elemento, velocidad) {
+                if (elemento) {
+                    setInterval(() => {
+                        // Evita hacer scroll si el usuario lo está tocando o no hay contenido suficiente
+                        if(elemento.scrollWidth <= elemento.clientWidth) return;
+                        
+                        // Si llega al final, se regresa al principio
+                        if (elemento.scrollLeft + elemento.clientWidth >= elemento.scrollWidth - 10) {
+                            elemento.scrollTo({ left: 0, behavior: 'smooth' });
+                        } else {
+                            elemento.scrollBy({ left: 260, behavior: 'smooth' }); 
+                        }
+                    }, velocidad); 
+                }
+            }
+
+            // Activamos ambos carruseles a distintas velocidades para que se vea más orgánico
+            activarAutoScroll(lookbook, 3500); // Lookbook cada 3.5 segundos
+            activarAutoScroll(resenas, 4500);  // Reseñas cada 4.5 segundos
+        });
 
         // ==========================================
         // ⚡ AUTOMATIZACIÓN DE MAYOREO (PAQUETE CERRADO)
