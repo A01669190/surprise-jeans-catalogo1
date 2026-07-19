@@ -1419,7 +1419,7 @@ async def crear_pantalon(
     # 1. Subimos la foto a ImgBB
     contenido = await foto.read()
     imagen_base64 = base64.b64encode(contenido).decode("utf-8")
-    API_KEY = "967d4560b8e4d58a4f50db487013722f"
+    API_KEY = os.getenv("IMGBB_API_KEY", "")
     respuesta = requests.post("https://api.imgbb.com/1/upload", data={"key": API_KEY, "image": imagen_base64})
     
     if respuesta.status_code == 200: 
