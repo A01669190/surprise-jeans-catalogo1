@@ -45,15 +45,15 @@ class ResenaCrear(BaseModel):
 # ==========================================
 # ESQUEMAS PARA LA BÓVEDA FINANCIERA Y CLIENTES (Sin cambios)
 class ItemCarrito(BaseModel):
-    id: int 
-    cantidad: int
-    precio: float
+    id: int
+    codigo: Optional[str] = "S/C"
     nombre: str
-    codigo: str
-    sku_variante: str # ⚡ NUEVO
-    talla: str        # ⚡ NUEVO
+    precio: float
+    cantidad: int
+    sku_variante: Optional[str] = None
+    talla: Optional[str] = None
 
-class InfoEnvio(BaseModel):
+class DireccionEnvio(BaseModel):
     nombre: str
     telefono: str
     calle_numero: str
@@ -64,10 +64,12 @@ class InfoEnvio(BaseModel):
     referencias: Optional[str] = None
 
 class PedidoSeguro(BaseModel):
-    envio: InfoEnvio
+    envio: DireccionEnvio
     items: List[ItemCarrito]
     cupon: Optional[str] = None
     usar_puntos: Optional[bool] = False
+    costo_envio: float = 0.0         # ⚡ NUEVO: Costo del envío
+    paqueteria: Optional[str] = None # ⚡ NUEVO: Paquetería elegida
 
 class ValidarCuponReq(BaseModel):
     codigo: str

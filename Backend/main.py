@@ -997,9 +997,21 @@ async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, 
             except:
                 pass
 
-        # 3. CÁLCULO DEL TOTAL FINAL ANTES DE CREAR EL PEDIDO
+        # ⚡ 3. CÁLCULO DEL TOTAL FINAL (AHORA SÍ INCLUYE EL ENVÍO PARA MERCADO PAGO)
+        costo_envio = getattr(pedido_req, 'costo_envio', 0.0)
+        
         total_final = total_pedido * (1.0 - (descuento_porc / 100.0)) - puntos_a_descontar
-        total_final = max(0.0, total_final) 
+        total_final = max(0.0, total_final) + costo_envio
+
+        # ⚡ INYECTAMOS EL COSTO DE ENVÍO COMO UN "ARTÍCULO" PARA QUE EL BANCO LO COBRE
+        if costo_envio > 0:
+            paqueteria_nombre = getattr(pedido_req, 'paqueteria', 'Estándar')
+            items_para_banco.append({
+                "title": f"Envío ({paqueteria_nombre})",
+                "quantity": 1,
+                "unit_price": round(costo_envio, 2),
+                "currency_id": "MXN"
+            })
 
         # 4. CREAR PEDIDO
         nuevo_pedido = models.Pedido(

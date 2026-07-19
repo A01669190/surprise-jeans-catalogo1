@@ -2116,6 +2116,9 @@
             return;
         }
 
+        const selectEnvio = document.getElementById('chk-paqueteria');
+        const costoEnvio = parseFloat(document.getElementById('chk-costo-envio').innerText.replace('$', '').replace('¡GRATIS!', '0'));
+
         const btnPagar = document.getElementById('btn-pagar');
         const textoOriginal = btnPagar.innerHTML;
         btnPagar.innerHTML = "Procesando de forma segura... ⏳";
@@ -2135,6 +2138,7 @@
                     sku_variante: item.sku_variante, 
                     talla: item.talla                
                 })),
+                costo_envio: costoEnvio,
                 cupon: cuponActivo ? cuponActivo.codigo : null,
                 usar_puntos: document.getElementById('chk-usar-puntos') ? document.getElementById('chk-usar-puntos').checked : false, // <--- ¡AQUÍ VA LA COMA!
                 paqueteria: document.getElementById('chk-paqueteria').value
