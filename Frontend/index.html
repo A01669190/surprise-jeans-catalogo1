@@ -651,17 +651,32 @@
     </div>
 
     <!-- AQUÍ EMPIEZA EL MODAL ASISTENTE (LIBRE) -->
-    <div id="modal-asistente" class="fixed inset-0 bg-stone-900 bg-opacity-75 z-[9999] hidden flex items-center justify-center p-4">        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
-            <h3 class="text-xl font-black text-stone-900 mb-2">Asistente de Talla 📏</h3>
-            <p class="text-xs text-stone-500 mb-6">Ingresa tus medidas en centímetros para encontrar tu match perfecto.</p>
+    <div id="modal-asistente" class="fixed inset-0 bg-stone-900 bg-opacity-75 z-[9999] hidden flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">        
+        <div class="bg-white w-full max-w-sm rounded-3xl p-7 shadow-2xl relative">
+            <button onclick="document.getElementById('modal-asistente').classList.add('hidden')" class="absolute top-5 right-5 text-gray-400 hover:text-rose-500 font-black text-xl">&times;</button>
             
-            <div class="space-y-4">
-                <input type="number" id="medida-cintura" placeholder="Cintura (cm)" class="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-600">
-                <input type="number" id="medida-cadera" placeholder="Cadera (cm)" class="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-600">
+            <h3 class="text-xl font-black text-indigo-600 mb-1">Encuentra tu Fit 👖</h3>
+            <p class="text-xs text-stone-500 mb-6 leading-relaxed font-medium">No te preocupes si no te sabes tus medidas. Toma una cinta métrica (o un cordón y una regla) y midamos rapidísimo:</p>
+            
+            <div class="space-y-5">
+                <div class="relative">
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1.5 ml-1">1. Medida de Cintura</label>
+                    <input type="number" id="medida-cintura" placeholder="Ej. 72" class="w-full p-3.5 pl-12 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-600 font-bold text-gray-800 shadow-sm transition-shadow">
+                    <span class="absolute left-4 top-[34px] text-lg opacity-70">📏</span>
+                    <p class="text-[10px] text-indigo-400 font-bold mt-1.5 ml-1">Mide alrededor de la parte más estrecha (arriba del ombligo).</p>
+                </div>
+                
+                <div class="relative border-t border-gray-100 pt-4">
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1.5 ml-1">2. Medida de Cadera</label>
+                    <input type="number" id="medida-cadera" placeholder="Ej. 95" class="w-full p-3.5 pl-12 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-600 font-bold text-gray-800 shadow-sm transition-shadow">
+                    <span class="absolute left-4 top-[50px] text-lg opacity-70">🍑</span>
+                    <p class="text-[10px] text-indigo-400 font-bold mt-1.5 ml-1">Mide la parte más ancha de tus glúteos.</p>
+                </div>
             </div>
             
-            <button onclick="calcularTalla()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl mt-6 hover:bg-indigo-700">Calcular mi Talla</button>
-            <button onclick="document.getElementById('modal-asistente').classList.add('hidden')" class="w-full text-stone-400 font-bold text-xs mt-4">Cerrar</button>
+            <button onclick="calcularTalla()" class="w-full bg-stone-900 text-white font-black py-4 rounded-xl mt-8 shadow-lg hover:bg-indigo-600 transition-colors flex justify-center items-center gap-2">
+                ✨ Descubrir mi talla
+            </button>
         </div>
     </div>
 
@@ -2270,90 +2285,89 @@
         }
     }
         async function verDetalles(id, nombre, img, precio) {
-            Swal.fire({ title: 'Analizando tendencias...', showConfirmButton: false });
-            Swal.showLoading();
+    Swal.fire({ title: 'Analizando tendencias...', showConfirmButton: false });
+    Swal.showLoading();
 
-            try {
-                const res = await fetch(`${API_URL}/pantalones/${id}/recomendaciones`);
-                const recomendados = await res.json();
+    try {
+        const res = await fetch(`${API_URL}/pantalones/${id}/recomendaciones`);
+        const recomendados = await res.json();
 
-                let htmlRecomendados = '';
-                if(recomendados.length > 0) {
-                    htmlRecomendados = `<h4 class="text-xs font-black text-gray-500 uppercase tracking-widest mt-6 mb-3 border-t pt-4">Comprados juntos habitualmente</h4>
-                    <div class="flex gap-3 overflow-x-auto pb-2">`;
-                    recomendados.forEach(r => {
-                        htmlRecomendados += `
-                        <div class="min-w-[120px] bg-gray-50 border border-gray-100 rounded-xl p-2 text-center shadow-sm">
-                            <img src="${r.imagen_url}" class="w-full h-24 object-cover rounded-lg mb-2">
-                            <p class="text-[10px] font-bold text-gray-800 truncate" title="${r.nombre}">${r.nombre}</p>
-                            <p class="text-[11px] font-black text-indigo-600 mb-2">$${r.precio}</p>
-                            <button onclick="agregarAlCarrito(${id}, this); setTimeout(() => Swal.close(), 800);" class="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-3.5 rounded-xl mt-2 shadow-lg transition-all duration-300">AÑADIR A LA BOLSA</button>
-                        </div>`;
-                    });
-                    htmlRecomendados += `</div>`;
-                }
-
-                // ⚡ DIBUJAMOS LOS BOTONES DE TALLAS DENTRO DEL POPUP
-                // ⚡ DIBUJAMOS LOS BOTONES Y VALIDAMOS SI HAY STOCK
-                const pantalon = catalogoCompleto.find(p => p.id === id);
-                let botonesTallasModal = '';
-                let botonPrincipalModal = ''; // Definimos qué botón mostrar abajo
-
-                if (pantalon && pantalon.stock > 0) {
-                    if (pantalon.tallas && pantalon.tallas.length > 0) {
-                        pantalon.tallas.sort((a, b) => parseInt(a.talla) - parseInt(b.talla));
-                        botonesTallasModal = `
-                            <div class="mt-4 mb-2">
-                                <p class="text-[10px] uppercase text-gray-500 font-bold mb-2 tracking-wider">Selecciona tu talla:</p>
-                                <div class="flex flex-wrap gap-2">
-                                    ${pantalon.tallas.map(t => {
-                                        if (t.stock > 0) {
-                                            return `<button type="button" class="btn-talla-${pantalon.id} w-10 h-10 rounded-md border border-gray-200 text-xs font-black text-gray-700 hover:border-indigo-600 hover:text-indigo-600 transition-all shadow-sm" onclick="seleccionarTalla(${pantalon.id}, '${t.talla}', '${t.sku}')">${t.talla}</button>`;
-                                        } else {
-                                            return `<button disabled class="w-10 h-10 rounded-md border border-gray-100 text-xs font-black text-gray-300 bg-gray-50 cursor-not-allowed line-through">${t.talla}</button>`;
-                                        }
-                                    }).join('')}
-                                </div>
-                            </div>
-                        `;
-                    }
-                    // ⚡ NUEVOS BOTONES DOBLES
-                    botonPrincipalModal = `<button onclick="agregarAlCarrito(${id}, this); setTimeout(() => Swal.close(), 800);" class="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-3.5 rounded-xl mt-2 shadow-lg transition-all duration-300">AÑADIR A LA BOLSA</button>`;
-                } else {
-                    // Si no hay stock, mostramos el botón de la campanita
-                    botonPrincipalModal = `<button onclick="abrirModalEspera(${id}, '${nombre.replace(/'/g, "\\'")}')" class="w-full bg-rose-50 text-rose-600 border border-rose-200 font-bold py-3.5 rounded-xl hover:bg-rose-100 transition-all duration-300 text-xs uppercase tracking-wider shadow-sm mt-2 flex items-center justify-center gap-2"><span>🔔</span> ¡Avísame cuando llegue!</button>`;
-                }
-
-                // ... dentro de la función verDetalles ...
-                Swal.fire({
-                    html: `
-                        <div class="text-left mt-2">
-                            <div class="relative rounded-2xl overflow-hidden mb-5 border border-gray-100 shadow-sm group cursor-crosshair" onmousemove="zoomImagen(event, this)" onmouseleave="resetZoomImagen(this)">
-                                <img src="${img}" class="w-full h-72 object-cover transition-transform duration-200 pointer-events-none group-hover:scale-[2]">
-                            </div>
-                            <h2 class="text-xl font-black text-stone-900 leading-tight">${nombre}</h2>
-                            <p class="text-3xl text-indigo-600 font-black my-2">$${precio}</p>
-                            ${botonesTallasModal}
-                            
-                            <!-- ⚡ AQUÍ LO AGREGAMOS: Solo aparece cuando ven el detalle -->
-                            <button onclick="abrirAsistenteTallas()" class="w-full bg-indigo-50 text-indigo-700 font-bold py-3 rounded-xl mt-2 border border-indigo-200 hover:bg-indigo-100 transition-all text-xs uppercase tracking-wider mb-2">
-                                📏 ¿No sabes tu talla? Pruébate el Fit Perfecto
-                            </button>
-
-                            ${botonPrincipalModal}
-                            ${htmlRecomendados}
-                        </div>
-                    `,
-                    // ... el resto del código del Swal ...
-                    showConfirmButton: false,
-                    showCloseButton: true,
-                    customClass: { popup: 'rounded-3xl' }
-                });
-            } catch(e) {
-                Swal.close();
-                console.error("Error al cargar recomendaciones");
-            }
+        let htmlRecomendados = '';
+        if (recomendados.length > 0) {
+            htmlRecomendados = `
+                <h4 class="text-xs font-black text-gray-500 uppercase tracking-widest mt-6 mb-3 border-t pt-4">
+                    Comprados juntos habitualmente
+                </h4>
+                <div class="flex gap-3 overflow-x-auto pb-2">`;
+            
+            recomendados.forEach(r => {
+                htmlRecomendados += `
+                    <div class="min-w-[120px] bg-gray-50 border border-gray-100 rounded-xl p-2 text-center shadow-sm">
+                        <img src="${r.imagen_url}" class="w-full h-24 object-cover rounded-lg mb-2">
+                        <p class="text-[10px] font-bold text-gray-800 truncate" title="${r.nombre}">${r.nombre}</p>                         <p class="text-[11px] font-black text-indigo-600 mb-2">$${r.precio}</p>
+                        <button onclick="agregarAlCarrito(${id}, this); setTimeout(() => Swal.close(), 800);" class="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-3.5 rounded-xl mt-2 shadow-lg transition-all duration-300">
+                            AÑADIR A LA BOLSA
+                        </button>
+                    </div>`;
+            });
+            htmlRecomendados += `</div>`;
         }
+
+        // ⚡ DIBUJAMOS LOS BOTONES Y VALIDAMOS SI HAY STOCK
+        const pantalon = catalogoCompleto.find(p => p.id === id);
+        let botonesTallasModal = '';
+        let botonPrincipalModal = ''; // Definimos qué botón mostrar abajo
+
+        if (pantalon && pantalon.stock > 0) {
+            if (pantalon.tallas && pantalon.tallas.length > 0) {
+                pantalon.tallas.sort((a, b) => parseInt(a.talla) - parseInt(b.talla));
+                botonesTallasModal = `
+                    <div class="mt-4 mb-4">
+                        <!-- ⚡ AQUÍ PONEMOS EL ASISTENTE ESTILO ZARA -->
+                        <div class="flex justify-between items-end mb-2">
+                            <p class="text-[10px] uppercase text-gray-500 font-bold tracking-wider">Selecciona tu talla:</p>
+                            <button onclick="abrirAsistenteTallas()" class="text-[10px] text-indigo-600 font-black hover:underline flex items-center gap-1 transition-all">
+                                📏 ¿Guía de Tallas?
+                            </button>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            ${pantalon.tallas.map(t => {
+                                if (t.stock > 0) {
+                                    return `<button type="button" class="btn-talla-${pantalon.id} w-10 h-10 rounded-md border border-gray-200 text-xs font-black text-gray-700 hover:border-indigo-600 hover:text-indigo-600 transition-all shadow-sm" onclick="seleccionarTalla(${pantalon.id}, '${t.talla}', '${t.sku}')">${t.talla}</button>`;
+                                } else {
+                                    return `<button disabled class="w-10 h-10 rounded-md border border-gray-100 text-xs font-black text-gray-300 bg-gray-50 cursor-not-allowed line-through">${t.talla}</button>`;
+                                }
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            // ⚡ NUEVOS BOTONES DOBLES
+            botonPrincipalModal = `<button onclick="agregarAlCarrito(${id}, this); setTimeout(() => Swal.close(), 800);" class="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-3.5 rounded-xl mt-2 shadow-lg transition-all duration-300">AÑADIR A LA BOLSA</button>`;
+        } else {
+            // Si no hay stock, mostramos el botón de la campanita
+            botonPrincipalModal = `<button onclick="abrirModalEspera(${id}, '${nombre.replace(/'/g, "\\'")}')" class="w-full bg-rose-50 text-rose-600 border border-rose-200 font-bold py-3.5 rounded-xl hover:bg-rose-100 transition-all duration-300 text-xs uppercase tracking-wider shadow-sm mt-2 flex items-center justify-center gap-2"><span>🔔</span> ¡Avísame cuando llegue!</button>`;
+        }
+
+        Swal.fire({
+            html: `
+                <div class="text-left mt-2">
+                    <div class="relative rounded-2xl overflow-hidden mb-5 border border-gray-100 shadow-sm group cursor-crosshair" onmousemove="zoomImagen(event, this)" onmouseleave="resetZoomImagen(this)">
+                        <img src="${img}" class="w-full h-72 object-cover transition-transform duration-200 pointer-events-none group-hover:scale-[2]">
+                    </div>
+                    <h2 class="text-xl font-black text-stone-900 leading-tight">${nombre}</h2>                     <p class="text-3xl text-indigo-600 font-black my-2">$${precio}</p>${botonesTallasModal}
+                    ${botonPrincipalModal}${htmlRecomendados}
+                </div>
+            `,
+            showConfirmButton: false,
+            showCloseButton: true,
+            customClass: { popup: 'rounded-3xl' }
+        });
+    } catch (e) {
+        Swal.close();
+        console.error("Error al cargar recomendaciones:", e);
+    }
+}
 
         // ==========================================
         // ⚡ ZOOM MÁGICO DE TELA
