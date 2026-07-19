@@ -934,6 +934,14 @@ def enviar_whatsapp_api(telefono_destino, texto_mensaje):
         error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
         print(f"❌ Error WhatsApp API: {error_msg}")
 
+def enviar_alarma_inventario(nombre_modelo, talla, stock_actual):
+    """ 🤖 Bot espía que avisa a Yessica si queda poco stock """
+    if stock_actual <= 12:
+        mensaje = f"🚨 *ALERTA DE INVENTARIO* 🚨\n\nYessica, el modelo *{nombre_modelo}* (Talla {talla}) se está agotando.\n\n⚠️ Solo quedan *{stock_actual} piezas* en bodega."
+        # Usamos el número de la tienda que ya tienes en tus variables de entorno
+        telefono_admin = os.getenv("WHATSAPP_NUMERO", "525513220695") 
+        enviar_whatsapp_api(telefono_admin, mensaje)
+
 async def auto_destruir_abandonado(pedido_id: int):
     """ Bomba de tiempo: Espera 30 minutos y si no hay pago, destruye el carrito """
     await asyncio.sleep(1800) # 1800 segundos = 30 minutos
@@ -1073,7 +1081,7 @@ async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, 
                 cliente_db.puntos += puntos_ganados
                 db.commit()
 
-            # ⚡ RECIBO VIRTUAL
+            # ⚡ RECIBO VIRTUAL Y BOT ESPÍA
             items_para_recibo = []
             for detalle in nuevo_pedido.detalles:
                 if detalle.sku_variante: 
@@ -1089,7 +1097,11 @@ async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, 
                             "cantidad": detalle.cantidad,
                             "precio": detalle.precio_unitario
                         })
-            
+                        
+                        # 🤖 ACTIVAMOS EL BOT ESPÍA DE INVENTARIO
+                        nombre_pantalon = variante_db.pantalon.nombre if variante_db.pantalon else "Modelo"
+                        background_tasks.add_task(enviar_alarma_inventario, nombre_pantalon, variante_db.talla, variante_db.stock)
+
             if items_para_recibo:
                 loyverse_sync.generar_recibo_virtual(nuevo_pedido.correo_cliente, nuevo_pedido.id, items_para_recibo, nuevo_pedido.total)
                 
@@ -1173,6 +1185,10 @@ async def webhook_mercadopago(request: Request, background_tasks: BackgroundTask
                                     "cantidad": detalle.cantidad,
                                     "precio": detalle.precio_unitario
                                 })
+
+                                # 🤖 ACTIVAMOS EL BOT ESPÍA DE INVENTARIO
+                                nombre_pantalon = variante_db.pantalon.nombre if variante_db.pantalon else "Modelo"
+                                background_tasks.add_task(enviar_alarma_inventario, nombre_pantalon, variante_db.talla, variante_db.stock)
                         
                         nombre_base = detalle.pantalon.nombre if detalle.pantalon else "Modelo"
                         nombre_final = f"{nombre_base} (Talla {detalle.talla})" if detalle.talla else nombre_base
