@@ -795,7 +795,7 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
     p = canvas.Canvas(buffer, pagesize=(100*mm, 150*mm)) 
     
     # Encabezado
-    p.setFont("Helvetica-Bold", 18)
+    p.setFont("Helvetica-Bold", 16)
     p.drawString(10*mm, 135*mm, "SURPRISE JEANS - ENVÍO OFICIAL")
     p.setFont("Helvetica-Bold", 12)
     p.drawString(10*mm, 125*mm, f"FOLIO: SJ-{pedido.id:04d}")
@@ -814,9 +814,19 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
     if pedido.referencias:
         p.drawString(10*mm, 45*mm, f"Ref: {pedido.referencias[:50]}")
 
-    # Código de Barras
-    barcode = code128.Code128(f"SJ-{pedido.id:04d}", barHeight=15*mm, barWidth=1.5)
-    barcode.drawOn(p, 10*mm, 15*mm)
+    # ⚡ EL TOQUE PERSONAL DE YESSICA (Firmas y Logo)
+    p.setFont("Times-Italic", 14)
+    p.drawString(10*mm, 32*mm, "Muchas gracias por tu compra ♥")
+    
+    # Simulando el logo "Surprise by YSK"
+    p.setFont("Times-BoldItalic", 18)
+    p.drawString(10*mm, 23*mm, "Surprise")
+    p.setFont("Helvetica-Bold", 10)
+    p.drawString(35*mm, 23*mm, "- by YSK")
+
+    # Código de Barras (Se baja para no chocar con las firmas)
+    barcode = code128.Code128(f"SJ-{pedido.id:04d}", barHeight=12*mm, barWidth=1.5)
+    barcode.drawOn(p, 10*mm, 6*mm)
 
     p.showPage()
     p.save()
