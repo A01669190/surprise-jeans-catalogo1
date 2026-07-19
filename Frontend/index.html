@@ -2409,21 +2409,17 @@
                 // ==========================================
                 // ⚡ MOTOR DE DECISIÓN 3D (FIT GENÉRICO)
                 // ==========================================
-                let archivo3D = "https://modelviewer.dev/shared-assets/models/Astronaut.glb"; // Default
-                let nombreCorte = "Estándar";
+                let archivo3D = ""; 
+                let nombreCorte = "Modelo 3D";
                 const nombreLower = nombre.toLowerCase();
+
+                const BASE_URL_MODELS = "https://surprise-jeans-api-denz.onrender.com/static/models/";
 
                 // Aquí pones los links de tus 4 escaneos cuando los tengas. 
                 // Por ahora usarán el astronauta de prueba.
-                if (nombreLower.includes("skinny")) {
-                    archivo3D = "https://modelviewer.dev/shared-assets/models/Astronaut.glb"; 
-                    nombreCorte = "Skinny";
-                } else if (nombreLower.includes("mom")) {
-                    archivo3D = "https://modelviewer.dev/shared-assets/models/Astronaut.glb";
-                    nombreCorte = "Mom Jeans";
-                } else if (nombreLower.includes("cargo")) {
-                    archivo3D = "https://modelviewer.dev/shared-assets/models/Astronaut.glb";
-                    nombreCorte = "Cargo";
+                if (nombreLower.includes("cargo")) {
+                    archivo3D = `${BASE_URL_MODELS}cargo_3d.glb`; 
+                    nombreCorte = "Cargo 3D";
                 }
 
                 Swal.fire({

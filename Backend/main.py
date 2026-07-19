@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from models import Pedido
 from sqlalchemy import or_
 import asyncio
+from fastapi.staticfiles import StaticFiles # 1. Importa esto
 import socket
 import logging
 import smtplib
@@ -62,6 +63,7 @@ from fastapi import BackgroundTasks
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="API Surprise Jeans - Fortificada")
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.on_event("startup")
 async def iniciar_tareas_fondo():
     import asyncio
