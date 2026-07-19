@@ -575,7 +575,7 @@ def obtener_mis_pedidos(correo: str = Depends(verificar_token_cliente), db: Sess
     
     resultado = []
     for p in pedidos:
-        # ⚡ EL FIX: Extraemos la talla para que el cliente la vea en su recibo web
+        # ⚡ Extraemos la talla para que el cliente la vea en su recibo web
         ropa_comprada = []
         for d in p.detalles:
             nombre_base = d.pantalon.nombre if d.pantalon else "Modelo"
@@ -583,6 +583,7 @@ def obtener_mis_pedidos(correo: str = Depends(verificar_token_cliente), db: Sess
             ropa_comprada.append({"id": d.pantalon_id, "nombre": nombre_final})
             
         resultado.append({
+            "id": p.id, # ⚡ ¡ESTA ES LA LÍNEA MÁGICA QUE FALTABA!
             "folio": f"SJ-{p.id:04d}",
             "fecha": p.fecha.strftime("%d/%m/%Y"),
             "total": p.total,
