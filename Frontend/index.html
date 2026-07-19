@@ -2409,48 +2409,47 @@
                 // ==========================================
                 // ⚡ MOTOR DE DECISIÓN 3D (FIT GENÉRICO)
                 // ==========================================
-                // ==========================================
-                // ⚡ MOTOR DE DECISIÓN 3D (FIT GENÉRICO)
-                // ==========================================
+            
                 let archivo3D = ""; 
                 let nombreCorte = "";
-                const nombreLower = nombre.toLowerCase();
+                
+                // 1. Extraemos la categoría de forma segura
+                let nombreCat = typeof pantalon.categoria === 'string' ? pantalon.categoria : (pantalon.categoria ? pantalon.categoria.nombre : "");
+                const categoriaLower = nombreCat.toLowerCase();
 
                 const BASE_URL_MODELS = "https://surprise-jeans-api-denz.onrender.com/static/models/";
 
-                // Mapeamos los nombres a tus archivos REALES del Finder
-                if (nombreLower.includes("cargo")) {
+                // 2. Mapeamos según la CATEGORÍA exacta
+                if (categoriaLower.includes("cargo")) {
                     archivo3D = `${BASE_URL_MODELS}cargo.glb`; 
                     nombreCorte = "Cargo";
-                } else if (nombreLower.includes("mom")) {
+                } else if (categoriaLower.includes("mom")) {
                     archivo3D = `${BASE_URL_MODELS}mom.glb`; 
                     nombreCorte = "Mom Jeans";
-                } else if (nombreLower.includes("barrell")) {
+                } else if (categoriaLower.includes("barrell") || categoriaLower.includes("barrel")) {
                     archivo3D = `${BASE_URL_MODELS}barrell.glb`; 
                     nombreCorte = "Barrell";
-                } else if (nombreLower.includes("campana")) {
+                } else if (categoriaLower.includes("campana")) {
                     archivo3D = `${BASE_URL_MODELS}campana.glb`; 
                     nombreCorte = "Campana";
-                } else if (nombreLower.includes("falda")) {
+                } else if (categoriaLower.includes("falda short") || categoriaLower.includes("faldashort")) {
                     archivo3D = `${BASE_URL_MODELS}faldaShort.glb`; 
                     nombreCorte = "Falda Short";
-                } else if (nombreLower.includes("short")) {
+                } else if (categoriaLower.includes("short")) {
+                    // Ponemos este después de falda short para que no se confundan
                     archivo3D = `${BASE_URL_MODELS}short.glb`; 
                     nombreCorte = "Short";
-                } else if (nombreLower.includes("wide") || nombreLower.includes("holgado")) {
-                    // Aquí asignamos el holgado.glb que tienes en tu carpeta
+                } else if (categoriaLower.includes("holgado") || categoriaLower.includes("wide")) {
                     archivo3D = `${BASE_URL_MODELS}holgado.glb`; 
                     nombreCorte = "Holgado";
-                } else if (nombreLower.includes("straight") || nombreLower.includes("recto")) {
+                } else if (categoriaLower.includes("recto") || categoriaLower.includes("straight")) {
                     archivo3D = `${BASE_URL_MODELS}straight.glb`; 
                     nombreCorte = "Recto";
                 } else {
-                    // ⚡ RED DE SEGURIDAD: Si no menciona el corte (Ej. "Jeans Lineas Brillantes"), asume Skinny
-                    // Asegúrate de tener un archivo llamado skinny.glb en tu carpeta models
+                    // ⚡ RED DE SEGURIDAD (Para categoría "Skinny", "Nuevos", etc.)
                     archivo3D = `${BASE_URL_MODELS}skinny.glb`;
                     nombreCorte = "Skinny";
                 }
-
                 Swal.fire({
                     html: `
                         <div class="text-left mt-2">
