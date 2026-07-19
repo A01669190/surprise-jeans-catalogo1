@@ -63,6 +63,9 @@ from fastapi import BackgroundTasks
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="API Surprise Jeans - Fortificada")
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.on_event("startup")
 async def iniciar_tareas_fondo():
@@ -190,8 +193,6 @@ MERCADO_PAGO_TOKEN = os.getenv("MERCADO_PAGO_TOKEN", "")
 sdk = mercadopago.SDK(MERCADO_PAGO_TOKEN)
 
 os.makedirs("static/uploads", exist_ok=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
 # ==========================================
 # 3. SISTEMA DE LOGIN (JSON Web Tokens)
 # ==========================================
