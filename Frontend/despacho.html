@@ -125,8 +125,9 @@
                     if (res.ok) {
                         Swal.fire({ icon: 'success', title: '¡Entregado!', showConfirmButton: false, timer: 1500 });
                         cargarPedidos();
+                    } else if (res.status === 401) {
+                        cerrarSesion(); // ⚡ Protegemos si la computadora de Yessica se durmió
                     } else {
-                        // ⚡ NUEVO: Si el servidor falla, atrapamos el error y quitamos la animación de carga
                         const errorData = await res.json();
                         Swal.fire('Error del servidor', errorData.detail || 'No se pudo actualizar el estatus.', 'error');
                     }
@@ -469,10 +470,10 @@
             historialPedidos.forEach(p => {
                 let folio = p.folio;
                 let estatus = p.estatus;
-                // Limpiamos comas en los textos para no romper las columnas del Excel
-                let cliente = p.cliente ? p.cliente.replace(/,/g, "") : "N/A";
-                let telefono = p.telefono ? p.telefono.replace(/,/g, "") : "N/A";
-                let direccion = p.direccion_completa ? p.direccion_completa.replace(/,/g, "") : "N/A";
+                // ⚡ FORMATO CSV UNIVERSAL: Envolver en comillas dobles para proteger comas originales
+                let cliente = p.cliente ? `"${p.cliente.replace(/"/g, '""')}"` : '"N/A"';
+                let telefono = p.telefono ? `"${p.telefono.replace(/"/g, '""')}"` : '"N/A"';
+                let direccion = p.direccion_completa ? `"${p.direccion_completa.replace(/"/g, '""')}"` : '"N/A"';
                 
                 // Juntamos todos los artículos de ropa en un solo texto (Ej: 1x Mom Jeans + 2x Skinny)
                 let articulos = p.detalles.map(d => `${d.cantidad}x ${d.nombre}`).join(" + ");

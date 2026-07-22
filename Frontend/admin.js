@@ -25,7 +25,10 @@ async function verificarAcceso() {
             sessionStorage.setItem('refresh_token_vip', data.refresh_token); // ⚡ NUEVA LÍNEA
             const panel = document.getElementById('panel-login');
             panel.style.opacity = '0';
-            setTimeout(() => { panel.style.display = 'none'; }, 500);
+            setTimeout(() => { 
+                panel.style.display = 'none'; 
+                document.getElementById('nav-admin').classList.remove('hidden'); // ⚡ Mostramos el menú
+            }, 500);
         } else {
             document.getElementById('error-password').classList.remove('hidden');
             document.getElementById('input-password').value = ''; 
@@ -489,6 +492,9 @@ async function descargarBaseDeDatos() {
 // ==========================================
 // 10. CARGA MÁGICA DE FOTOS (NIVEL HACKER)
 // ==========================================
+// ==========================================
+// 10. CARGA MÁGICA DE FOTOS (100% SEGURA)
+// ==========================================
 async function procesarFotosMagicas() {
     const inputFotos = document.getElementById('fotos-magicas');
     const archivos = inputFotos.files;
@@ -498,87 +504,57 @@ async function procesarFotosMagicas() {
         alert("Por favor, selecciona al menos una foto.");
         return;
     }
-
-    // Pon aquí tu API Key de ImgBB
-    const IMGBB_API_KEY = '967d4560b8e4d58a4f50db487013722f'; 
     
-    btnMagico.innerHTML = 'Subiendo a la nube... ⏳';
+    btnMagico.innerHTML = 'Enviando al servidor... ⏳';
     btnMagico.disabled = true;
 
-    // ⚡ 1. Agregamos "Color" a los encabezados del Excel Virtual
-    let csvVirtual = "Codigo,Nombre,Precio,Stock,Categoria,Color,Foto_URL\n";
-    // ⚡ Tomamos la categoría que Yessica eligió en el menú
     const selectorMagico = document.getElementById('categoria-magica');
     const categoriaElegida = selectorMagico ? selectorMagico.value : "Nuevos";
-    let exitos = 0;
+    
+    const formDataSegura = new FormData();
+    formDataSegura.append('categoria_destino', categoriaElegida);
+    
+    let validFiles = 0;
+    for (let i = 0; i < archivos.length; i++) {
+        if (!archivos[i].type.startsWith('image/')) continue;
+        
+        // ⚡ BUG ARREGLADO: Soporta nombres con múltiples puntos (ej. pantalon.roto.jpg)
+        const nombreSinExtension = archivos[i].name.substring(0, archivos[i].name.lastIndexOf('.'));
+        const partes = nombreSinExtension.split('_'); 
+        
+        if (partes.length >= 3) {
+            formDataSegura.append('archivos_fotos', archivos[i]);
+            validFiles++;
+        }
+    }
+
+    if (validFiles === 0) {
+        alert("Ninguna foto tenía el formato correcto (SKU_Nombre_Precio.jpg).");
+        btnMagico.innerHTML = '<span>🚀</span> SUBIR FOTOS';
+        btnMagico.disabled = false;
+        return;
+    }
 
     try {
-        for (let i = 0; i < archivos.length; i++) {
-            const archivo = archivos[i];
-
-            if (!archivo.type.startsWith('image/')) continue;
-
-            const nombreSinExtension = archivo.name.split('.')[0];
-            const partes = nombreSinExtension.split('_'); 
-            
-            if (partes.length < 3) {
-                console.warn(`Se saltó ${archivo.name}: El nombre no tiene el formato correcto.`);
-                continue; 
-            }
-
-            const sku = partes[0];
-            const nombre = partes[1].replace(/([a-z])([A-Z])/g, '$1 $2');
-            const precio = partes[2];
-            
-            // ⚡ 2. Extraemos el color si existe (si no, ponemos 'Original')
-            // Automáticamente separa "AzulClaro" en "Azul Claro"
-            const color = partes[3] ? partes[3].replace(/([a-z])([A-Z])/g, '$1 $2') : 'Original';
-
-            const fdImg = new FormData();
-            fdImg.append('image', archivo);
-
-            const respuestaImg = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
-                method: 'POST',
-                body: fdImg
-            });
-
-            const dataImg = await respuestaImg.json();
-            
-            if (dataImg.success) {
-                const urlDirecta = dataImg.data.url;
-                // ⚡ 3. Inyectamos la variable "categoriaElegida" en vez de forzar "Nuevos"
-                csvVirtual += `${sku},${nombre},${precio},0,${categoriaElegida},${color},${urlDirecta}\n`;
-                exitos++;
-            }
-        }
-
-        if (exitos === 0) {
-            alert("Ninguna foto tenía el formato correcto (SKU_Nombre_Precio.jpg o SKU_Nombre_Precio_Color.jpg).");
-            return;
-        }
-
-        btnMagico.innerHTML = 'Sincronizando catálogo... ⚙️';
-
-        const blobCSV = new Blob([csvVirtual], { type: 'text/csv' });
-        const formDataFinal = new FormData();
-        formDataFinal.append('archivo', blobCSV, 'catalogo_magico.csv');
-
-        const respuestaBackend = await fetch(`${API_URL}/pantalones/excel`, {
+        // ⚡ ENVIAMOS TODO AL BACKEND. Python hará el trabajo pesado y usará su propia llave segura.
+        const respuesta = await fetch(`${API_URL}/pantalones/magico`, {
             method: 'POST',
-            headers: obtenerTokenHeader(),
-            body: formDataFinal
+            headers: obtenerTokenHeader(), // Cuidamos la seguridad
+            body: formDataSegura
         });
 
-        const dataBackend = await respuestaBackend.json();
+        const data = await respuesta.json();
 
-        if (respuestaBackend.ok) {
-            alert(`¡Magia completada! ✨\nSe subieron y procesaron ${exitos} fotos nuevas.\n\nEl servidor dice: ${dataBackend.mensaje}`);
+        if (respuesta.ok) {
+            alert(`¡Magia completada! ✨\nEl servidor procesó las fotos de forma segura.\n\nMensaje: ${data.mensaje}`);
             cargarInventarioAdmin(); 
             inputFotos.value = ''; 
+        } else if (respuesta.status === 401) {
+            alert('Tu sesión ha caducado por seguridad.');
+            window.location.reload();
         } else {
-            alert(`Error del servidor: ${dataBackend.detail || dataBackend.error}`);
+            alert(`Error del servidor: ${data.detail || data.error}`);
         }
-
     } catch (error) {
         console.error("Error en la carga mágica:", error);
         alert("Hubo un problema de red. Revisa tu conexión.");

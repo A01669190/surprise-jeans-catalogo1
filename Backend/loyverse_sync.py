@@ -267,100 +267,86 @@ def actualizar_categoria_loyverse(sku_hijo_exacto, nombre_categoria):
         print(f"❌ Error al actualizar categoría en Loyverse: {error_msg}")
 
 def generar_recibo_virtual(correo_cliente, folio_interno, items_comprados, total_pagado):
-    """ Ejecuta la creación del ticket en segundo plano para no trabar la página """
-    def tarea():
-        try:
-            # 1. Obtener las "llaves" maestras de tu tienda (Caja, Empleado, etc.)
-            req_tienda = urllib.request.Request("https://api.loyverse.com/v1.0/stores")
-            req_tienda.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
-            store_id = json.loads(urllib.request.urlopen(req_tienda).read().decode('utf-8'))["stores"][0]["id"]
+    """ Se ejecuta de forma segura usando BackgroundTasks de FastAPI """
+    try:
+        # 1. Obtener las llaves maestras
+        req_tienda = urllib.request.Request("https://api.loyverse.com/v1.0/stores")
+        req_tienda.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
+        store_id = json.loads(urllib.request.urlopen(req_tienda).read().decode('utf-8'))["stores"][0]["id"]
 
-            req_emp = urllib.request.Request("https://api.loyverse.com/v1.0/employees")
-            req_emp.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
-            employee_id = json.loads(urllib.request.urlopen(req_emp).read().decode('utf-8'))["employees"][0]["id"]
+        req_emp = urllib.request.Request("https://api.loyverse.com/v1.0/employees")
+        req_emp.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
+        employee_id = json.loads(urllib.request.urlopen(req_emp).read().decode('utf-8'))["employees"][0]["id"]
 
-            # ⚡ EL FIX: La ruta correcta es pos_devices
-            req_pos = urllib.request.Request("https://api.loyverse.com/v1.0/pos_devices")
-            req_pos.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
-            pos_id = json.loads(urllib.request.urlopen(req_pos).read().decode('utf-8'))["pos_devices"][0]["id"]
+        req_pos = urllib.request.Request("https://api.loyverse.com/v1.0/pos_devices")
+        req_pos.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
+        pos_id = json.loads(urllib.request.urlopen(req_pos).read().decode('utf-8'))["pos_devices"][0]["id"]
 
-            # ⚡ EL FIX 1: Pedimos el método de pago configurado en tu tienda
-            req_pay = urllib.request.Request("https://api.loyverse.com/v1.0/payment_types")
-            req_pay.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
-            payment_type_id = json.loads(urllib.request.urlopen(req_pay).read().decode('utf-8'))["payment_types"][0]["id"]
-            
+        req_pay = urllib.request.Request("https://api.loyverse.com/v1.0/payment_types")
+        req_pay.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
+        payment_type_id = json.loads(urllib.request.urlopen(req_pay).read().decode('utf-8'))["payment_types"][0]["id"]
+        
+        # 2. Buscar al cliente
+        customer_id = None
+        if correo_cliente:
+            req_cust = urllib.request.Request(f"https://api.loyverse.com/v1.0/customers?email={correo_cliente}")
+            req_cust.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
+            clientes = json.loads(urllib.request.urlopen(req_cust).read().decode('utf-8')).get("customers", [])
+            if clientes:
+                customer_id = clientes[0]["id"]
 
-            # 2. Buscar al cliente para pegarlo al ticket
-            customer_id = None
-            if correo_cliente:
-                req_cust = urllib.request.Request(f"https://api.loyverse.com/v1.0/customers?email={correo_cliente}")
-                req_cust.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
-                clientes = json.loads(urllib.request.urlopen(req_cust).read().decode('utf-8')).get("customers", [])
-                if clientes:
-                    customer_id = clientes[0]["id"]
+        # 3. Mapear tallas
+        req_item = urllib.request.Request("https://api.loyverse.com/v1.0/items?limit=250")
+        req_item.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
+        catalogo = json.loads(urllib.request.urlopen(req_item).read().decode('utf-8')).get("items", [])
 
-            # 3. Mapear las tallas exactas con el catálogo de Loyverse
-            req_item = urllib.request.Request("https://api.loyverse.com/v1.0/items?limit=250")
-            req_item.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
-            catalogo = json.loads(urllib.request.urlopen(req_item).read().decode('utf-8')).get("items", [])
+        line_items = []
+        for item in items_comprados:
+            sku_buscado = item["sku"]
+            for cat_item in catalogo:
+                for var in cat_item.get("variants", []):
+                    if var.get("sku") == sku_buscado:
+                        line_items.append({
+                            "item_id": cat_item["id"],
+                            "variant_id": var["variant_id"],
+                            "quantity": item["cantidad"],
+                            "price": item["precio"],
+                            "gross_total_money": item["precio"] * item["cantidad"],
+                            "total_money": item["precio"] * item["cantidad"]
+                        })
+                        break
 
-            line_items = []
-            for item in items_comprados:
-                sku_buscado = item["sku"]
-                for cat_item in catalogo:
-                    for var in cat_item.get("variants", []):
-                        if var.get("sku") == sku_buscado:
-                            line_items.append({
-                                "item_id": cat_item["id"],
-                                "variant_id": var["variant_id"],
-                                "quantity": item["cantidad"],
-                                "price": item["precio"],
-                                "gross_total_money": item["precio"] * item["cantidad"],
-                                "total_money": item["precio"] * item["cantidad"]
-                            })
-                            break
+        if not line_items:
+            print("⚠️ Loyverse: No se armó el recibo porque no se encontraron las tallas.")
+            return
 
-            if not line_items:
-                print("⚠️ Loyverse: No se armó el recibo porque no se encontraron las tallas.")
-                return
+        fecha_iso = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
-            fecha_iso = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        # 4. Armar y cobrar
+        recibo = {
+            "receipt_number": f"WEB-{folio_interno:04d}",
+            "receipt_type": "SALE",
+            "store_id": store_id,
+            "pos_id": pos_id,
+            "employee_id": employee_id,
+            "receipt_date": fecha_iso,
+            "total_money": total_pagado,
+            "net_amount": total_pagado,
+            "line_items": line_items,
+            "payments": [{"payment_type_id": payment_type_id, "money_amount": total_pagado}]
+        }
 
-            # 4. Armar y cobrar el ticket final
-            recibo = {
-                "receipt_number": f"WEB-{folio_interno:04d}",
-                "receipt_type": "SALE",
-                "store_id": store_id,
-                "pos_id": pos_id,
-                "employee_id": employee_id,
-                "receipt_date": fecha_iso,
-                "total_money": total_pagado,
-                "net_amount": total_pagado,
-                "line_items": line_items,
-                # ⚡ EL FIX 2: Le decimos cómo nos pagó
-                "payments": [
-                    {
-                        "payment_type_id": payment_type_id,
-                        "money_amount": total_pagado
-                    }
-                ]
-            }
+        if customer_id:
+            recibo["customer_id"] = customer_id
 
-            if customer_id:
-                recibo["customer_id"] = customer_id
+        payload = json.dumps(recibo).encode("utf-8")
+        req_receipt = urllib.request.Request("https://api.loyverse.com/v1.0/receipts", data=payload, method="POST")
+        req_receipt.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
+        req_receipt.add_header("Content-Type", "application/json")
+        urllib.request.urlopen(req_receipt)
+        
+        print(f"🧾✅ Recibo WEB-{folio_interno:04d} tecleado virtualmente.")
 
-            # ⚡ EL FIX: Le mandamos el recibo directamente, sin la "caja" extra
-            payload = json.dumps(recibo).encode("utf-8")
-            req_receipt = urllib.request.Request("https://api.loyverse.com/v1.0/receipts", data=payload, method="POST")
-            req_receipt.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
-            req_receipt.add_header("Content-Type", "application/json")
-            urllib.request.urlopen(req_receipt)
-            
-            print(f"🧾✅ Recibo WEB-{folio_interno:04d} tecleado virtualmente en Loyverse.")
-
-        except Exception as e:
-            error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
-            print(f"❌ Error al generar recibo en Loyverse: {error_msg}")
-            
-    # Lanzamos el robot en segundo plano para que la web no se congele
-    threading.Thread(target=tarea).start()
+    except Exception as e:
+        error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
+        print(f"❌ Error al generar recibo en Loyverse: {error_msg}")

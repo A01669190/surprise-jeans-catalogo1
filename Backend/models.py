@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
-from sqlalchemy.orm import relationship
-import datetime
+from sqlalchemy.orm import relationship, object_session
+from sqlalchemy import func
+from datetime import datetime, timezone
 from database import Base
 
 class Categoria(Base):
@@ -24,21 +25,21 @@ class Pantalon(Base):
     resenas = relationship("Resena", back_populates="pantalon", cascade="all, delete-orphan")
     detalles = relationship("DetallePedido", back_populates="pantalon")
 
-    # ⚡ CALCULADORA AUTOMÁTICA DE ESTRELLAS (FILTRO POSITIVO)
+    # ⚡ CALCULADORA OPTIMIZADA POR BASE DE DATOS (N+1 FIXED)
     @property
     def promedio_estrellas(self):
-        # 1. Filtramos en secreto: Solo tomamos en cuenta reseñas de 3, 4 o 5 estrellas
-        resenas_buenas = [r for r in self.resenas if r.calificacion >= 3]
-        
-        if not resenas_buenas: return 0.0
-        # 2. Calculamos el promedio solo usando las buenas
-        return sum(r.calificacion for r in resenas_buenas) / len(resenas_buenas)
+        session = object_session(self)
+        if session:
+            resultado = session.query(func.avg(Resena.calificacion)).filter(Resena.pantalon_id == self.id, Resena.calificacion >= 3).scalar()
+            return float(resultado) if resultado else 0.0
+        return 0.0
 
     @property
     def total_resenas(self):
-        # El número entre paréntesis () en tu catálogo también ignorará las malas
-        resenas_buenas = [r for r in self.resenas if r.calificacion >= 3]
-        return len(resenas_buenas)
+        session = object_session(self)
+        if session:
+            return session.query(func.count(Resena.id)).filter(Resena.pantalon_id == self.id, Resena.calificacion >= 3).scalar() or 0
+        return 0
     tallas = relationship("VarianteTalla", back_populates="pantalon", cascade="all, delete-orphan")
 
 class VarianteTalla(Base):
@@ -58,8 +59,9 @@ class Resena(Base):
     cliente_id = Column(Integer, ForeignKey("clientes.id"))
     calificacion = Column(Integer) # Del 1 al 5
     comentario = Column(String, nullable=True)
-    fecha = Column(DateTime, default=datetime.datetime.utcnow)
 
+    fecha = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    fecha_registro = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     pantalon = relationship("Pantalon", back_populates="resenas")
     cliente = relationship("Cliente")
 
@@ -81,8 +83,8 @@ class Pedido(Base):
     estatus = Column(String, default="PENDIENTE")
     guia_rastreo = Column(String, nullable=True) 
     pago_id = Column(String, nullable=True) # ⚡ NUEVA COLUMNA PARA REEMBOLSOS
-    fecha = Column(DateTime, default=datetime.datetime.utcnow)
-    detalles = relationship("DetallePedido", back_populates="pedido")
+    fecha = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    detalles = relationship("DetallePedido", back_populates="pedido", cascade="all, delete-orphan")
 
 class DetallePedido(Base):
     __tablename__ = "detalles_pedido"
@@ -113,7 +115,7 @@ class Cliente(Base):
     codigo_postal = Column(String, nullable=True)
     referencias_domicilio = Column(String, nullable=True)
     puntos = Column(Float, default=0.0)
-    fecha_registro = Column(DateTime, default=datetime.datetime.utcnow)
+    fecha_registro = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 class Cupon(Base):
     __tablename__ = "cupones"

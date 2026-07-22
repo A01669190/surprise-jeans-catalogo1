@@ -311,14 +311,13 @@
         }
 
         // ⚡ VIGILANTE OPTIMIZADO (Cero Lag)
-        const checkLogin = setInterval(() => {
-            // En vez de analizar todo el diseño web, solo buscamos si existe la llave VIP en la memoria
+        function verificarEstadoMenu() {
             if (sessionStorage.getItem('token_vip')) {
                 document.getElementById('nav-admin').classList.remove('hidden');
-                // Una vez que encuentra la llave y muestra el menú, ¡se apaga a sí mismo para liberar memoria!
-                clearInterval(checkLogin); 
             }
-        }, 500);
+        }
+        // Solo se ejecuta una vez cuando abres la página
+        document.addEventListener('DOMContentLoaded', verificarEstadoMenu);
 
         // Variables globales para destruir las gráficas viejas si cambian de pestaña
         let chartInventario = null;
@@ -460,7 +459,6 @@
                 alert("Hubo un problema de conexión al generar las etiquetas.");
             }
         }
-
 
 
     </script>

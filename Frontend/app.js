@@ -82,6 +82,23 @@ async function cargarPantalones(esNuevaBusqueda) {
         
         renderizarPantalones(pantalones, esNuevaBusqueda);
 
+        // ==========================================
+        // ⚡ MAGIA PHYGITAL: DETECTAR ESCANEO DE QR ⚡
+        // ==========================================
+        const parametrosURL = new URLSearchParams(window.location.search);
+        const qrId = parametrosURL.get('producto');
+        
+        if (qrId && esNuevaBusqueda) {
+            const pantalonQR = pantalones.find(p => p.id == qrId);
+            if (pantalonQR) {
+                // Solo si pasas la función verDetalles a index.js o la dejas global
+                if(typeof verDetalles === "function") {
+                    verDetalles(pantalonQR.id, pantalonQR.nombre.replace(/'/g, "\\'"), pantalonQR.imagen_url, pantalonQR.precio);
+                }
+                window.history.replaceState({}, document.title, "/");
+            }
+        }
+
         // Lógica para mostrar u ocultar el botón de "Cargar Más"
         const btnCargarMas = document.getElementById('btn-cargar-mas');
         if (pantalones.length === LIMITE) {

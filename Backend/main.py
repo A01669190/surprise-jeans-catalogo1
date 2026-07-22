@@ -6,6 +6,8 @@ from reportlab.pdfgen import canvas
 from datetime import datetime
 from logistica_sync import generar_guia_envio
 import threading
+from fastapi.concurrency import run_in_threadpool
+from fastapi import Body
 from reportlab.graphics.barcode import code128
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import mm
@@ -20,15 +22,14 @@ import logging
 import smtplib
 from email.mime.application import MIMEApplication
 from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import shutil
 from fastapi import FastAPI, Depends, File, UploadFile, Form, Request, HTTPException, status, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session  # <--- ¡ESTA ES LA LÍNEA QUE FALTABA!
 import base64
 import requests
+import re
 import pandas as pd
 import hmac
 import hashlib
@@ -53,7 +54,6 @@ from email.mime.multipart import MIMEMultipart
 import string
 import random
 from pydantic import BaseModel
-from fastapi import BackgroundTasks
 import jwt
 from datetime import datetime, timedelta
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -195,20 +195,27 @@ MERCADO_PAGO_TOKEN = os.getenv("MERCADO_PAGO_TOKEN", "")
 sdk = mercadopago.SDK(MERCADO_PAGO_TOKEN)
 
 os.makedirs("static/uploads", exist_ok=True)
+
 # ==========================================
-# 3. SISTEMA DE LOGIN (JSON Web Tokens)
+# 🚨 SISTEMA DE LOGIN Y SEGURIDAD (JSON Web Tokens)
 # ==========================================
-SECRET_KEY = os.getenv("JWT_SECRET", "llave_secreta_del_catalogo_surprise")
-# ==========================================
-# VARIABLES DE ENTORNO (SEGURIDAD)
-# ==========================================
-SECRET_KEY = os.getenv("JWT_SECRET", "llave_secreta_del_catalogo_surprise")
+ESTAMOS_EN_RENDER = os.getenv("RENDER")
+
+if ESTAMOS_EN_RENDER:
+    # 🔒 EN PRODUCCIÓN: Exigimos la llave real obligatoriamente
+    SECRET_KEY = os.getenv("JWT_SECRET")
+    if not SECRET_KEY:
+        raise ValueError("🚨 ERROR FATAL: No configuraste JWT_SECRET en las variables de entorno de Render.")
+else:
+    # 💻 EN LOCAL (Tu Mac): Usamos una llave de repuesto para que puedas programar
+    print("🔓 Modo local: Usando llave JWT de prueba.")
+    SECRET_KEY = os.getenv("JWT_SECRET", "llave_secreta_local_para_pruebas")
+
+# 👇 ESTAS LÍNEAS SE HABÍAN BORRADO, AQUÍ ESTÁN DE REGRESO 👇
 GMAIL_USER = os.getenv("GMAIL_USER", "denzellopezcabrera@gmail.com")
 GMAIL_PASSWORD = os.getenv("GMAIL_PASSWORD", "")
 ALGORITHM = "HS256"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
-
-
 
 # ==========================================
 # INFRAESTRUCTURA DE WEBSOCKETS (TIEMPO REAL)
@@ -857,7 +864,7 @@ async def robot_respaldos_diarios():
             pedidos = db.query(models.Pedido).all()
             clientes = db.query(models.Cliente).all()
             
-            fecha = datetime.datetime.now().strftime("%Y-%m-%d")
+            fecha = datetime.now().strftime("%Y-%m-%d")
             
             respaldo = {
                 "fecha_respaldo": fecha,
@@ -974,7 +981,7 @@ async def auto_destruir_abandonado(pedido_id: int):
             pass
 
 @app.post("/crear-pago-seguro")
-async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     try:
         # 1. CÁLCULO DE TOTALES Y APLICACIÓN DE CUPONES
         total_pedido = 0.0
@@ -1074,8 +1081,8 @@ async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, 
             lista_ropa.append({"cantidad": item.cantidad, "nombre": f"{item.nombre} (Talla {item.talla})", "precio": round(precio_final, 2)})
         db.commit()
         
-        # Calculamos los puntos, pero NO los guardamos en la base de datos todavía
-        puntos_ganados = total_final * 0.05
+        # Puntos calculados estrictamente sobre la ropa, ignorando el envío
+        puntos_ganados = max(0.0, total_final - costo_envio) * 0.05
 
         # 🚨 LA MAGIA: BYPASS DE INVENTARIO Y LOYVERSE 🚨
         if total_final <= 0 or pedido_req.cupon == "VENTA-PRESENCIAL":
@@ -1108,7 +1115,7 @@ async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, 
                         background_tasks.add_task(enviar_alarma_inventario, nombre_pantalon, variante_db.talla, variante_db.stock)
 
             if items_para_recibo:
-                loyverse_sync.generar_recibo_virtual(nuevo_pedido.correo_cliente, nuevo_pedido.id, items_para_recibo, nuevo_pedido.total)
+                background_tasks.add_task(loyverse_sync.generar_recibo_virtual, nuevo_pedido.correo_cliente, nuevo_pedido.id, items_para_recibo, nuevo_pedido.total)
                 
             db.commit()
             
@@ -1153,8 +1160,8 @@ async def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, 
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/webhook/mercadopago")
-async def webhook_mercadopago(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    datos = await request.json()
+def webhook_mercadopago(background_tasks: BackgroundTasks, datos: dict = Body(...), db: Session = Depends(get_db)):
+    # datos se extrae automáticamente, ya no bloquea el servidor
     
     if datos.get("type") == "payment":
         pago_id = datos.get("data", {}).get("id")
@@ -1201,7 +1208,7 @@ async def webhook_mercadopago(request: Request, background_tasks: BackgroundTask
                     
                     # 🎉 DISPARAMOS EL RECIBO VIRTUAL EN LOYVERSE 🎉
                     if items_para_recibo:
-                        loyverse_sync.generar_recibo_virtual(pedido_db.correo_cliente, pedido_db.id, items_para_recibo, pedido_db.total)
+                        background_tasks.add_task(loyverse_sync.generar_recibo_virtual, pedido_db.correo_cliente, pedido_db.id, items_para_recibo, pedido_db.total)
                     
                     db.commit()
                     
@@ -1405,7 +1412,7 @@ def eliminar_categoria(
 
 @app.post("/pantalones")
 @limiter.limit("20/minute")
-async def crear_pantalon(
+def crear_pantalon(
     request: Request, 
     background_tasks: BackgroundTasks, 
     codigo: str = Form(...), 
@@ -1418,8 +1425,8 @@ async def crear_pantalon(
     db: Session = Depends(get_db), 
     token: str = Depends(verificar_token)
 ):
-    # 1. Subimos la foto a ImgBB
-    contenido = await foto.read()
+    # 1. Subimos la foto a ImgBB de forma segura
+    contenido = foto.file.read()
     imagen_base64 = base64.b64encode(contenido).decode("utf-8")
     API_KEY = os.getenv("IMGBB_API_KEY", "")
     respuesta = requests.post("https://api.imgbb.com/1/upload", data={"key": API_KEY, "image": imagen_base64})
@@ -1497,6 +1504,101 @@ def eliminar_pantalon(
     db.commit()
     return {"mensaje": "Pantalón eliminado de la web y de Loyverse"}
 
+# ==========================================
+# ⚡ RUTA DE CARGA MÁGICA DE FOTOS (100% SEGURA)
+# ==========================================
+@app.post("/pantalones/magico")
+@limiter.limit("5/minute")
+def subir_fotos_magicas(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    categoria_destino: str = Form("Nuevos"),
+    archivos_fotos: List[UploadFile] = File(...),
+    db: Session = Depends(get_db),
+    token: str = Depends(verificar_token)
+):
+    API_KEY = os.getenv("IMGBB_API_KEY", "")
+    if not API_KEY:
+        raise HTTPException(status_code=500, detail="Falta configurar la llave de ImgBB en el servidor.")
+
+    # 1. Revisamos si la categoría existe, si no, la creamos
+    categoria = db.query(models.Categoria).filter(models.Categoria.nombre.ilike(categoria_destino)).first()
+    if not categoria:
+        categoria = models.Categoria(nombre=categoria_destino)
+        db.add(categoria)
+        db.commit()
+        db.refresh(categoria)
+
+    exitos = 0
+    errores = 0
+
+    for foto in archivos_fotos:
+        # Extraemos el nombre sin la extensión (Ej: SJ-001_Skinny_350.jpg -> SJ-001_Skinny_350)
+        nombre_base = foto.filename.rsplit('.', 1)[0]
+        partes = nombre_base.split('_')
+        
+        if len(partes) < 3:
+            errores += 1
+            continue
+
+        sku_padre = partes[0]
+        # Regex para separar palabras pegadas (Ej: MomJeans -> Mom Jeans)
+        nombre_limpio = re.sub(r'([a-z])([A-Z])', r'\1 \2', partes[1])
+        
+        try:
+            precio = float(partes[2])
+        except ValueError:
+            errores += 1
+            continue
+
+        # Si trae color en el nombre, lo usamos; si no, es 'Original'
+        color = "Original"
+        if len(partes) >= 4:
+            color = re.sub(r'([a-z])([A-Z])', r'\1 \2', partes[3])
+        color_sku = color.replace(" ", "").upper()
+
+        # 2. Subimos la foto a ImgBB
+        contenido = foto.file.read()
+        imagen_base64 = base64.b64encode(contenido).decode("utf-8")
+        respuesta = requests.post("https://api.imgbb.com/1/upload", data={"key": API_KEY, "image": imagen_base64})
+        
+        if respuesta.status_code != 200:
+            errores += 1
+            continue
+            
+        url_permanente = respuesta.json()["data"]["url"]
+
+        # 3. Guardamos el pantalón papá en la BD
+        nuevo_pantalon = models.Pantalon(
+            codigo=sku_padre, nombre=nombre_limpio, precio=precio, 
+            stock=0, categoria_id=categoria.id, imagen_url=url_permanente
+        )
+        db.add(nuevo_pantalon)
+        db.commit()
+        db.refresh(nuevo_pantalon)
+
+        # 4. Creamos las 7 tallas (hijos) con stock en 0
+        distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
+        for talla_str in distribucion.keys():
+            sku_variante = f"{sku_padre}-{color_sku}-{talla_str}"
+            nueva_variante = models.VarianteTalla(
+                pantalon_id=nuevo_pantalon.id, 
+                talla=talla_str, 
+                color=color, 
+                stock=0, 
+                sku=sku_variante
+            )
+            db.add(nueva_variante)
+        
+        db.commit()
+
+        # 5. Le avisamos a Loyverse que existe este modelo (en segundo plano)
+        background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre_limpio, sku_padre, precio, categoria.nombre, color)
+        
+        exitos += 1
+
+    return {"mensaje": f"Se subieron {exitos} modelos con éxito. Hubo {errores} archivos ignorados por mal formato."}
+
 @app.post("/pantalones/excel")
 @limiter.limit("5/minute") 
 async def subir_excel(
@@ -1512,8 +1614,15 @@ async def subir_excel(
     try:
         import pandas as pd
         from io import BytesIO
-        if archivo.filename.endswith('.csv'): df = pd.read_csv(BytesIO(contenido))
-        else: df = pd.read_excel(BytesIO(contenido))
+        
+        # Aislamos la lectura pesada del Excel
+        def procesar_pandas():
+            if archivo.filename.endswith('.csv'): 
+                return pd.read_csv(BytesIO(contenido))
+            else: 
+                return pd.read_excel(BytesIO(contenido))
+                
+        df = await run_in_threadpool(procesar_pandas)
         df.columns = df.columns.str.strip()
         
         columnas_esperadas = ["Codigo", "Nombre", "Precio", "Stock", "Categoria", "Foto_URL"]
@@ -1669,14 +1778,14 @@ def marcar_pedido_entregado(pedido_id: int, db: Session = Depends(get_db)):
 
 @app.get("/reset-db-total")
 def reset_db_total():
-    # Borrado forzado usando instrucción CASCADE de PostgreSQL
     with engine.begin() as conn:
-        # 🟢 Agregamos 'clientes' a la lista de tablas a destruir
-        conn.execute(text("DROP TABLE IF EXISTS variantes_talla, resenas, detalles_pedido, pedidos, pantalones, categorias, clientes, cupones CASCADE;"))
+        if engine.name == "sqlite":
+            conn.execute(text("DROP TABLE IF EXISTS variantes_talla, resenas, detalles_pedido, pedidos, pantalones, categorias, clientes, cupones;"))
+        else:
+            conn.execute(text("DROP TABLE IF EXISTS variantes_talla, resenas, detalles_pedido, pedidos, pantalones, categorias, clientes, cupones CASCADE;"))
 
-    # Volvemos a construir la estructura limpia
     models.Base.metadata.create_all(bind=engine)
-    return {"mensaje": "Base de datos formateada al 100%. ¡Ahora sí está lista para los colores!"}
+    return {"mensaje": "Base de datos formateada al 100%."}
 
 @app.get("/backup/descargar")
 @limiter.limit("3/minute")
@@ -1883,7 +1992,7 @@ def cron_respaldo_semanal():
         clientes = db.query(models.Cliente).all()
         
         datos_respaldo = {
-            "fecha": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+            "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "inventario": [{"codigo": p.codigo, "nombre": p.nombre, "stock": p.stock} for p in pantalones],
             "clientes": [{"nombre": c.nombre_completo, "correo": c.correo, "telefono": c.telefono} for c in clientes]
         }
