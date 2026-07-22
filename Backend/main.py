@@ -181,11 +181,11 @@ limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# 2. CORS ESTRICTO
+# 2. CORS SEGURO (Anti-Crash)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Permitimos todo para evitar bloqueos del banco
-    allow_credentials=True,
+    allow_origins=["*"], # Permitimos el acceso desde el frontend
+    allow_credentials=False, # ⚡ FIX: Apagamos esto para evitar el bloqueo interno de FastAPI
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -1832,7 +1832,7 @@ def ver_clientes(db: Session = Depends(get_db)):
 
 @app.put("/pantalones/{pantalon_id}")
 @limiter.limit("20/minute")
-async def editar_pantalon(
+def editar_pantalon(  # ⚡ FIX: Quitamos el async para evitar bloqueos
     request: Request,
     pantalon_id: int,
     background_tasks: BackgroundTasks,
@@ -1841,7 +1841,7 @@ async def editar_pantalon(
     precio: float = Form(...),
     stock: int = Form(...),
     categoria_id: int = Form(...),
-    color: str = Form("Original"), # ⚡ RECIBE EL COLOR
+    color: str = Form("Original"),
     foto: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     token: str = Depends(verificar_token)
@@ -1877,9 +1877,9 @@ async def editar_pantalon(
     pantalon.categoria_id = categoria_id
 
     if foto and foto.filename:
-        contenido = await foto.read()
+        contenido = foto.file.read()  # ⚡ FIX: Lectura segura de la memoria
         imagen_base64 = base64.b64encode(contenido).decode("utf-8")
-        API_KEY = "967d4560b8e4d58a4f50db487013722f"
+        API_KEY = os.getenv("IMGBB_API_KEY", "") # ⚡ FIX: Llave encriptada desde Render
         respuesta = requests.post("https://api.imgbb.com/1/upload", data={"key": API_KEY, "image": imagen_base64})
         if respuesta.status_code == 200:
             pantalon.imagen_url = respuesta.json()["data"]["url"]
