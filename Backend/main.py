@@ -2061,7 +2061,7 @@ def generar_etiquetas_qr(token: str, db: Session = Depends(get_db)):
     p.setFont("Helvetica-Bold", 16)
     p.drawString(margen_x, alto - 15*mm, "Etiquetas Phygital - Surprise Jeans")
     
-    y_base = alto - 40*mm
+    y_base = alto - 65*mm # ✅ LÍNEA CORREGIDA (Bajamos los QRs 2.5 centímetros)
     
     for pantalon in pantalones:
         x = margen_x + (col * espacio_x)
@@ -2101,7 +2101,7 @@ def generar_etiquetas_qr(token: str, db: Session = Depends(get_db)):
             if fila > 3: # Caben 12 por página
                 p.showPage()
                 fila = 0
-                y_base = alto - 40*mm
+                y_base = alto - 65*mm # ✅ LÍNEA CORREGIDA
                 p.setFont("Helvetica-Bold", 16)
                 p.drawString(margen_x, alto - 15*mm, "Etiquetas Phygital - Surprise Jeans")
 
@@ -2109,7 +2109,6 @@ def generar_etiquetas_qr(token: str, db: Session = Depends(get_db)):
     buffer.seek(0)
     
     return Response(content=buffer.getvalue(), media_type="application/pdf")
-
 
 # ==========================================
 # 🌟 CARRUSEL DE RESEÑAS EN VIVO (PRUEBA SOCIAL)
