@@ -159,12 +159,20 @@
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-black text-gray-800">4. Inventario Actual</h2>
                 
-                <button onclick="descargarBaseDeDatos()" class="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors shadow-md">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    Respaldo de Seguridad
-                </button>
+                <div class="flex gap-2">
+                    <!-- ⚡ NUEVO: BOTÓN DE ETIQUETAS QR -->
+                    <button onclick="descargarEtiquetasQR()" class="flex items-center gap-2 bg-stone-900 hover:bg-indigo-600 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors shadow-md">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
+                        Imprimir QRs
+                    </button>
+
+                    <button onclick="descargarBaseDeDatos()" class="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors shadow-md">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Respaldo
+                    </button>
+                </div>
             </div>
             
             <div id="lista-inventario" class="space-y-3 max-h-96 overflow-y-auto pr-2"></div>
@@ -352,6 +360,7 @@
                     }
                 });
 
+
                 // Convertimos el conteo a una lista y sacamos los 5 ganadores
                 const topVentas = Object.entries(contadorVentas)
                     .map(([nombre, cantidad]) => ({ nombre, cantidad }))
@@ -406,6 +415,54 @@
                 console.error("No se pudo cargar la data para el dashboard", error);
             }
         }
+
+        // ==========================================
+        // ⚡ ECOSISTEMA PHYGITAL: DESCARGAR QRS
+        // ==========================================
+        async function descargarEtiquetasQR() {
+            try {
+                // Animación del botón
+                const btn = document.querySelector('button[onclick="descargarEtiquetasQR()"]');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = 'Generando PDF... ⏳';
+                btn.disabled = true;
+
+                // Aquí usamos la llave maestra que Yessica ya tiene guardada en su navegador
+                const respuesta = await fetch(`${API_URL}/admin/etiquetas-qr?token=${sessionStorage.getItem('token_vip')}`, {
+                    method: 'GET'
+                });
+
+                if (!respuesta.ok) {
+                    alert("No se pudo generar el archivo. Verifica tu sesión.");
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                    return;
+                }
+
+                // Descarga del PDF forzada
+                const blob = await respuesta.blob();
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `Etiquetas_Phygital_Surprise.pdf`;
+                
+                document.body.appendChild(link);
+                link.click();
+                
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+                
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                
+            } catch (error) {
+                console.error("Error al descargar QRs:", error);
+                alert("Hubo un problema de conexión al generar las etiquetas.");
+            }
+        }
+
+
+
     </script>
 
     <script src="admin.js?v=4.0"></script>

@@ -1449,3 +1449,13 @@
 2026-07-21 18:15:38,892 [INFO] Added job "cron_reporte_mensual" to job store "default"
 2026-07-21 18:15:38,893 [INFO] Added job "cron_respaldo_semanal" to job store "default"
 2026-07-21 18:15:38,893 [INFO] Scheduler started
+2026-07-21 19:15:38,878 [INFO] Running job "cron_recuperar_carritos (trigger: interval[1:00:00], next run at: 2026-07-21 19:15:38 CST)" (scheduled at 2026-07-21 19:15:38.877527-06:00)
+2026-07-21 19:15:38,898 [INFO] Job "cron_recuperar_carritos (trigger: interval[1:00:00], next run at: 2026-07-21 20:15:38 CST)" executed successfully
+2026-07-21 20:15:38,881 [INFO] Running job "cron_recuperar_carritos (trigger: interval[1:00:00], next run at: 2026-07-21 21:15:38 CST)" (scheduled at 2026-07-21 20:15:38.877527-06:00)
+2026-07-21 20:15:38,894 [INFO] Job "cron_recuperar_carritos (trigger: interval[1:00:00], next run at: 2026-07-21 21:15:38 CST)" executed successfully
+2026-07-21 21:15:38,878 [INFO] Running job "cron_recuperar_carritos (trigger: interval[1:00:00], next run at: 2026-07-21 22:15:38 CST)" (scheduled at 2026-07-21 21:15:38.877527-06:00)
+2026-07-21 21:15:38,883 [INFO] Job "cron_recuperar_carritos (trigger: interval[1:00:00], next run at: 2026-07-21 22:15:38 CST)" executed successfully
+2026-07-21 22:15:38,879 [INFO] Running job "cron_recuperar_carritos (trigger: interval[1:00:00], next run at: 2026-07-21 23:15:38 CST)" (scheduled at 2026-07-21 22:15:38.877527-06:00)
+2026-07-21 22:15:38,884 [INFO] Job "cron_recuperar_carritos (trigger: interval[1:00:00], next run at: 2026-07-21 23:15:38 CST)" executed successfully
+2026-07-21 23:15:38,880 [INFO] Running job "cron_recuperar_carritos (trigger: interval[1:00:00], next run at: 2026-07-22 00:15:38 CST)" (scheduled at 2026-07-21 23:15:38.877527-06:00)
+2026-07-21 23:15:38,887 [INFO] Job "cron_recuperar_carritos (trigger: interval[1:00:00], next run at: 2026-07-22 00:15:38 CST)" executed successfully
