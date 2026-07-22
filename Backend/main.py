@@ -59,6 +59,8 @@ from datetime import datetime, timedelta
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi import WebSocket, WebSocketDisconnect
 from fastapi import BackgroundTasks
+import qrcode
+from reportlab.lib.utils import ImageReader
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="API Surprise Jeans - Fortificada")
@@ -2027,6 +2029,87 @@ def descargar_recibo_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
     buffer.seek(0)
     
     return Response(content=buffer.getvalue(), media_type="application/pdf")
+
+# ==========================================
+# 📱 ECOSISTEMA PHYGITAL: GENERADOR DE CÓDIGOS QR
+# ==========================================
+@app.get("/admin/etiquetas-qr")
+def generar_etiquetas_qr(token: str, db: Session = Depends(get_db)):
+    # 1. Validamos que solo Yessica pueda imprimir esto
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("sub") != "admin_yessica": raise Exception()
+    except:
+        raise HTTPException(status_code=401, detail="Pase VIP inválido")
+
+    # 2. Traemos todos los pantalones que tienen stock
+    pantalones = db.query(models.Pantalon).filter(models.Pantalon.stock > 0).all()
+    
+    # 3. Preparamos el lienzo PDF (Tamaño Carta)
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+    ancho, alto = letter
+    
+    # Configuramos la cuadrícula (3 columnas x 4 filas)
+    margen_x = 15 * mm
+    margen_y = 20 * mm
+    espacio_x = 65 * mm
+    espacio_y = 60 * mm
+    col = 0
+    fila = 0
+    
+    p.setFont("Helvetica-Bold", 16)
+    p.drawString(margen_x, alto - 15*mm, "Etiquetas Phygital - Surprise Jeans")
+    
+    y_base = alto - 40*mm
+    
+    for pantalon in pantalones:
+        x = margen_x + (col * espacio_x)
+        y = y_base - (fila * espacio_y)
+        
+        # ⚡ GENERACIÓN DEL CÓDIGO QR MÁGICO ⚡
+        qr = qrcode.QRCode(version=1, box_size=10, border=1)
+        # Este es el link que leerá el celular del cliente
+        qr.add_data(f"https://surprisejeanysk.com/?producto={pantalon.id}")
+        qr.make(fit=True)
+        img_qr = qr.make_image(fill_color="black", back_color="white")
+        
+        buf_qr = BytesIO()
+        img_qr.save(buf_qr, format="PNG")
+        buf_qr.seek(0)
+        
+        # 4. Dibujamos el QR y los textos en el PDF
+        p.drawImage(ImageReader(buf_qr), x, y, width=35*mm, height=35*mm)
+        
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(x + 38*mm, y + 25*mm, pantalon.codigo)
+        
+        p.setFont("Helvetica", 8)
+        nombre_corto = pantalon.nombre[:20] + "..." if len(pantalon.nombre) > 20 else pantalon.nombre
+        p.drawString(x + 38*mm, y + 18*mm, nombre_corto)
+        
+        p.setFont("Helvetica-Bold", 12)
+        p.setFillColorRGB(0.31, 0.27, 0.90) # Indigo
+        p.drawString(x + 38*mm, y + 8*mm, f"${pantalon.precio:.2f}")
+        p.setFillColorRGB(0, 0, 0) # Regresa a negro
+        
+        # Lógica de salto de cuadrícula y página
+        col += 1
+        if col > 2:
+            col = 0
+            fila += 1
+            if fila > 3: # Caben 12 por página
+                p.showPage()
+                fila = 0
+                y_base = alto - 40*mm
+                p.setFont("Helvetica-Bold", 16)
+                p.drawString(margen_x, alto - 15*mm, "Etiquetas Phygital - Surprise Jeans")
+
+    p.save()
+    buffer.seek(0)
+    
+    return Response(content=buffer.getvalue(), media_type="application/pdf")
+
 
 # ==========================================
 # 🌟 CARRUSEL DE RESEÑAS EN VIVO (PRUEBA SOCIAL)

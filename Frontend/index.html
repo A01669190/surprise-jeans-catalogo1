@@ -179,13 +179,23 @@
         <h2 class="text-4xl md:text-6xl font-serif mb-4 text-stone-800 tracking-tight">Realza tu figura</h2>
         <p class="text-stone-500 mb-10 max-w-lg mx-auto text-sm md:text-base font-medium">Descubre nuestra nueva colección. El fit perfecto diseñado para ti, directo de fábrica.</p>
         
-        <!-- Buscador Elegante (Lupa corregida al 100%) -->
-        <div class="max-w-2xl mx-auto relative shadow-xl rounded-full transform transition-transform hover:scale-[1.02]">
-            <!-- Usamos py (arriba/abajo) y pl/pr (lados) por separado para que no choquen -->
-            <input type="text" id="buscador-tienda" autocomplete="off" name="busqueda" data-lpignore="true" placeholder="¿Qué modelo buscas? (Ej. Skinny, Mom...)" class="w-full border-none bg-white py-4 md:py-5 pr-6 pl-14 md:pl-16 rounded-full focus:outline-none focus:ring-4 focus:ring-rose-200 transition-all text-sm md:text-base text-gray-800 font-medium">                   
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-5 md:left-6 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <!-- ⚡ FONDO OSCURO PARA EL BUSCADOR (Efecto Cine) ⚡ -->
+        <div id="overlay-buscador" class="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-40 hidden transition-opacity" onclick="cerrarBuscadorPredictivo()"></div>
+
+        <!-- Buscador Elegante con Ventana Predictiva -->
+        <div class="max-w-2xl mx-auto relative shadow-xl rounded-full transform transition-transform hover:scale-[1.02] z-50">
+            
+            <input type="text" id="buscador-tienda" autocomplete="off" name="busqueda" data-lpignore="true" placeholder="¿Qué modelo buscas? (Ej. Skinny, Mom...)" class="w-full border-none bg-white py-4 md:py-5 pr-6 pl-14 md:pl-16 rounded-full focus:outline-none focus:ring-4 focus:ring-rose-200 transition-all text-sm md:text-base text-gray-800 font-medium relative z-20">                   
+            
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-5 md:left-6 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none z-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
+
+            <!-- ⚡ VENTANA PREDICTIVA FLOTANTE (Inicia oculta) ⚡ -->
+            <div id="resultados-predictivos" class="absolute top-full left-0 right-0 mt-3 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden hidden flex-col max-h-[360px] overflow-y-auto z-10">
+                <!-- JavaScript inyectará las sugerencias aquí mágicamente -->
+            </div>
+            
         </div>
 
         <div class="max-w-4xl mx-auto mt-10 px-4">
@@ -1031,10 +1041,26 @@
                 const respuesta = await fetch(`${API_URL}/pantalones?limit=1000`);
                 catalogoCompleto = await respuesta.json();
                 
-                // ⚡ AQUÍ ACTIVAMOS LOS BOTONES DINÁMICOS
                 renderizarCategoriasDinamicas(); 
-                
                 renderizarCatalogo(catalogoCompleto);
+
+                // ==========================================
+                // ⚡ MAGIA PHYGITAL: DETECTAR ESCANEO DE QR ⚡
+                // ==========================================
+                const parametrosURL = new URLSearchParams(window.location.search);
+                const qrId = parametrosURL.get('producto');
+                
+                if (qrId) {
+                    const pantalonQR = catalogoCompleto.find(p => p.id == qrId);
+                    if (pantalonQR) {
+                        // 1. Abrimos el modelo 3D automáticamente
+                        verDetalles(pantalonQR.id, pantalonQR.nombre.replace(/'/g, "\\'"), pantalonQR.imagen_url, pantalonQR.precio);
+                        
+                        // 2. Limpiamos la URL para que no se vuelva a abrir si recargan la página
+                        window.history.replaceState({}, document.title, "/");
+                    }
+                }
+
             } catch (error) {
                 document.getElementById('grid-pantalones').innerHTML = '<p class="text-center text-rose-500 col-span-full">Error al cargar la colección.</p>';
             }
@@ -1644,13 +1670,98 @@
             }
         }
 
-        document.getElementById('buscador-tienda').addEventListener('input', (e) => {
-            const texto = e.target.value.toLowerCase();
+        // ==========================================
+        // ⚡ MOTOR DE BÚSQUEDA PREDICTIVA (Estilo Amazon)
+        // ==========================================
+        const inputBuscador = document.getElementById('buscador-tienda');
+        const ventanaPredictiva = document.getElementById('resultados-predictivos');
+        const overlayBuscador = document.getElementById('overlay-buscador');
+
+        // Función para cerrar todo si dan clic afuera o borran el texto
+        window.cerrarBuscadorPredictivo = function() {
+            ventanaPredictiva.classList.add('hidden');
+            if(overlayBuscador) overlayBuscador.classList.add('hidden');
+            
+            // Si el buscador se quedó vacío, mostramos el catálogo completo de nuevo
+            if(inputBuscador.value.trim() === '') {
+                aplicarFiltrosGlobales();
+            }
+        }
+
+        inputBuscador.addEventListener('input', (e) => {
+            const texto = e.target.value.toLowerCase().trim();
+            
+            // 1. Si borran el texto, escondemos la ventana
+            if (texto.length === 0) {
+                cerrarBuscadorPredictivo();
+                return;
+            }
+
+            // 2. Efecto cine: Oscurecer fondo y mostrar ventana
+            ventanaPredictiva.classList.remove('hidden');
+            if(overlayBuscador) overlayBuscador.classList.remove('hidden');
+
+            // 3. Buscar coincidencias ultra-rápidas
             const filtrados = catalogoCompleto.filter(p => 
                 p.nombre.toLowerCase().includes(texto) || 
                 (p.codigo && p.codigo.toLowerCase().includes(texto))
             );
+
+            // Filtramos también la cuadrícula de atrás en tiempo real
             renderizarCatalogo(filtrados);
+
+            // 4. Tomar solo los mejores 5 resultados para no saturar la ventana
+            const top5 = filtrados.slice(0, 5);
+
+            // Caso: No se encontró nada
+            if (top5.length === 0) {
+                ventanaPredictiva.innerHTML = `
+                    <div class="p-8 text-center text-gray-400">
+                        <span class="text-4xl block mb-3">🕵️‍♀️</span>
+                        <p class="font-bold text-gray-700">No encontramos "${texto}"</p>
+                        <p class="text-xs mt-1">Intenta buscar por corte, ej. "Skinny", "Mom"</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Caso: Sí hay resultados, los dibujamos
+            ventanaPredictiva.innerHTML = top5.map(p => {
+                const estaAgotado = p.stock === 0;
+                const estiloAgotado = estaAgotado ? 'opacity-50 grayscale' : '';
+                const etiquetaAgotado = estaAgotado ? `<span class="bg-rose-100 text-rose-600 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ml-2">Agotado</span>` : '';
+                
+                return `
+                <div class="flex items-center gap-4 p-4 hover:bg-indigo-50 border-b border-gray-50 cursor-pointer transition-colors group"
+                     onclick="cerrarBuscadorPredictivo(); verDetalles(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', '${p.imagen_url}', ${p.precio})">
+                    
+                    <div class="w-14 h-16 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0 relative shadow-sm">
+                        <img src="${p.imagen_url}" class="w-full h-full object-cover ${estiloAgotado} group-hover:scale-110 transition-transform">
+                    </div>
+                    
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-bold text-gray-800 truncate transition-colors group-hover:text-indigo-700">${p.nombre} ${etiquetaAgotado}</p>
+                        <p class="text-[10px] text-gray-400 mt-0.5 tracking-wider">Cód: ${p.codigo || 'N/A'}</p>
+                    </div>
+                    
+                    <div class="text-right flex-shrink-0 pr-2">
+                        <span class="font-black text-indigo-600 text-base">$${p.precio.toFixed(2)}</span>
+                        <div class="text-[9px] font-bold text-gray-400 mt-1 uppercase tracking-widest flex items-center justify-end gap-1 group-hover:text-indigo-500 transition-colors">
+                            Ver modelo <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>
+                        </div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+            
+            // 5. Botón de "Ver todos" si hay más de 5 resultados
+            if (filtrados.length > 5) {
+                ventanaPredictiva.innerHTML += `
+                    <div class="p-4 text-center bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors" onclick="cerrarBuscadorPredictivo()">
+                        <p class="text-xs font-black text-indigo-600 uppercase tracking-widest">Ver los ${filtrados.length} resultados completos</p>
+                    </div>
+                `;
+            }
         });
 
         function agregarAlCarrito(id, botonElemento = null) {

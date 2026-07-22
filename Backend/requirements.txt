@@ -12,3 +12,4 @@ openpyxl
 mercadopago
 bcrypt
 resend
+qrcode
