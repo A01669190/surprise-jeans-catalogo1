@@ -60,7 +60,7 @@ import string
 import random
 from pydantic import BaseModel
 import jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi import WebSocket, WebSocketDisconnect
 from fastapi import BackgroundTasks
