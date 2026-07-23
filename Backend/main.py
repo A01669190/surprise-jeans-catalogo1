@@ -1,5 +1,10 @@
 import os
 from sqlalchemy import func, text
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+from pydantic import BaseModel
+import string
+import random
 import loyverse_sync
 from fastapi.responses import Response
 from reportlab.pdfgen import canvas
@@ -2244,3 +2249,63 @@ def obtener_resenas_destacadas(db: Session = Depends(get_db)):
             "imagen": p.imagen_url
         })
     return resultado
+
+# ==========================================
+# ⚡ LOGIN CON GOOGLE (SSO)
+# ==========================================
+class GoogleLoginReq(BaseModel):
+    token: str
+
+@app.post("/login-google")
+def login_google(req: GoogleLoginReq, db: Session = Depends(get_db)):
+    GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=500, detail="Falta configurar GOOGLE_CLIENT_ID en Render.")
+    
+    try:
+        # 1. Desencriptamos y validamos el token oficial de Google
+        idinfo = id_token.verify_oauth2_token(req.token, google_requests.Request(), GOOGLE_CLIENT_ID)
+        correo = idinfo.get('email')
+        nombre = idinfo.get('name')
+        
+        # 2. ¿Existe la clienta en nuestra base de datos?
+        cliente = db.query(models.Cliente).filter(models.Cliente.correo == correo).first()
+        
+        if not cliente:
+            # 3. Si es nueva, la registramos mágicamente sin pedirle nada
+            password_basura = ''.join(random.choice(string.ascii_letters) for i in range(16))
+            
+            cliente = models.Cliente(
+                nombre_completo=nombre,
+                correo=correo,
+                password_hash=obtener_hash_password(password_basura), # Contraseña inaccesible
+                telefono=""
+            )
+            db.add(cliente)
+            db.commit()
+            db.refresh(cliente)
+            
+            # La metemos a Loyverse silenciosamente
+            try:
+                import loyverse_sync
+                loyverse_sync.crear_cliente_loyverse(nombre, correo, "")
+            except Exception:
+                pass # Si Loyverse falla, no detenemos el login
+
+        # 4. Le damos las llaves de acceso de Surprise Jeans
+        # (Usamos tu función de crear_token existente si la tienes, o generamos los JWT directo)
+        exp_access = datetime.now(timezone.utc) + timedelta(minutes=15)
+        access_token = jwt.encode({"sub": cliente.correo, "rol": "cliente", "id": cliente.id, "exp": exp_access}, SECRET_KEY, algorithm=ALGORITHM)
+        
+        exp_refresh = datetime.now(timezone.utc) + timedelta(days=7)
+        refresh_token = jwt.encode({"sub": cliente.correo, "rol": "cliente", "type": "refresh", "exp": exp_refresh}, SECRET_KEY, algorithm=ALGORITHM)
+        
+        return {
+            "access_token": access_token, 
+            "refresh_token": refresh_token,
+            "token_type": "bearer", 
+            "nombre": cliente.nombre_completo
+        }
+        
+    except ValueError:
+        raise HTTPException(status_code=401, detail="El Token de Google es inválido o ha expirado.")
