@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from models import Pedido
 from sqlalchemy import or_
 import asyncio
-from fastapi.staticfiles import StaticFiles # 1. Importa esto
+from fastapi.staticfiles import StaticFiles 
 import socket
 import logging
 import smtplib

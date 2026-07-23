@@ -61,7 +61,6 @@ class Resena(Base):
     comentario = Column(String, nullable=True)
 
     fecha = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    fecha_registro = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     pantalon = relationship("Pantalon", back_populates="resenas")
     cliente = relationship("Cliente")
 
