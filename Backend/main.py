@@ -2289,8 +2289,9 @@ def login_google(req: GoogleLoginReq, db: Session = Depends(get_db)):
             try:
                 import loyverse_sync
                 loyverse_sync.crear_cliente_loyverse(nombre, correo, "")
-            except Exception:
-                pass # Si Loyverse falla, no detenemos el login
+            except Exception as e:
+                # ⚡ AHORA SÍ NOS VA A IMPRIMIR EL ERROR EN RENDER
+                print(f"❌ Error al enviar cliente a Loyverse desde Google: {e}")
 
         # 4. Le damos las llaves de acceso de Surprise Jeans
         # (Usamos tu función de crear_token existente si la tienes, o generamos los JWT directo)
