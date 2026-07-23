@@ -17,8 +17,8 @@
     <meta property="og:image" content="https://i.ibb.co/M9F7mR5/tu-foto-estrella.jpg">
 
     <script src="https://cdn.tailwindcss.com"></script>
-    
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <!-- ⚡ OCULTAR BARRA DE SCROLL EN CARRUSELES ⚡ -->
     <style>
@@ -216,6 +216,17 @@
                 <button onclick="filtrarPorTalla('13', this)" class="btn-talla-filtro bg-white text-gray-500 border border-gray-200 w-9 h-9 rounded-full text-xs font-bold shadow-sm hover:bg-rose-50 transition-all transform hover:scale-110">13</button>
                 <button onclick="filtrarPorTalla('15', this)" class="btn-talla-filtro bg-white text-gray-500 border border-gray-200 w-9 h-9 rounded-full text-xs font-bold shadow-sm hover:bg-rose-50 transition-all transform hover:scale-110">15</button>
             </div>
+
+            <!-- ⚡ FILTROS AVANZADOS (Solo Presupuesto) -->
+            <div class="flex mt-6 border-t border-rose-100 pt-6 justify-center items-center">
+                <div class="flex flex-col w-full max-w-sm">
+                    <label class="text-xs font-black text-rose-300 uppercase tracking-widest mb-2 flex justify-between">
+                        Presupuesto: <span id="display-precio" class="text-indigo-600">Hasta $800</span>
+                    </label>
+                    <input type="range" id="filtro-precio" min="150" max="800" step="50" value="800" class="w-full accent-indigo-600 cursor-pointer" oninput="actualizarPrecio(this.value)">
+                </div>
+            </div>
+
         </div>
     </section> <!-- Aquí termina tu portada rosa -->
 
@@ -319,8 +330,17 @@
                     <!-- Aquí se renderizan los pantalones guardados -->
                 </ul>
             </div>
+            
+            <!-- ⚡ BOTÓN DE COMPARTIR WISHLIST -->
+            <div class="p-6 border-t border-gray-100 bg-white">
+                <button onclick="compartirWishlist()" class="w-full bg-[#25D366] hover:bg-[#128C7E] text-white font-black py-4 rounded-xl shadow-lg transition-colors text-sm uppercase tracking-wider flex justify-center items-center gap-2">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                    Compartir con mi pareja/amigos
+                </button>
+            </div>
         </div>
     </div>
+    
 
     <!-- ========================================== -->
     <!-- PANTALLA DE CHECKOUT (Estilo Shopify) -->
@@ -622,6 +642,23 @@
                     <button onclick="procesarLoginCliente()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3.5 rounded-lg shadow-md transition-all mt-4">
                         Entrar
                     </button>
+                    
+                    <!-- ⚡ BOTÓN DE GOOGLE -->
+                    <div class="mt-4 flex items-center justify-between">
+                        <span class="border-b border-gray-200 w-1/5"></span>
+                        <span class="text-xs text-gray-400 uppercase tracking-widest font-bold">O continúa con</span>
+                        <span class="border-b border-gray-200 w-1/5"></span>
+                    </div>
+                    <div class="mt-4 flex justify-center">
+                        <div id="g_id_onload"
+                             data-client_id="TU_CLIENT_ID_AQUI"
+                             data-context="signin"
+                             data-ux_mode="popup"
+                             data-callback="manejarLoginGoogle"
+                             data-auto_prompt="false">
+                        </div>
+                        <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="outline" data-text="signin_with" data-size="large" data-logo_alignment="left"></div>
+                    </div>
                 </div>
 
                 <!-- FORMULARIO DE REGISTRO -->
@@ -972,6 +1009,28 @@
         function abrirAsistenteTallas() {
             document.getElementById('modal-asistente').classList.remove('hidden');
         }
+        
+        // ⚡ COMPARTIR WISHLIST (Fix para pruebas locales)
+        function compartirWishlist() {
+            if (misFavoritos.length === 0) {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Lista vacía',
+                    text: 'Agrega tus jeans favoritos presionando el corazón en el catálogo primero. ❤️',
+                    confirmButtonColor: '#4f46e5'
+                });
+                return;
+            }
+            
+            // Encriptamos los IDs para que la URL sea segura
+            const idsCodificados = btoa(misFavoritos.join(',')); 
+            
+            // ⚡ FIX: Usamos tu dominio real para que WhatsApp lo acepte siempre, incluso si pruebas en tu Mac
+            const link = `https://surprisejeanysk.com/?wishlist=${idsCodificados}`;
+            const mensaje = `¡Hola! 💖 Hice mi wishlist en Surprise Jeans. Aquí te dejo mis modelos favoritos para que no batalles con mi regalo 🎁👖:\n\n${link}`;
+            
+            window.open(`https://wa.me/?text=${encodeURIComponent(mensaje)}`, '_blank');
+        }
 
         function calcularTalla() {
             const cintura = parseFloat(document.getElementById('medida-cintura').value);
@@ -1041,6 +1100,26 @@
                 const respuesta = await fetch(`${API_URL}/pantalones?limit=1000`);
                 catalogoCompleto = await respuesta.json();
                 
+                // ⚡ AUTO-DETECTAR EL PRECIO MÁXIMO PARA LA BARRA
+                if (catalogoCompleto.length > 0) {
+                    // 1. Busca el pantalón más caro usando matemáticas
+                    let precioMasAlto = Math.max(...catalogoCompleto.map(p => p.precio));
+                    
+                    // 2. Redondea hacia arriba al múltiplo de 50 más cercano (ej. 320 -> 350)
+                    precioMasAlto = Math.ceil(precioMasAlto / 50) * 50; 
+
+                    // 3. Ajustamos la interfaz visual
+                    const sliderPrecio = document.getElementById('filtro-precio');
+                    const displayPrecio = document.getElementById('display-precio');
+                    
+                    if (sliderPrecio && displayPrecio) {
+                        sliderPrecio.max = precioMasAlto;     // Tope de la barra
+                        sliderPrecio.value = precioMasAlto;   // Posición de la bolita
+                        filtroPrecio = precioMasAlto;         // Variable interna
+                        displayPrecio.innerText = `Hasta $${precioMasAlto}`;
+                    }
+                }
+
                 renderizarCategoriasDinamicas(); 
                 renderizarCatalogo(catalogoCompleto);
 
@@ -1160,10 +1239,84 @@
             tallaActiva = tallaSeleccionada;
             aplicarFiltrosGlobales();
         }
+// ⚡ FILTROS AVANZADOS (Solo Presupuesto)
+        let filtroPrecio = 9999; // Empezamos alto, el sistema lo ajustará solo
+        let filtroColor = 'Todos';
+
+        function actualizarPrecio(valor) {
+            document.getElementById('display-precio').innerText = `Hasta $${valor}`;
+            filtroPrecio = parseFloat(valor);
+            aplicarFiltrosGlobales();
+        }
+
+        function seleccionarColorFiltro(color, btnElement) {
+            document.querySelectorAll('.btn-color-filtro').forEach(btn => btn.classList.remove('ring-2', 'ring-indigo-600', 'ring-offset-2', 'scale-110'));
+            btnElement.classList.add('ring-2', 'ring-indigo-600', 'ring-offset-2', 'scale-110');
+            filtroColor = color;
+            aplicarFiltrosGlobales();
+        }
+
+        function renderizarColoresDinamicos() {
+            const contenedor = document.getElementById('contenedor-colores');
+            if(!contenedor) return;
+
+            const coloresUnicos = new Set();
+            catalogoCompleto.forEach(p => {
+                if(p.tallas && p.tallas.length > 0) coloresUnicos.add(p.tallas[0].color);
+            });
+
+            const mapaColores = {
+                'Original': 'bg-blue-600', 'Azul': 'bg-blue-500', 'Azul Claro': 'bg-sky-400',
+                'Azul Oscuro': 'bg-blue-900', 'Negro': 'bg-black', 'Blanco': 'bg-white border-gray-300',
+                'Gris': 'bg-gray-500', 'Rosa': 'bg-pink-400'
+            };
+
+            let htmlColores = `<button onclick="seleccionarColorFiltro('Todos', this)" class="btn-color-filtro w-7 h-7 rounded-full bg-gradient-to-br from-red-400 via-green-400 to-blue-400 shadow-sm border border-gray-200 transition-all ring-2 ring-indigo-600 ring-offset-2 scale-110" title="Todos"></button>`;
+
+            Array.from(coloresUnicos).forEach(color => {
+                const claseCss = mapaColores[color] || 'bg-stone-300';
+                htmlColores += `<button onclick="seleccionarColorFiltro('${color}', this)" class="btn-color-filtro w-7 h-7 rounded-full ${claseCss} shadow-sm border border-gray-200 transition-all" title="${color}"></button>`;
+            });
+
+            contenedor.innerHTML = htmlColores;
+        }
+
+        // ⚡ INTERCEPTOR DE GOOGLE
+        async function manejarLoginGoogle(response) {
+            const tokenGoogle = response.credential;
+            Swal.fire({ title: 'Conectando con Google...', text: 'Abriendo tu bóveda.', allowOutsideClick: false, showConfirmButton: false });
+            Swal.showLoading();
+
+            try {
+                const res = await fetch(`${API_URL}/login-google`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: tokenGoogle })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    localStorage.setItem('token_cliente_sj', data.access_token);
+                    localStorage.setItem('refresh_token_cliente_sj', data.refresh_token);
+                    localStorage.setItem('nombre_cliente_sj', data.nombre);
+                    
+                    Swal.fire({
+                        icon: 'success', title: `¡Hola ${data.nombre}!`, text: 'Acceso seguro concedido.',
+                        showConfirmButton: false, timer: 2000
+                    });
+                    setTimeout(() => { cerrarPerfilCliente(); window.location.reload(); }, 2000);
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: 'No pudimos validar tu cuenta de Google.' });
+                }
+            } catch(e) {
+                Swal.fire({ icon: 'error', title: 'Fallo de conexión', text: 'Error en la red.' });
+            }
+        }
 
         function aplicarFiltrosGlobales() {
             let filtrados = catalogoCompleto;
 
+            // 1. Categoría
             if (categoriaActiva !== 'Todos') {
                 filtrados = filtrados.filter(p => {
                     let nombreCat = typeof p.categoria === 'string' ? p.categoria : (p.categoria ? p.categoria.nombre : "");
@@ -1171,12 +1324,13 @@
                 });
             }
 
+            // 2. Talla
             if (tallaActiva !== 'Todas') {
-                filtrados = filtrados.filter(p => {
-                    // Busca que exista la talla Y que tenga stock mayor a 0
-                    return p.tallas.some(t => t.talla === tallaActiva && t.stock > 0);
-                });
+                filtrados = filtrados.filter(p => p.tallas.some(t => t.talla === tallaActiva && t.stock > 0));
             }
+
+            // 3. ⚡ Filtro Precio
+            filtrados = filtrados.filter(p => p.precio <= filtroPrecio);
 
             const inputBusqueda = document.getElementById('buscador-tienda');
             if(inputBusqueda) inputBusqueda.value = "";
@@ -1186,9 +1340,8 @@
                     <div class="col-span-full text-center py-20">
                         <span class="text-6xl mb-4 block">👗</span>
                         <p class="text-gray-500 font-bold text-lg">No hay inventario</p>
-                        <p class="text-gray-400 text-sm mt-1">Intenta con otra combinación de talla o modelo.</p>
-                    </div>
-                `;
+                        <p class="text-gray-400 text-sm mt-1">Sube tu presupuesto o cambia de filtros.</p>
+                    </div>`;
             } else {
                 renderizarCatalogo(filtrados);
             }
@@ -2901,7 +3054,6 @@
         // ==========================================
 
     </script>
-    
     
 </body>
 </html>
