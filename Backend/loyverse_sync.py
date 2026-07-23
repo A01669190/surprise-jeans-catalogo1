@@ -169,14 +169,21 @@ def crear_articulo_loyverse(nombre, sku, precio, nombre_categoria="General", col
 def crear_cliente_loyverse(nombre, correo, telefono):
     """ Sincroniza a un cliente recién registrado con la tablet física """
     try:
-        payload = json.dumps({"name": nombre, "email": correo, "phone_number": telefono if telefono else ""}).encode("utf-8")
+        # ⚡ EL FIX: Si no hay teléfono, no mandamos el campo para que Loyverse no marque error 400
+        datos_cliente = {"name": nombre, "email": correo}
+        if telefono:
+            datos_cliente["phone_number"] = telefono
+            
+        payload = json.dumps(datos_cliente).encode("utf-8")
         req = urllib.request.Request("https://api.loyverse.com/v1.0/customers", data=payload, method="POST")
         req.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
         req.add_header("Content-Type", "application/json")
         urllib.request.urlopen(req)
         print(f"👤 Cliente guardado en Loyverse: {nombre}")
     except Exception as e:
-        print(f"❌ Error al crear cliente en Loyverse: {e}")
+        # ⚡ EXTRAEMOS EL MENSAJE EXACTO POR SI VUELVE A FALLAR
+        error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
+        print(f"❌ Error al crear cliente en Loyverse: {error_msg}")
 
 def eliminar_articulo_loyverse(sku_hijo_exacto):
     """ Busca un artículo por el SKU EXACTO de una de sus tallas y lo destruye de la tablet """
