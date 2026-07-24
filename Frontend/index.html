@@ -3097,17 +3097,21 @@
                 console.log("El dispositivo no soporta sonido web.");
             }
         }
+        
         // ==========================================
-        // ⚡ ESCÁNER DE ALMACÉN PARA YESSICA
+        // ⚡ ESCÁNER DE ALMACÉN PARA YESSICA (MODO RÁFAGA)
         // ==========================================
         let html5QrcodeScanner = null;
+        let codigosEscaneados = new Set(); // ⚡ MEMORIA ANTI-DUPLICADOS
 
         function abrirEscanerAlmacen() {
+            codigosEscaneados.clear(); // Limpiamos la memoria al abrir
+            
             Swal.fire({
                 title: 'Escáner de Despacho 📦',
-                html: '<div id="reader" width="600px" class="bg-gray-100 rounded-2xl overflow-hidden shadow-inner"></div><p class="text-xs text-gray-500 mt-4">Apunta la cámara al código de barras del recibo PDF.</p>',
+                html: '<div id="reader" width="600px" class="bg-gray-100 rounded-2xl overflow-hidden shadow-inner mb-2"></div><p class="text-xs font-black text-emerald-600 animate-pulse">Escaneo continuo activado 🚀</p>',
                 showCancelButton: true,
-                cancelButtonText: 'Cerrar Escáner',
+                cancelButtonText: 'Terminar y Cerrar',
                 showConfirmButton: false,
                 didOpen: () => {
                     html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 100} }, false);
@@ -3117,6 +3121,49 @@
                     if(html5QrcodeScanner) html5QrcodeScanner.clear();
                 }
             });
+        }
+
+        async function onScanSuccess(decodedText, decodedResult) {
+            // 1. Evitar escanear el mismo código 20 veces por segundo
+            if (codigosEscaneados.has(decodedText)) return;
+            
+            // 2. Guardarlo en la memoria y hacer sonar el Bip
+            codigosEscaneados.add(decodedText);
+            reproducirBip();
+
+            // Validación de formato
+            if (!decodedText.includes("SJ-")) {
+                Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title: 'Código Inválido', showConfirmButton: false, timer: 2000 });
+                return;
+            }
+
+            const idPedido = parseInt(decodedText.replace("SJ-", ""));
+
+            // 3. Notificación silenciosa en la esquina (¡No tapa la cámara!)
+            Swal.fire({ toast: true, position: 'top-end', icon: 'info', title: `Procesando ${decodedText}...`, showConfirmButton: false, timer: 1500 });
+
+            try {
+                // 4. Disparamos la señal al backend
+                const res = await fetch(`${API_URL}/pedidos/${idPedido}/enviar`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ guia: "ENTREGA_LOCAL_O_REGIONAL" }) 
+                });
+
+                if (res.ok) {
+                    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: `¡${decodedText} Listo! ✅`, showConfirmButton: false, timer: 2500, background: '#10b981', color: '#fff', iconColor: '#fff' });
+                } else {
+                    Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: `Fallo en ${decodedText}`, showConfirmButton: false, timer: 3000 });
+                    codigosEscaneados.delete(decodedText); // Lo borramos de la memoria para que Yessica pueda reintentar
+                }
+            } catch (error) {
+                Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Error de Red', showConfirmButton: false, timer: 3000 });
+                codigosEscaneados.delete(decodedText);
+            }
+        }
+
+        function onScanFailure(error) {
+            // Ignoramos los fallos cuadro por cuadro
         }
 
         // ==========================================
@@ -3143,80 +3190,10 @@
             }
         }
 
-        async function onScanSuccess(decodedText, decodedResult) {
-            // Detenemos el escáner al instante para no leer dos veces
-            if(html5QrcodeScanner) html5QrcodeScanner.clear();
-            Swal.close();
-
-            // El formato que generaste en el PDF es "SJ-0045"
-            if (!decodedText.includes("SJ-")) {
-                Swal.fire('Código Inválido', 'Este no parece un recibo de Surprise Jeans.', 'error');
-                return;
-            }
-
-            const idPedido = parseInt(decodedText.replace("SJ-", ""));
-
-            Swal.fire({ title: 'Despachando...', text: 'Comunicando con bodega...', allowOutsideClick: false, showConfirmButton: false });
-            Swal.showLoading();
-
-            try {
-                // Disparamos la ruta que ya tienes en tu main.py para enviar pedidos
-                const res = await fetch(`${API_URL}/pedidos/${idPedido}/enviar`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ guia: "ENTREGA_LOCAL_O_REGIONAL" }) 
-                });
-
-                if (res.ok) {
-                    Swal.fire('¡Despachado! ✅', `El pedido ${decodedText} fue marcado como ENVIADO y el inventario actualizado.`, 'success');
-                } else {
-                    Swal.fire('Error', 'No se pudo procesar el envío. Revisa la consola.', 'error');
-                }
-            } catch (error) {
-                Swal.fire('Error de red', 'Fallo de conexión.', 'error');
-            }
-        }
-
         function onScanFailure(error) {
             // Ignoramos los fallos cuadro por cuadro
         }
 
-        async function onScanSuccess(decodedText, decodedResult) {
-            // ⚡ HACER SONAR EL BIP FÍSICO ⚡
-            reproducirBip();
-
-            // Detenemos el escáner al instante para no leer dos veces
-            if(html5QrcodeScanner) html5QrcodeScanner.clear();
-            Swal.close();
-
-            // El formato que generaste en el PDF es "SJ-0045"
-            if (!decodedText.includes("SJ-")) {
-                Swal.fire('Código Inválido', 'Este no parece un recibo de Surprise Jeans.', 'error');
-                return;
-            }
-
-            const idPedido = parseInt(decodedText.replace("SJ-", ""));
-
-            Swal.fire({ title: 'Despachando...', text: 'Comunicando con bodega...', allowOutsideClick: false, showConfirmButton: false });
-            Swal.showLoading();
-
-            try {
-                // Disparamos la ruta que ya tienes en tu main.py para enviar pedidos
-                const res = await fetch(`${API_URL}/pedidos/${idPedido}/enviar`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ guia: "ENTREGA_LOCAL_O_REGIONAL" }) 
-                });
-
-                if (res.ok) {
-                    Swal.fire('¡Despachado! ✅', `El pedido ${decodedText} fue marcado como ENVIADO y el inventario actualizado.`, 'success');
-                } else {
-                    Swal.fire('Error', 'No se pudo procesar el envío. Revisa la consola.', 'error');
-                }
-            } catch (error) {
-                Swal.fire('Error de red', 'Fallo de conexión.', 'error');
-            }
-        }
 
     </script>
     
