@@ -1071,8 +1071,12 @@ def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, backgr
         db.commit()
         db.refresh(nuevo_pedido)
 
-        # ⚡ ENCENDEMOS LA BOMBA DE TIEMPO DE 30 MINUTOS
-        background_tasks.add_task(auto_destruir_abandonado, nuevo_pedido.id)
+        # ⚡ ENCENDEMOS LA BOMBA DE TIEMPO SIN BLOQUEAR LA FILA (SUPER FIX)
+        async def lanzar_bomba_fondo(id_pedido):
+            import asyncio
+            asyncio.create_task(auto_destruir_abandonado(id_pedido))
+            
+        background_tasks.add_task(lanzar_bomba_fondo, nuevo_pedido.id)
 
         lista_ropa = []
         for item in pedido_req.items:
