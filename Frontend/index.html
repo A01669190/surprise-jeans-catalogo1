@@ -137,7 +137,7 @@
             </button>
             
             <div class="flex-shrink-0 flex items-center justify-center">
-                <h1 class="text-2xl font-black text-indigo-400 italic tracking-tighter cursor-pointer">Surprise<span class="text-sm font-normal text-gray-400">Jeans</span></h1>
+                <h1 onclick="activarBotonSecreto()" class="text-2xl font-black text-indigo-400 italic tracking-tighter cursor-pointer select-none">Surprise<span class="text-sm font-normal text-gray-400">Jeans</span></h1>
             </div>
 
             <div class="flex items-center space-x-5">
@@ -3097,6 +3097,30 @@
                     if(html5QrcodeScanner) html5QrcodeScanner.clear();
                 }
             });
+        }
+
+        // ==========================================
+        // ⚡ BOTÓN SECRETO (EASTER EGG) PARA ALMACÉN
+        // ==========================================
+        let contadorClics = 0;
+        let temporizadorClics;
+
+        function activarBotonSecreto() {
+            contadorClics++;
+            
+            if (contadorClics === 1) {
+                // Tiene 1.5 segundos para completar los 3 toques
+                temporizadorClics = setTimeout(() => {
+                    contadorClics = 0; 
+                }, 1500); 
+            }
+
+            if (contadorClics === 3) {
+                clearTimeout(temporizadorClics);
+                contadorClics = 0;
+                // ¡Se activa la magia phygital!
+                abrirEscanerAlmacen();
+            }
         }
 
         async function onScanSuccess(decodedText, decodedResult) {
