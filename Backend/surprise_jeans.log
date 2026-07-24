@@ -1725,3 +1725,5 @@
 2026-07-23 18:45:08,971 [INFO] Scheduler started
 2026-07-23 19:45:06,620 [INFO] Running job "cron_recuperar_carritos (trigger: interval[1:00:00], next run at: 2026-07-23 19:45:06 CST)" (scheduled at 2026-07-23 19:45:06.609751-06:00)
 2026-07-23 19:45:06,759 [INFO] Job "cron_recuperar_carritos (trigger: interval[1:00:00], next run at: 2026-07-23 20:45:06 CST)" executed successfully
+2026-07-23 20:45:06,618 [INFO] Running job "cron_recuperar_carritos (trigger: interval[1:00:00], next run at: 2026-07-23 21:45:06 CST)" (scheduled at 2026-07-23 20:45:06.609751-06:00)
+2026-07-23 20:45:06,628 [INFO] Job "cron_recuperar_carritos (trigger: interval[1:00:00], next run at: 2026-07-23 21:45:06 CST)" executed successfully
