@@ -1126,13 +1126,8 @@ def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, backgr
                 
             db.commit()
             
-            # Avisamos a las pantallas del despacho
-            try:
-                import asyncio
-                loop = asyncio.get_event_loop()
-                loop.create_task(manager.broadcast("NUEVO_PEDIDO"))
-            except:
-                pass
+            # Avisamos a las pantallas del despacho (Fix Asíncrono)
+            background_tasks.add_task(manager.broadcast, "NUEVO_PEDIDO")
             
             # Escudo protector para que el correo no rompa la compra si falla
             if cliente_db:

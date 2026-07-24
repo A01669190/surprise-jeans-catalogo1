@@ -95,6 +95,10 @@
                         showConfirmButton: false, timer: 4000, timerProgressBar: true
                     });
                     cargarPedidos(); 
+                } 
+                else if (event.data === "ACTUALIZAR_ADMIN") {
+                    // ⚡ El escáner y los envíos mandan esta señal. Actualizamos la pantalla.
+                    cargarPedidos();
                 }
             };
 

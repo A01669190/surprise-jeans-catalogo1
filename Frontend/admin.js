@@ -685,37 +685,3 @@ function renderizarPantalones(listaPantalones, esNuevaBusqueda) {
         contenedor.appendChild(tarjeta);
     });
 }
-
-// ==========================================
-// ⚡ CONEXIÓN TELEPÁTICA CON EL ALMACÉN (WebSockets)
-// ==========================================
-let socketDespacho;
-
-function conectarTelepatia() {
-    socketDespacho = new WebSocket('wss://surprise-jeans-api-denz.onrender.com/ws/despacho');
-
-    socketDespacho.onmessage = function(event) {
-        if (event.data === "ACTUALIZAR_ADMIN") {
-            // ¡El servidor avisó! Recargamos el inventario en silencio sin F5
-            cargarInventarioAdmin();
-            
-            // Si la gráfica está abierta, la pintamos de nuevo
-            const vistaDashboard = document.getElementById('vista-dashboard');
-            if (vistaDashboard && !vistaDashboard.classList.contains('hidden')) {
-                renderizarDashboard();
-            }
-        }
-    };
-
-    socketDespacho.onclose = function() {
-        // ⚡ MODO HACKER: Si Render desconecta el cable, nosotros lo volvemos a conectar solos en 3 segundos
-        setTimeout(conectarTelepatia, 3000);
-    };
-    
-    socketDespacho.onerror = function() {
-        socketDespacho.close();
-    };
-}
-
-// Encendemos la antena por primera vez
-conectarTelepatia();
