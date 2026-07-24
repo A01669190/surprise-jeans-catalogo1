@@ -1209,25 +1209,34 @@ def webhook_mercadopago(background_tasks: BackgroundTasks, datos: dict = Body(..
                 pedido_db = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
                 
                 if pedido_db and pedido_db.estatus in ["PENDIENTE", "RECORDATORIO_ENVIADO"]:
+                    print(f"\n💰 [RASTREADOR MP 1] ¡Pago real aprobado en Mercado Pago! Pedido: SJ-{pedido_db.id:04d}")
                     pedido_db.estatus = "PAGADO"
                     pedido_db.pago_id = str(pago_id) # ⚡ GUARDAMOS LA LLAVE AQUÍ
                     lista_ropa = []
-
-                    # ⚡ EL FIX 3.0: RECIBOS VIRTUALES COMPLETOS
                     items_para_recibo = []
                     
                     for detalle in pedido_db.detalles:
+                        print(f"💰 [RASTREADOR MP 2] Procesando prenda ID interno: {detalle.pantalon_id}, Talla: {detalle.talla}")
+                        
                         # ⚡ FIX DEFINITIVO: Buscamos por ID interno y Talla
                         variante_db = db.query(models.VarianteTalla).filter(
                             models.VarianteTalla.pantalon_id == detalle.pantalon_id,
                             models.VarianteTalla.talla == detalle.talla
                         ).first()
                         
-                        if variante_db and variante_db.stock >= detalle.cantidad:
+                        if not variante_db:
+                            print("❌ [RASTREADOR MP ERROR] La variante NO existe en la base de datos local.")
+                            continue
+                            
+                        print(f"💰 [RASTREADOR MP 3] Variante encontrada. Stock BD: {variante_db.stock}, Pidieron: {detalle.cantidad}")
+                        
+                        if variante_db.stock >= detalle.cantidad:
                             # Descuenta localmente en tu servidor web
                             variante_db.stock -= detalle.cantidad
                             if variante_db.pantalon:
                                 variante_db.pantalon.stock -= detalle.cantidad 
+                            
+                            print(f"💰 [RASTREADOR MP 4] Stock local descontado. Avisando a Loyverse para SKU: {variante_db.sku}")
                             
                             # ⚡ Descuento en la tablet Loyverse
                             background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, variante_db.sku, variante_db.stock)
@@ -1242,6 +1251,8 @@ def webhook_mercadopago(background_tasks: BackgroundTasks, datos: dict = Body(..
                             # 🤖 ACTIVAMOS EL BOT ESPÍA DE INVENTARIO
                             nombre_pantalon = variante_db.pantalon.nombre if variante_db.pantalon else "Modelo"
                             background_tasks.add_task(enviar_alarma_inventario, nombre_pantalon, variante_db.talla, variante_db.stock)
+                        else:
+                            print(f"❌ [RASTREADOR MP ERROR] No hay suficiente stock. Tienes {variante_db.stock}, pidieron {detalle.cantidad}")
                         
                         nombre_base = detalle.pantalon.nombre if detalle.pantalon else "Modelo"
                         nombre_final = f"{nombre_base} (Talla {detalle.talla})" if detalle.talla else nombre_base
@@ -1249,9 +1260,11 @@ def webhook_mercadopago(background_tasks: BackgroundTasks, datos: dict = Body(..
                     
                     # 🎉 DISPARAMOS EL RECIBO VIRTUAL EN LOYVERSE 🎉
                     if items_para_recibo:
+                        print("💰 [RASTREADOR MP 5] Mandando recibo virtual a Loyverse...")
                         background_tasks.add_task(loyverse_sync.generar_recibo_virtual, pedido_db.correo_cliente, pedido_db.id, items_para_recibo, pedido_db.total)
                     
                     db.commit()
+                    print("💰 [RASTREADOR MP 6] Base de datos guardada y proceso completado.\n")
                     
                     # Sonido Din por WebSocket
                     import asyncio
