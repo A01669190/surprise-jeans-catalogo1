@@ -97,18 +97,18 @@
                     cargarPedidos(); 
                 } 
                 else if (event.data === "ACTUALIZAR_ADMIN") {
-                    // ⚡ 1. HACEMOS QUE SUENE EL DIIIIN EN DESPACHO
+                    // ⚡ 1. HACEMOS QUE SUENE EL DIIIIN AL ESCANEAR
                     sonidoDin.play().catch(e => console.log("El navegador bloqueó el sonido."));
                     
-                    // ⚡ 2. MOSTRAMOS UNA ALERTA VISUAL RÁPIDA (OPCIONAL PERO ÚTIL)
+                    // ⚡ 2. MOSTRAMOS UNA ALERTA VERDE CONFIRMANDO EL ENVÍO
                     Swal.fire({
                         title: '¡Paquete Escaneado! 🚀',
-                        text: 'Actualizado a ENVIADO.',
+                        text: 'El pedido se movió a ENVIADO.',
                         icon: 'success', toast: true, position: 'top-end',
                         showConfirmButton: false, timer: 3000
                     });
 
-                    // ⚡ 3. ACTUALIZAMOS LA LISTA SIN RECARGAR LA PÁGINA
+                    // ⚡ 3. ACTUALIZAMOS LOS CARRITOS EN PANTALLA
                     cargarPedidos();
                 }
             };
