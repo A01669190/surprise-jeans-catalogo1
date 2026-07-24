@@ -66,6 +66,8 @@ from fastapi import WebSocket, WebSocketDisconnect
 from fastapi import BackgroundTasks
 import qrcode
 from reportlab.lib.utils import ImageReader
+from PIL import Image
+import io
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="API Surprise Jeans - Fortificada")
@@ -1430,9 +1432,32 @@ def crear_pantalon(
     db: Session = Depends(get_db), 
     token: str = Depends(verificar_token)
 ):
-    # 1. Subimos la foto a ImgBB de forma segura
-    contenido = foto.file.read()
-    imagen_base64 = base64.b64encode(contenido).decode("utf-8")
+    # 1. COMPRESIÓN WEBP Y SUBIDA A IMGBB MÁGICA
+    contenido_original = foto.file.read()
+    
+    try:
+        # Abrimos la foto pesada original
+        imagen_pil = Image.open(io.BytesIO(contenido_original))
+        
+        # La convertimos a formato RGB (por si era un PNG con transparencia)
+        if imagen_pil.mode in ("RGBA", "P"):
+            imagen_pil = imagen_pil.convert("RGB")
+            
+        # Creamos un archivo temporal en la memoria RAM
+        buffer_webp = io.BytesIO()
+        
+        # Guardamos la imagen como WebP con 80% de calidad (Compresión masiva)
+        imagen_pil.save(buffer_webp, format="webp", quality=80)
+        buffer_webp.seek(0)
+        
+        # Extraemos la nueva foto ultraligera
+        contenido_comprimido = buffer_webp.read()
+    except Exception as e:
+        print(f"Error comprimiendo imagen: {e}. Usando original.")
+        contenido_comprimido = contenido_original # Respaldo de seguridad
+
+    imagen_base64 = base64.b64encode(contenido_comprimido).decode("utf-8")
+    
     API_KEY = os.getenv("IMGBB_API_KEY", "")
     respuesta = requests.post("https://api.imgbb.com/1/upload", data={"key": API_KEY, "image": imagen_base64})
     
@@ -1483,7 +1508,7 @@ def crear_pantalon(
     # ⚡ LLAMADA A LOYVERSE INCLUYENDO EL COLOR
     background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre, codigo, precio, nombre_cat, color_limpio)
 
-    return {"mensaje": "Pantalón subido con éxito", "url": url_permanente}
+    return {"mensaje": "Pantalón subido y comprimido con éxito", "url": url_permanente}
 
 @app.delete("/pantalones/{pantalon_id}")
 @limiter.limit("15/minute")
@@ -1562,9 +1587,31 @@ def subir_fotos_magicas(
             color = re.sub(r'([a-z])([A-Z])', r'\1 \2', partes[3])
         color_sku = color.replace(" ", "").upper()
 
-        # 2. Subimos la foto a ImgBB
-        contenido = foto.file.read()
-        imagen_base64 = base64.b64encode(contenido).decode("utf-8")
+        # 2. COMPRESIÓN WEBP Y SUBIDA A IMGBB
+        contenido_original = foto.file.read()
+        
+        try:
+            # Abrimos la foto pesada original
+            imagen_pil = Image.open(io.BytesIO(contenido_original))
+            
+            # La convertimos a formato RGB (por si era un PNG con transparencia)
+            if imagen_pil.mode in ("RGBA", "P"):
+                imagen_pil = imagen_pil.convert("RGB")
+                
+            # Creamos un archivo temporal en la memoria RAM
+            buffer_webp = io.BytesIO()
+            
+            # Guardamos la imagen como WebP con 80% de calidad (Compresión masiva)
+            imagen_pil.save(buffer_webp, format="webp", quality=80)
+            buffer_webp.seek(0)
+            
+            # Extraemos la nueva foto ultraligera
+            contenido_comprimido = buffer_webp.read()
+        except Exception as e:
+            print(f"Error comprimiendo imagen: {e}. Usando original.")
+            contenido_comprimido = contenido_original # Respaldo de seguridad
+
+        imagen_base64 = base64.b64encode(contenido_comprimido).decode("utf-8")
         respuesta = requests.post("https://api.imgbb.com/1/upload", data={"key": API_KEY, "image": imagen_base64})
         
         if respuesta.status_code != 200:

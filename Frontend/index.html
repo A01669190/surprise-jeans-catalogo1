@@ -19,6 +19,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
 
     <!-- ⚡ OCULTAR BARRA DE SCROLL EN CARRUSELES ⚡ -->
     <style>
@@ -1121,7 +1122,24 @@
                 }
 
                 renderizarCategoriasDinamicas(); 
-                renderizarCatalogo(catalogoCompleto);
+                
+                const memoriaFiltros = JSON.parse(localStorage.getItem('filtros_sj'));
+                if (memoriaFiltros) {
+                    categoriaActiva = memoriaFiltros.categoria || 'Todos';
+                    tallaActiva = memoriaFiltros.talla || 'Todas';
+                    filtroPrecio = memoriaFiltros.precio || filtroPrecio;
+                    
+                    // Actualizar visualmente la barra de precio si se recuperó uno
+                    const sliderPrecio = document.getElementById('filtro-precio');
+                    if(sliderPrecio) {
+                        sliderPrecio.value = filtroPrecio;
+                        document.getElementById('display-precio').innerText = `Hasta $${filtroPrecio}`;
+                    }
+                    // Disparamos la aplicación de filtros (esto ya llama a renderizarCatalogo)
+                    aplicarFiltrosGlobales();
+                } else {
+                    renderizarCatalogo(catalogoCompleto);
+                }
 
                 // ==========================================
                 // ⚡ MAGIA PHYGITAL: DETECTAR ESCANEO DE QR ⚡
@@ -1335,7 +1353,7 @@
             const inputBusqueda = document.getElementById('buscador-tienda');
             if(inputBusqueda) inputBusqueda.value = "";
 
-            if(filtrados.length === 0) {
+                if(filtrados.length === 0) {
                 document.getElementById('grid-pantalones').innerHTML = `
                     <div class="col-span-full text-center py-20">
                         <span class="text-6xl mb-4 block">👗</span>
@@ -1345,8 +1363,14 @@
             } else {
                 renderizarCatalogo(filtrados);
             }
-        }
 
+            // ⚡ NUEVO: GUARDAR MEMORIA DE FILTROS ⚡
+            localStorage.setItem('filtros_sj', JSON.stringify({
+                categoria: categoriaActiva,
+                talla: tallaActiva,
+                precio: filtroPrecio
+            }));
+        }
         // ==========================================
         // UI: TOGGLE MAYOREO / MENUDEO
         // ==========================================
@@ -3052,6 +3076,66 @@
         // ==========================================
         // ⚡ AUTOMATIZACIÓN DE MAYOREO (PAQUETE CERRADO)
         // ==========================================
+
+        // ==========================================
+        // ⚡ ESCÁNER DE ALMACÉN PARA YESSICA
+        // ==========================================
+        let html5QrcodeScanner = null;
+
+        function abrirEscanerAlmacen() {
+            Swal.fire({
+                title: 'Escáner de Despacho 📦',
+                html: '<div id="reader" width="600px" class="bg-gray-100 rounded-2xl overflow-hidden shadow-inner"></div><p class="text-xs text-gray-500 mt-4">Apunta la cámara al código de barras del recibo PDF.</p>',
+                showCancelButton: true,
+                cancelButtonText: 'Cerrar Escáner',
+                showConfirmButton: false,
+                didOpen: () => {
+                    html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 100} }, false);
+                    html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+                },
+                willClose: () => {
+                    if(html5QrcodeScanner) html5QrcodeScanner.clear();
+                }
+            });
+        }
+
+        async function onScanSuccess(decodedText, decodedResult) {
+            // Detenemos el escáner al instante para no leer dos veces
+            if(html5QrcodeScanner) html5QrcodeScanner.clear();
+            Swal.close();
+
+            // El formato que generaste en el PDF es "SJ-0045"
+            if (!decodedText.includes("SJ-")) {
+                Swal.fire('Código Inválido', 'Este no parece un recibo de Surprise Jeans.', 'error');
+                return;
+            }
+
+            const idPedido = parseInt(decodedText.replace("SJ-", ""));
+
+            Swal.fire({ title: 'Despachando...', text: 'Comunicando con bodega...', allowOutsideClick: false, showConfirmButton: false });
+            Swal.showLoading();
+
+            try {
+                // Disparamos la ruta que ya tienes en tu main.py para enviar pedidos
+                const res = await fetch(`${API_URL}/pedidos/${idPedido}/enviar`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ guia: "ENTREGA_LOCAL_O_REGIONAL" }) 
+                });
+
+                if (res.ok) {
+                    Swal.fire('¡Despachado! ✅', `El pedido ${decodedText} fue marcado como ENVIADO y el inventario actualizado.`, 'success');
+                } else {
+                    Swal.fire('Error', 'No se pudo procesar el envío. Revisa la consola.', 'error');
+                }
+            } catch (error) {
+                Swal.fire('Error de red', 'Fallo de conexión.', 'error');
+            }
+        }
+
+        function onScanFailure(error) {
+            // Ignoramos los fallos cuadro por cuadro
+        }
 
     </script>
     
