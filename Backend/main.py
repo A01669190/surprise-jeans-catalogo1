@@ -1098,73 +1098,49 @@ def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, backgr
         # 🚨 LA MAGIA: BYPASS DE INVENTARIO Y LOYVERSE 🚨
         if total_final <= 0 or pedido_req.cupon == "VENTA-PRESENCIAL":
             nuevo_pedido.estatus = "PAGADO"
-            print("\n🔥 [RASTREADOR 1] ¡Entró al Bypass de Pago (Cupón / Presencial)!")
             
             # ⚡ PUNTOS
             if cliente_db:
                 cliente_db.puntos += puntos_ganados
                 db.commit()
 
-            # ⚡ SUPER FIX: Refrescamos el pedido para asegurar que la BD no oculte la ropa insertada
             db.refresh(nuevo_pedido)
-            print(f"🔥 [RASTREADOR 2] Encontramos {len(nuevo_pedido.detalles)} prendas en el pedido.")
 
-            # ⚡ RECIBO VIRTUAL Y BOT ESPÍA
+            # ⚡ RECIBO VIRTUAL (Este hace el descuento automático en Loyverse)
             items_para_recibo = []
             for detalle in nuevo_pedido.detalles:
-                print(f"🔥 [RASTREADOR 3] Procesando prenda ID interno: {detalle.pantalon_id}, Talla: {detalle.talla}")
-                
-                # ⚡ FIX DEFINITIVO: Buscamos por ID interno y Talla
                 variante_db = db.query(models.VarianteTalla).filter(
                     models.VarianteTalla.pantalon_id == detalle.pantalon_id,
                     models.VarianteTalla.talla == detalle.talla
                 ).first()
                 
-                if not variante_db:
-                    print("❌ [RASTREADOR ERROR] La variante NO existe en la base de datos local.")
-                    continue
-                    
-                print(f"🔥 [RASTREADOR 4] Variante encontrada localmente. Stock BD: {variante_db.stock}, Cantidad pedida: {detalle.cantidad}")
-                
-                if variante_db.stock >= detalle.cantidad:
-                    # Descuento en tu base de datos local
+                if variante_db and variante_db.stock >= detalle.cantidad:
+                    # 1. Descuento en tu base de datos local
                     variante_db.stock -= detalle.cantidad
                     if variante_db.pantalon:
                         variante_db.pantalon.stock -= detalle.cantidad 
                         
-                    print(f"🔥 [RASTREADOR 5] Stock descontado de BD. Mandando orden a Loyverse para el SKU: {variante_db.sku}")
-                    
-                    # ⚡ Descuento en la tablet Loyverse
-                    background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, variante_db.sku, variante_db.stock)
-                        
+                    # 2. Guardamos para armar el recibo (Loyverse descontará su lado con esto)
                     items_para_recibo.append({
                         "sku": variante_db.sku,
                         "cantidad": detalle.cantidad,
                         "precio": detalle.precio_unitario
                     })
                     
-                    # 🤖 ACTIVAMOS EL BOT ESPÍA DE INVENTARIO
+                    # 3. Alarma de Yessica
                     nombre_pantalon = variante_db.pantalon.nombre if variante_db.pantalon else "Modelo"
                     background_tasks.add_task(enviar_alarma_inventario, nombre_pantalon, variante_db.talla, variante_db.stock)
-                else:
-                    print(f"❌ [RASTREADOR ERROR] No hay suficiente stock en BD. Tienes {variante_db.stock}, pidieron {detalle.cantidad}")
 
+            # 🎉 Mandamos un ÚNICO recibo a la tablet
             if items_para_recibo:
-                print("🔥 [RASTREADOR 6] Mandando recibo virtual a Loyverse...")
                 background_tasks.add_task(loyverse_sync.generar_recibo_virtual, nuevo_pedido.correo_cliente, nuevo_pedido.id, items_para_recibo, nuevo_pedido.total)
             
             db.commit()
-            print("🔥 [RASTREADOR 7] Proceso de Bypass Terminado.\n")
-
-            if items_para_recibo:
-                background_tasks.add_task(loyverse_sync.generar_recibo_virtual, nuevo_pedido.correo_cliente, nuevo_pedido.id, items_para_recibo, nuevo_pedido.total)
-                
-            db.commit()
             
-            # Avisamos a las pantallas del despacho (Fix Asíncrono)
+            # Avisamos a las pantallas del despacho
             background_tasks.add_task(manager.broadcast, "NUEVO_PEDIDO")
             
-            # Escudo protector para que el correo no rompa la compra si falla
+            # Correo al cliente
             if cliente_db:
                 try:
                     enviar_correo_recibo(cliente_db.correo, cliente_db.nombre_completo, f"{nuevo_pedido.id:04d}", total_final, lista_ropa, puntos_ganados)
@@ -1220,43 +1196,27 @@ def webhook_mercadopago(background_tasks: BackgroundTasks, datos: dict = Body(..
                     items_para_recibo = []
                     
                     for detalle in pedido_db.detalles:
-                        print(f"💰 [RASTREADOR MP 2] Procesando prenda ID interno: {detalle.pantalon_id}, Talla: {detalle.talla}")
-                        
-                        # ⚡ FIX DEFINITIVO: Buscamos por ID interno y Talla
                         variante_db = db.query(models.VarianteTalla).filter(
                             models.VarianteTalla.pantalon_id == detalle.pantalon_id,
                             models.VarianteTalla.talla == detalle.talla
                         ).first()
                         
-                        if not variante_db:
-                            print("❌ [RASTREADOR MP ERROR] La variante NO existe en la base de datos local.")
-                            continue
-                            
-                        print(f"💰 [RASTREADOR MP 3] Variante encontrada. Stock BD: {variante_db.stock}, Pidieron: {detalle.cantidad}")
-                        
-                        if variante_db.stock >= detalle.cantidad:
+                        if variante_db and variante_db.stock >= detalle.cantidad:
                             # Descuenta localmente en tu servidor web
                             variante_db.stock -= detalle.cantidad
                             if variante_db.pantalon:
                                 variante_db.pantalon.stock -= detalle.cantidad 
-                            
-                            print(f"💰 [RASTREADOR MP 4] Stock local descontado. Avisando a Loyverse para SKU: {variante_db.sku}")
-                            
-                            # ⚡ Descuento en la tablet Loyverse
-                            background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, variante_db.sku, variante_db.stock)
 
                             # Guardamos el item para el recibo de Loyverse
                             items_para_recibo.append({
-                                "sku": variante_db.sku, # Usamos la llave maestra de la base de datos
+                                "sku": variante_db.sku, 
                                 "cantidad": detalle.cantidad,
                                 "precio": detalle.precio_unitario
                             })
 
-                            # 🤖 ACTIVAMOS EL BOT ESPÍA DE INVENTARIO
+                            # Bot Espía
                             nombre_pantalon = variante_db.pantalon.nombre if variante_db.pantalon else "Modelo"
                             background_tasks.add_task(enviar_alarma_inventario, nombre_pantalon, variante_db.talla, variante_db.stock)
-                        else:
-                            print(f"❌ [RASTREADOR MP ERROR] No hay suficiente stock. Tienes {variante_db.stock}, pidieron {detalle.cantidad}")
                         
                         nombre_base = detalle.pantalon.nombre if detalle.pantalon else "Modelo"
                         nombre_final = f"{nombre_base} (Talla {detalle.talla})" if detalle.talla else nombre_base
