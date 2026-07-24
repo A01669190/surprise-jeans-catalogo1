@@ -97,7 +97,18 @@
                     cargarPedidos(); 
                 } 
                 else if (event.data === "ACTUALIZAR_ADMIN") {
-                    // ⚡ El escáner y los envíos mandan esta señal. Actualizamos la pantalla.
+                    // ⚡ 1. HACEMOS QUE SUENE EL DIIIIN EN DESPACHO
+                    sonidoDin.play().catch(e => console.log("El navegador bloqueó el sonido."));
+                    
+                    // ⚡ 2. MOSTRAMOS UNA ALERTA VISUAL RÁPIDA (OPCIONAL PERO ÚTIL)
+                    Swal.fire({
+                        title: '¡Paquete Escaneado! 🚀',
+                        text: 'Actualizado a ENVIADO.',
+                        icon: 'success', toast: true, position: 'top-end',
+                        showConfirmButton: false, timer: 3000
+                    });
+
+                    // ⚡ 3. ACTUALIZAMOS LA LISTA SIN RECARGAR LA PÁGINA
                     cargarPedidos();
                 }
             };
