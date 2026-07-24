@@ -137,7 +137,7 @@
             </button>
             
             <div class="flex-shrink-0 flex items-center justify-center">
-                <h1 onclick="activarBotonSecreto()" class="text-2xl font-black text-indigo-400 italic tracking-tighter cursor-pointer select-none">Surprise<span class="text-sm font-normal text-gray-400">Jeans</span></h1>
+                <h1 onclick="activarBotonSecreto()" class="text-2xl font-black text-indigo-400 italic tracking-tighter cursor-pointer select-none touch-manipulation">Surprise<span class="text-sm font-normal text-gray-400">Jeans</span></h1>
             </div>
 
             <div class="flex items-center space-x-5">
@@ -3099,17 +3099,22 @@
         }
         
         // ==========================================
-        // ⚡ ESCÁNER DE ALMACÉN PARA YESSICA (MODO RÁFAGA)
+        // ⚡ ESCÁNER DE ALMACÉN (MODO RÁFAGA CORREGIDO)
         // ==========================================
         let html5QrcodeScanner = null;
-        let codigosEscaneados = new Set(); // ⚡ MEMORIA ANTI-DUPLICADOS
+        let codigosEscaneados = new Set(); // Memoria anti-duplicados
 
         function abrirEscanerAlmacen() {
             codigosEscaneados.clear(); // Limpiamos la memoria al abrir
             
             Swal.fire({
                 title: 'Escáner de Despacho 📦',
-                html: '<div id="reader" width="600px" class="bg-gray-100 rounded-2xl overflow-hidden shadow-inner mb-2"></div><p class="text-xs font-black text-emerald-600 animate-pulse">Escaneo continuo activado 🚀</p>',
+                html: `
+                    <div id="reader" width="100%" class="bg-gray-100 rounded-2xl overflow-hidden shadow-inner mb-3"></div>
+                    <div id="scan-mensaje" class="bg-indigo-50 text-indigo-600 px-4 py-3 rounded-xl text-xs font-black animate-pulse border border-indigo-100 shadow-sm">
+                        Esperando código de barras... 📸
+                    </div>
+                `,
                 showCancelButton: true,
                 cancelButtonText: 'Terminar y Cerrar',
                 showConfirmButton: false,
@@ -3118,32 +3123,44 @@
                     html5QrcodeScanner.render(onScanSuccess, onScanFailure);
                 },
                 willClose: () => {
-                    if(html5QrcodeScanner) html5QrcodeScanner.clear();
+                    if(html5QrcodeScanner) {
+                        html5QrcodeScanner.clear().catch(e => console.log("Cámara cerrada"));
+                    }
                 }
             });
         }
 
         async function onScanSuccess(decodedText, decodedResult) {
-            // 1. Evitar escanear el mismo código 20 veces por segundo
+            // 1. Si ya lo escaneamos, lo ignoramos para no repetir
             if (codigosEscaneados.has(decodedText)) return;
             
-            // 2. Guardarlo en la memoria y hacer sonar el Bip
+            // 2. Lo anotamos en la memoria y hacemos el ¡BIP!
             codigosEscaneados.add(decodedText);
             reproducirBip();
 
-            // Validación de formato
+            const msgDiv = document.getElementById('scan-mensaje');
+
+            // 3. Validación de que sea un recibo nuestro
             if (!decodedText.includes("SJ-")) {
-                Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title: 'Código Inválido', showConfirmButton: false, timer: 2000 });
+                if(msgDiv) {
+                    msgDiv.innerHTML = `⚠️ Ignorado: ${decodedText} no es de la tienda.`;
+                    msgDiv.className = "bg-rose-50 text-rose-600 px-4 py-3 rounded-xl text-xs font-black border border-rose-100";
+                }
+                // Lo borramos de la memoria después de 2 segundos para que puedan volver a intentar
+                setTimeout(() => { codigosEscaneados.delete(decodedText); }, 2000);
                 return;
             }
 
             const idPedido = parseInt(decodedText.replace("SJ-", ""));
 
-            // 3. Notificación silenciosa en la esquina (¡No tapa la cámara!)
-            Swal.fire({ toast: true, position: 'top-end', icon: 'info', title: `Procesando ${decodedText}...`, showConfirmButton: false, timer: 1500 });
+            // 4. Avisamos visualmente que estamos procesando
+            if(msgDiv) {
+                msgDiv.innerHTML = `⏳ Despachando ${decodedText}...`;
+                msgDiv.className = "bg-amber-50 text-amber-600 px-4 py-3 rounded-xl text-xs font-black border border-amber-100 animate-pulse";
+            }
 
             try {
-                // 4. Disparamos la señal al backend
+                // 5. Disparamos la señal al servidor web
                 const res = await fetch(`${API_URL}/pedidos/${idPedido}/enviar`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
@@ -3151,16 +3168,30 @@
                 });
 
                 if (res.ok) {
-                    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: `¡${decodedText} Listo! ✅`, showConfirmButton: false, timer: 2500, background: '#10b981', color: '#fff', iconColor: '#fff' });
+                    if(msgDiv) {
+                        msgDiv.innerHTML = `✅ ¡${decodedText} ENVIADO! Pasa el siguiente.`;
+                        msgDiv.className = "bg-emerald-50 text-emerald-600 px-4 py-3 rounded-xl text-xs font-black border border-emerald-100 shadow-sm";
+                    }
                 } else {
-                    Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: `Fallo en ${decodedText}`, showConfirmButton: false, timer: 3000 });
-                    codigosEscaneados.delete(decodedText); // Lo borramos de la memoria para que Yessica pueda reintentar
+                    if(msgDiv) {
+                        msgDiv.innerHTML = `❌ Falló ${decodedText}. Intenta de nuevo.`;
+                        msgDiv.className = "bg-rose-50 text-rose-600 px-4 py-3 rounded-xl text-xs font-black border border-rose-100";
+                    }
+                    setTimeout(() => { codigosEscaneados.delete(decodedText); }, 2000);
                 }
             } catch (error) {
-                Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Error de Red', showConfirmButton: false, timer: 3000 });
-                codigosEscaneados.delete(decodedText);
+                if(msgDiv) {
+                    msgDiv.innerHTML = `❌ Error de red con ${decodedText}.`;
+                    msgDiv.className = "bg-rose-50 text-rose-600 px-4 py-3 rounded-xl text-xs font-black border border-rose-100";
+                }
+                setTimeout(() => { codigosEscaneados.delete(decodedText); }, 2000);
             }
         }
+
+        function onScanFailure(error) {
+            // Silencio total mientras busca códigos
+        }
+        
 
         function onScanFailure(error) {
             // Ignoramos los fallos cuadro por cuadro
