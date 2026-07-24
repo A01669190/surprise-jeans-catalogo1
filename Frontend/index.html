@@ -3073,10 +3073,30 @@
             activarAutoScroll(resenas, 4500);  // Reseñas cada 4.5 segundos
         });
 
+       // ==========================================
+        // ⚡ GENERADOR DE SONIDO (BIP) DE ESCÁNER
         // ==========================================
-        // ⚡ AUTOMATIZACIÓN DE MAYOREO (PAQUETE CERRADO)
-        // ==========================================
-
+        function reproducirBip() {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscilador = audioCtx.createOscillator();
+                const ganancia = audioCtx.createGain();
+                
+                oscilador.type = 'sine';
+                oscilador.frequency.setValueAtTime(880, audioCtx.currentTime); // 880 Hz es el tono clásico de caja
+                
+                ganancia.gain.setValueAtTime(0.1, audioCtx.currentTime); // Volumen al 10% para que no lastime
+                
+                oscilador.connect(ganancia);
+                ganancia.connect(audioCtx.destination);
+                
+                oscilador.start();
+                // Lo apagamos a los 150 milisegundos para que sea un "bip" corto y rápido
+                setTimeout(() => oscilador.stop(), 150);
+            } catch(e) {
+                console.log("El dispositivo no soporta sonido web.");
+            }
+        }
         // ==========================================
         // ⚡ ESCÁNER DE ALMACÉN PARA YESSICA
         // ==========================================
@@ -3159,6 +3179,43 @@
 
         function onScanFailure(error) {
             // Ignoramos los fallos cuadro por cuadro
+        }
+
+        async function onScanSuccess(decodedText, decodedResult) {
+            // ⚡ HACER SONAR EL BIP FÍSICO ⚡
+            reproducirBip();
+
+            // Detenemos el escáner al instante para no leer dos veces
+            if(html5QrcodeScanner) html5QrcodeScanner.clear();
+            Swal.close();
+
+            // El formato que generaste en el PDF es "SJ-0045"
+            if (!decodedText.includes("SJ-")) {
+                Swal.fire('Código Inválido', 'Este no parece un recibo de Surprise Jeans.', 'error');
+                return;
+            }
+
+            const idPedido = parseInt(decodedText.replace("SJ-", ""));
+
+            Swal.fire({ title: 'Despachando...', text: 'Comunicando con bodega...', allowOutsideClick: false, showConfirmButton: false });
+            Swal.showLoading();
+
+            try {
+                // Disparamos la ruta que ya tienes en tu main.py para enviar pedidos
+                const res = await fetch(`${API_URL}/pedidos/${idPedido}/enviar`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ guia: "ENTREGA_LOCAL_O_REGIONAL" }) 
+                });
+
+                if (res.ok) {
+                    Swal.fire('¡Despachado! ✅', `El pedido ${decodedText} fue marcado como ENVIADO y el inventario actualizado.`, 'success');
+                } else {
+                    Swal.fire('Error', 'No se pudo procesar el envío. Revisa la consola.', 'error');
+                }
+            } catch (error) {
+                Swal.fire('Error de red', 'Fallo de conexión.', 'error');
+            }
         }
 
     </script>
