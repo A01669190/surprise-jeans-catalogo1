@@ -1810,6 +1810,14 @@ def enviar_pedido(pedido_id: int, guia_data: dict, background_tasks: BackgroundT
     # ⚡ LE DECIMOS AL ROBOT QUE LO MANDE EN SEGUNDO PLANO
     background_tasks.add_task(enviar_whatsapp_api, pedido.telefono, mensaje)
 
+    # ⚡ NUEVO: AVISAR AL PANEL DE ADMIN QUE SE ACTUALICE SOLO
+    try:
+        import asyncio
+        loop = asyncio.get_event_loop()
+        loop.create_task(manager.broadcast("ACTUALIZAR_ADMIN"))
+    except:
+        pass
+
     return {"mensaje": "Pedido enviado y en proceso de notificación"}
 
 

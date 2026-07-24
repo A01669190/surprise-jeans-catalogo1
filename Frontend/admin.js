@@ -51,6 +51,15 @@ document.addEventListener('DOMContentLoaded', () => {
     cargarInventarioAdmin(); 
 });
 
+// ⚡ VIGILANTE OPTIMIZADO (Cero Lag)
+        function verificarEstadoMenu() {
+            if (sessionStorage.getItem('token_vip')) {
+                document.getElementById('nav-admin').classList.remove('hidden');
+                // ⚡ EL FIX: Ocultar la pantalla de login para que no estorbe al dar F5
+                document.getElementById('panel-login').style.display = 'none'; 
+            }
+        }
+
 // ==========================================
 // 4. GESTIÓN DE CATEGORÍAS
 // ==========================================
@@ -676,3 +685,21 @@ function renderizarPantalones(listaPantalones, esNuevaBusqueda) {
         contenedor.appendChild(tarjeta);
     });
 }
+
+// ==========================================
+// ⚡ CONEXIÓN TELEPÁTICA CON EL ALMACÉN (WebSockets)
+// ==========================================
+const socketDespacho = new WebSocket('wss://surprise-jeans-api-denz.onrender.com/ws/despacho');
+
+socketDespacho.onmessage = function(event) {
+    if (event.data === "ACTUALIZAR_ADMIN") {
+        // El servidor avisa que Yessica escaneó un paquete. ¡Recargamos todo en silencio sin F5!
+        cargarInventarioAdmin();
+        
+        // Si tienes la pestaña de estadísticas abierta, también la refrescamos
+        const vistaDashboard = document.getElementById('vista-dashboard');
+        if (vistaDashboard && !vistaDashboard.classList.contains('hidden')) {
+            renderizarDashboard();
+        }
+    }
+};

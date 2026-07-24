@@ -311,9 +311,12 @@
         }
 
         // ⚡ VIGILANTE OPTIMIZADO (Cero Lag)
+        // ⚡ VIGILANTE OPTIMIZADO (Cero Lag)
         function verificarEstadoMenu() {
             if (sessionStorage.getItem('token_vip')) {
                 document.getElementById('nav-admin').classList.remove('hidden');
+                // ⚡ EL FIX: Ocultar la pantalla de login para que no estorbe al dar F5
+                document.getElementById('panel-login').style.display = 'none'; 
             }
         }
         // Solo se ejecuta una vez cuando abres la página
