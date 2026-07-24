@@ -1111,6 +1111,9 @@ def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, backgr
                         if variante_db.pantalon:
                             variante_db.pantalon.stock -= detalle.cantidad 
                             
+                        # ⚡ AGREGA ESTA LÍNEA AQUÍ PARA ACTUALIZAR LA TABLET
+                        background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, variante_db.sku, variante_db.stock)
+
                         items_para_recibo.append({
                             "sku": detalle.sku_variante,
                             "cantidad": detalle.cantidad,
@@ -1193,6 +1196,9 @@ def webhook_mercadopago(background_tasks: BackgroundTasks, datos: dict = Body(..
                                 if variante_db.pantalon:
                                     variante_db.pantalon.stock -= detalle.cantidad 
                                 
+                                # ⚡ AGREGA ESTA LÍNEA AQUÍ PARA ACTUALIZAR LA TABLET
+                                background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, variante_db.sku, variante_db.stock)
+
                                 # Guardamos el item para el recibo de Loyverse
                                 items_para_recibo.append({
                                     "sku": detalle.sku_variante,
