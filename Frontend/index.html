@@ -793,7 +793,7 @@
         const NUMERO_WHATSAPP = '525513220695'; 
         
         let catalogoCompleto = [];
-        let carrito = [];
+        let carrito = JSON.parse(localStorage.getItem('carrito_sj')) || [];
         let misFavoritos = JSON.parse(localStorage.getItem('favoritos_sj')) || [];
         let tallasSeleccionadas = {};
         // ⚡ VARIABLES PARA EL SCROLL INFINITO
@@ -817,6 +817,7 @@
         // EL ESCÁNER DE RECIBOS (Se ejecuta apenas abre la página)
         document.addEventListener('DOMContentLoaded', () => {
             cargarCatalogo();
+            actualizarUICarrito(); // ⚡ NUEVO: DIBUJAR CARRITO GUARDADO DE INMEDIATO
 
             const parametrosURL = new URLSearchParams(window.location.search);
             const estadoPago = parametrosURL.get('pago');
@@ -1137,13 +1138,37 @@
                     tallaActiva = memoriaFiltros.talla || 'Todas';
                     filtroPrecio = memoriaFiltros.precio || filtroPrecio;
                     
-                    // Actualizar visualmente la barra de precio si se recuperó uno
+                    // Actualizar visualmente la barra de precio
                     const sliderPrecio = document.getElementById('filtro-precio');
                     if(sliderPrecio) {
                         sliderPrecio.value = filtroPrecio;
                         document.getElementById('display-precio').innerText = `Hasta $${filtroPrecio}`;
                     }
-                    // Disparamos la aplicación de filtros (esto ya llama a renderizarCatalogo)
+
+                    // ⚡ MAGIA VISUAL: Pintar los botones correctos de Categoría
+                    document.querySelectorAll('.btn-categoria').forEach(btn => {
+                        if (btn.innerText.trim() === categoriaActiva) {
+                            btn.className = "btn-categoria px-6 py-2.5 rounded-full bg-indigo-100 text-indigo-600 border border-indigo-200 text-sm font-black shadow-sm whitespace-nowrap transition-all transform hover:scale-105 active:scale-95";
+                        } else {
+                            btn.className = "btn-categoria px-6 py-2.5 rounded-full bg-white text-gray-500 border border-gray-200 text-sm font-bold shadow-sm hover:bg-indigo-50 hover:text-indigo-400 whitespace-nowrap transition-all transform hover:scale-105 active:scale-95";
+                        }
+                    });
+
+                    // ⚡ MAGIA VISUAL: Pintar los botones correctos de Talla
+                    document.querySelectorAll('.btn-talla-filtro').forEach(btn => {
+                        btn.className = "btn-talla-filtro bg-white text-gray-500 border border-gray-200 w-9 h-9 rounded-full text-xs font-bold shadow-sm hover:bg-stone-100 transition-all transform hover:scale-110";
+                        if(btn.innerText === 'Todas') btn.className = "btn-talla-filtro bg-white text-gray-500 border border-gray-200 px-4 h-9 rounded-full text-xs font-bold shadow-sm hover:bg-stone-100 transition-all transform hover:scale-110";
+                        
+                        if(btn.innerText.trim() === tallaActiva) {
+                            if(tallaActiva === 'Todas') {
+                                btn.className = "btn-talla-filtro bg-stone-900 text-white px-4 h-9 rounded-full text-xs font-black shadow-md transition-all transform hover:scale-110";
+                            } else {
+                                btn.className = "btn-talla-filtro bg-stone-900 text-white w-9 h-9 rounded-full text-xs font-black shadow-md transition-all transform hover:scale-110";
+                            }
+                        }
+                    });
+
+                    // Disparamos la aplicación de filtros ya con todo pintado
                     aplicarFiltrosGlobales();
                 } else {
                     renderizarCatalogo(catalogoCompleto);
@@ -2107,6 +2132,8 @@
             badge.innerText = cantidadTotal;
             totalEl.innerText = `$${total.toFixed(2)}`;
             renderizarCrossSell();
+
+            localStorage.setItem('carrito_sj', JSON.stringify(carrito));
         }
 
         // ==========================================
