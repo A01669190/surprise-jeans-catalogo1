@@ -1103,26 +1103,30 @@ def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, backgr
             # ⚡ RECIBO VIRTUAL Y BOT ESPÍA
             items_para_recibo = []
             for detalle in nuevo_pedido.detalles:
-                if detalle.sku_variante: 
-                    variante_db = db.query(models.VarianteTalla).filter(models.VarianteTalla.sku == detalle.sku_variante).first()
-                    
-                    if variante_db and variante_db.stock >= detalle.cantidad:
-                        variante_db.stock -= detalle.cantidad
-                        if variante_db.pantalon:
-                            variante_db.pantalon.stock -= detalle.cantidad 
-                            
-                        # ⚡ AGREGA ESTA LÍNEA AQUÍ PARA ACTUALIZAR LA TABLET
-                        background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, variante_db.sku, variante_db.stock)
-
-                        items_para_recibo.append({
-                            "sku": detalle.sku_variante,
-                            "cantidad": detalle.cantidad,
-                            "precio": detalle.precio_unitario
-                        })
+                # ⚡ FIX DEFINITIVO: Buscamos por ID interno y Talla
+                variante_db = db.query(models.VarianteTalla).filter(
+                    models.VarianteTalla.pantalon_id == detalle.pantalon_id,
+                    models.VarianteTalla.talla == detalle.talla
+                ).first()
+                
+                if variante_db and variante_db.stock >= detalle.cantidad:
+                    # Descuento en tu base de datos local
+                    variante_db.stock -= detalle.cantidad
+                    if variante_db.pantalon:
+                        variante_db.pantalon.stock -= detalle.cantidad 
                         
-                        # 🤖 ACTIVAMOS EL BOT ESPÍA DE INVENTARIO
-                        nombre_pantalon = variante_db.pantalon.nombre if variante_db.pantalon else "Modelo"
-                        background_tasks.add_task(enviar_alarma_inventario, nombre_pantalon, variante_db.talla, variante_db.stock)
+                    # ⚡ Descuento en la tablet Loyverse
+                    background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, variante_db.sku, variante_db.stock)
+                        
+                    items_para_recibo.append({
+                        "sku": variante_db.sku, # Llave maestra
+                        "cantidad": detalle.cantidad,
+                        "precio": detalle.precio_unitario
+                    })
+                    
+                    # 🤖 ACTIVAMOS EL BOT ESPÍA DE INVENTARIO
+                    nombre_pantalon = variante_db.pantalon.nombre if variante_db.pantalon else "Modelo"
+                    background_tasks.add_task(enviar_alarma_inventario, nombre_pantalon, variante_db.talla, variante_db.stock)
 
             if items_para_recibo:
                 background_tasks.add_task(loyverse_sync.generar_recibo_virtual, nuevo_pedido.correo_cliente, nuevo_pedido.id, items_para_recibo, nuevo_pedido.total)
@@ -1184,31 +1188,36 @@ def webhook_mercadopago(background_tasks: BackgroundTasks, datos: dict = Body(..
                     pedido_db.estatus = "PAGADO"
                     pedido_db.pago_id = str(pago_id) # ⚡ GUARDAMOS LA LLAVE AQUÍ
                     lista_ropa = []
+
                     # ⚡ EL FIX 3.0: RECIBOS VIRTUALES COMPLETOS
                     items_para_recibo = []
                     
                     for detalle in pedido_db.detalles:
-                        if detalle.sku_variante: 
-                            variante_db = db.query(models.VarianteTalla).filter(models.VarianteTalla.sku == detalle.sku_variante).first()
-                            if variante_db and variante_db.stock >= detalle.cantidad:
-                                # Descuenta localmente en tu servidor web
-                                variante_db.stock -= detalle.cantidad
-                                if variante_db.pantalon:
-                                    variante_db.pantalon.stock -= detalle.cantidad 
-                                
-                                # ⚡ AGREGA ESTA LÍNEA AQUÍ PARA ACTUALIZAR LA TABLET
-                                background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, variante_db.sku, variante_db.stock)
+                        # ⚡ FIX DEFINITIVO: Buscamos por ID interno y Talla
+                        variante_db = db.query(models.VarianteTalla).filter(
+                            models.VarianteTalla.pantalon_id == detalle.pantalon_id,
+                            models.VarianteTalla.talla == detalle.talla
+                        ).first()
+                        
+                        if variante_db and variante_db.stock >= detalle.cantidad:
+                            # Descuenta localmente en tu servidor web
+                            variante_db.stock -= detalle.cantidad
+                            if variante_db.pantalon:
+                                variante_db.pantalon.stock -= detalle.cantidad 
+                            
+                            # ⚡ Descuento en la tablet Loyverse
+                            background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, variante_db.sku, variante_db.stock)
 
-                                # Guardamos el item para el recibo de Loyverse
-                                items_para_recibo.append({
-                                    "sku": detalle.sku_variante,
-                                    "cantidad": detalle.cantidad,
-                                    "precio": detalle.precio_unitario
-                                })
+                            # Guardamos el item para el recibo de Loyverse
+                            items_para_recibo.append({
+                                "sku": variante_db.sku, # Usamos la llave maestra de la base de datos
+                                "cantidad": detalle.cantidad,
+                                "precio": detalle.precio_unitario
+                            })
 
-                                # 🤖 ACTIVAMOS EL BOT ESPÍA DE INVENTARIO
-                                nombre_pantalon = variante_db.pantalon.nombre if variante_db.pantalon else "Modelo"
-                                background_tasks.add_task(enviar_alarma_inventario, nombre_pantalon, variante_db.talla, variante_db.stock)
+                            # 🤖 ACTIVAMOS EL BOT ESPÍA DE INVENTARIO
+                            nombre_pantalon = variante_db.pantalon.nombre if variante_db.pantalon else "Modelo"
+                            background_tasks.add_task(enviar_alarma_inventario, nombre_pantalon, variante_db.talla, variante_db.stock)
                         
                         nombre_base = detalle.pantalon.nombre if detalle.pantalon else "Modelo"
                         nombre_final = f"{nombre_base} (Talla {detalle.talla})" if detalle.talla else nombre_base
