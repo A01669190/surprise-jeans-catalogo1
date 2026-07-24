@@ -1115,11 +1115,11 @@ def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, backgr
                     if variante_db.pantalon:
                         variante_db.pantalon.stock -= detalle.cantidad 
                         
-                    # ⚡ Descuento en la tablet Loyverse
+                    # 🚀 AQUÍ ESTÁ LA LÍNEA CRÍTICA QUE FALTABA PARA ACTUALIZAR LOYVERSE 🚀
                     background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, variante_db.sku, variante_db.stock)
                         
                     items_para_recibo.append({
-                        "sku": variante_db.sku, # Llave maestra
+                        "sku": variante_db.sku,
                         "cantidad": detalle.cantidad,
                         "precio": detalle.precio_unitario
                     })
