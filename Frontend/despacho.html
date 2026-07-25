@@ -68,7 +68,8 @@
         let tokenPrivado = null; 
         
         // ⚡ WEBSOCKETS: Sonido y Conexión
-        const sonidoDin = new Audio('https://www.myinstants.com/media/sounds/ding-sound-effect_2.mp3');
+        const sonidoDin = new Audio('https://www.myinstants.com/media/sounds/ding-sound-effect_2.mp3'); // Para nueva venta
+        const sonidoEscaneo = new Audio('https://www.myinstants.com/media/sounds/success-1-6297.mp3'); // ⚡ NUEVO: Para escáner/envío
         let socket = null;
         let historialPedidos = []; // Guardará los datos para el Excel
 
@@ -97,8 +98,8 @@
                     cargarPedidos(); 
                 } 
                 else if (event.data === "ACTUALIZAR_ADMIN") {
-                    // ⚡ 1. HACEMOS QUE SUENE EL DIIIIN AL ESCANEAR
-                    sonidoDin.play().catch(e => console.log("El navegador bloqueó el sonido."));
+                    // ⚡ 1. HACEMOS QUE SUENE EL NUEVO SONIDO DE ESCÁNER/ÉXITO
+                    sonidoEscaneo.play().catch(e => console.log("El navegador bloqueó el sonido."));
                     
                     // ⚡ 2. MOSTRAMOS UNA ALERTA VERDE CONFIRMANDO EL ENVÍO
                     Swal.fire({
