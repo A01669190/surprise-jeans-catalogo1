@@ -1,12 +1,40 @@
 import urllib.request
 import json
 import os
-import models
-import threading
-import datetime
+import time  # ⚡ NUEVO: Importamos el control de tiempo
+import datetime # ⚡ FIX: Agregado para generar_recibo_virtual
+import models   # ⚡ FIX: Agregado para procesar_webhooks_loyverse
 
-# Cargar token desde variables de entorno por seguridad
 TOKEN_LOYVERSE = os.getenv("LOYVERSE_TOKEN", "")
+
+def obtener_catalogo_completo(token):
+    """ Descarga TODOS los artículos de Loyverse, saltando de página en página """
+    todos_los_items = []
+    url = "https://api.loyverse.com/v1.0/items?limit=250"
+    
+    while url:
+        try:
+            req = urllib.request.Request(url)
+            req.add_header("Authorization", f"Bearer {token}")
+            respuesta = urllib.request.urlopen(req)
+            datos = json.loads(respuesta.read().decode('utf-8'))
+            
+            todos_los_items.extend(datos.get("items", []))
+            
+            cursor = datos.get("cursor")
+            if cursor:
+                url = f"https://api.loyverse.com/v1.0/items?limit=250&cursor={cursor}"
+                
+                # ⚡ EL FIX ANTI-BLOQUEO: Una pausa de 0.3 segundos antes de pedir la siguiente página
+                time.sleep(0.3) 
+            else:
+                url = None
+                
+        except Exception as e:
+            print(f"❌ Error descargando catálogo paginado: {e}")
+            break
+            
+    return todos_los_items
 
 def descontar_stock_loyverse(sku, stock_after):
     """ Actualiza el inventario absoluto en la tablet para una variante ESPECÍFICA """
@@ -15,10 +43,8 @@ def descontar_stock_loyverse(sku, stock_after):
         req_tienda.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
         store_id = json.loads(urllib.request.urlopen(req_tienda).read().decode('utf-8'))["stores"][0]["id"]
         
-        # ⚡ EL FIX: Pedimos 250 artículos de golpe (el máximo) para no dejar pantalones fuera
-        req_item = urllib.request.Request("https://api.loyverse.com/v1.0/items?limit=250")
-        req_item.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
-        items = json.loads(urllib.request.urlopen(req_item).read().decode('utf-8')).get("items", [])
+        # ⚡ FIX: Usamos el motor de paginación infinita
+        items = obtener_catalogo_completo(TOKEN_LOYVERSE)
         
         if not items:
             print(f"⚠️ El catálogo está vacío en Loyverse.")
@@ -188,11 +214,8 @@ def crear_cliente_loyverse(nombre, correo, telefono):
 def eliminar_articulo_loyverse(sku_hijo_exacto):
     """ Busca un artículo por el SKU EXACTO de una de sus tallas y lo destruye de la tablet """
     try:
-        # ⚡ EL FIX: Pedimos hasta 250 artículos
-        req_item = urllib.request.Request("https://api.loyverse.com/v1.0/items?limit=250")
-        req_item.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
-        res_item = urllib.request.urlopen(req_item)
-        items = json.loads(res_item.read().decode('utf-8')).get("items", [])
+        # ⚡ FIX: Usamos el motor de paginación infinita
+        items = obtener_catalogo_completo(TOKEN_LOYVERSE)
         
         if not items:
             return
@@ -241,11 +264,8 @@ def actualizar_categoria_loyverse(sku_hijo_exacto, nombre_categoria):
             res_nueva_cat = urllib.request.urlopen(req_nueva_cat)
             cat_id = json.loads(res_nueva_cat.read().decode('utf-8'))["id"]
 
-        # ⚡ EL FIX: Pedimos hasta 250 artículos
-        req_item = urllib.request.Request("https://api.loyverse.com/v1.0/items?limit=250")
-        req_item.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
-        res_item = urllib.request.urlopen(req_item)
-        items = json.loads(res_item.read().decode('utf-8')).get("items", [])
+        # ⚡ FIX: Usamos el motor de paginación infinita
+        items = obtener_catalogo_completo(TOKEN_LOYVERSE)
         
         item_a_modificar = None
         for item in items:
@@ -302,10 +322,8 @@ def generar_recibo_virtual(correo_cliente, folio_interno, items_comprados, total
             if clientes:
                 customer_id = clientes[0]["id"]
 
-        # 3. Mapear tallas
-        req_item = urllib.request.Request("https://api.loyverse.com/v1.0/items?limit=250")
-        req_item.add_header("Authorization", f"Bearer {TOKEN_LOYVERSE}")
-        catalogo = json.loads(urllib.request.urlopen(req_item).read().decode('utf-8')).get("items", [])
+        # 3. Mapear tallas (⚡ Paginación infinita)
+        catalogo = obtener_catalogo_completo(TOKEN_LOYVERSE)
 
         line_items = []
         for item in items_comprados:

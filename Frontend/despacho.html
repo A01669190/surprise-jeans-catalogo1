@@ -157,43 +157,7 @@
                 setTimeout(conectarTúnelEnVivo, 5000); 
             };
         }
-
-        async function marcarEntregado(id) {
-
-            socket.onmessage = function(event) {
-                if (event.data === "NUEVO_PEDIDO") {
-                    sonidoDin.play().catch(e => console.log("El navegador bloqueó el sonido."));
-                    Swal.fire({
-                        title: '¡Nuevo Pedido! 📦',
-                        text: 'El pago ha sido procesado con éxito.',
-                        icon: 'info', toast: true, position: 'top-end',
-                        showConfirmButton: false, timer: 4000, timerProgressBar: true
-                    });
-                    cargarPedidos(); 
-                } 
-                else if (event.data === "ACTUALIZAR_ADMIN") {
-                    // ⚡ 1. HACEMOS QUE SUENE EL NUEVO SONIDO DE ESCÁNER/ÉXITO
-                    sonidoEscaneo.play().catch(e => console.log("El navegador bloqueó el sonido."));
-                    
-                    // ⚡ 2. MOSTRAMOS UNA ALERTA VERDE CONFIRMANDO EL ENVÍO
-                    Swal.fire({
-                        title: '¡Paquete Escaneado! 🚀',
-                        text: 'El pedido se movió a ENVIADO.',
-                        icon: 'success', toast: true, position: 'top-end',
-                        showConfirmButton: false, timer: 3000
-                    });
-
-                    // ⚡ 3. ACTUALIZAMOS LOS CARRITOS EN PANTALLA
-                    cargarPedidos();
-                }
-            };
-
-            socket.onclose = function() { 
-                console.log("El túnel se durmió. Reconectando...");
-                setTimeout(conectarTúnelEnVivo, 5000); 
-            };
-        }
-
+     
         async function marcarEntregado(id) {
             const result = await Swal.fire({
                 title: '¿Marcar como Entregado?',
