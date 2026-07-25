@@ -69,9 +69,30 @@
         
         // ⚡ WEBSOCKETS: Sonido y Conexión
         const sonidoDin = new Audio('https://www.myinstants.com/media/sounds/ding-sound-effect_2.mp3'); // Para nueva venta
-        const sonidoEscaneo = new Audio('https://www.myinstants.com/media/sounds/loz_get_rupee.mp3');
         let socket = null;
         let historialPedidos = []; // Guardará los datos para el Excel
+
+        // ⚡ NUEVA FUNCIÓN MATEMÁTICA DE SONIDO DE ESCÁNER (100% Libre de Internet)
+        function reproducirSonidoEscaneo() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                function beep(freq, time, dur) {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.1, ctx.currentTime + time);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + time + dur);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(ctx.currentTime + time);
+                    osc.stop(ctx.currentTime + time + dur);
+                }
+                // Doble bip rápido y agudo estilo "Escáner Láser de Caja"
+                beep(1500, 0, 0.08);
+                beep(2000, 0.1, 0.15);
+            } catch(e) { console.log("Sonido web no soportado", e); }
+        }
 
         function conectarTúnelEnVivo() {
             const wsUrl = API_URL.replace('https://', 'wss://').replace('http://', 'ws://') + '/ws/despacho';
@@ -85,6 +106,41 @@
                     showConfirmButton: false, timer: 3000
                 });
             };
+
+            socket.onmessage = function(event) {
+                if (event.data === "NUEVO_PEDIDO") {
+                    sonidoDin.currentTime = 0; // Reinicia el audio para que no se atore
+                    sonidoDin.play().catch(e => console.log("El navegador bloqueó el sonido."));
+                    Swal.fire({
+                        title: '¡Nuevo Pedido! 📦',
+                        text: 'El pago ha sido procesado con éxito.',
+                        icon: 'info', toast: true, position: 'top-end',
+                        showConfirmButton: false, timer: 4000, timerProgressBar: true
+                    });
+                    cargarPedidos(); 
+                } 
+                else if (event.data === "ACTUALIZAR_ADMIN") {
+                    // ⚡ 1. HACEMOS QUE SUENE LA CAMPANILLA SINTÉTICA (Cero fallos)
+                    reproducirSonidoEscaneo();
+                    
+                    // ⚡ 2. MOSTRAMOS UNA ALERTA VERDE CONFIRMANDO EL ENVÍO
+                    Swal.fire({
+                        title: '¡Paquete Escaneado! 🚀',
+                        text: 'El pedido se movió a ENVIADO.',
+                        icon: 'success', toast: true, position: 'top-end',
+                        showConfirmButton: false, timer: 3000
+                    });
+
+                    // ⚡ 3. ACTUALIZAMOS LOS CARRITOS EN PANTALLA
+                    cargarPedidos();
+                }
+            };
+
+            socket.onclose = function() { 
+                console.log("El túnel se durmió. Reconectando...");
+                setTimeout(conectarTúnelEnVivo, 5000); 
+            };
+        }
 
             socket.onmessage = function(event) {
                 if (event.data === "NUEVO_PEDIDO") {
@@ -118,7 +174,7 @@
                 console.log("El túnel se durmió. Reconectando...");
                 setTimeout(conectarTúnelEnVivo, 5000); 
             };
-        }
+        
 
         async function marcarEntregado(id) {
             const result = await Swal.fire({
