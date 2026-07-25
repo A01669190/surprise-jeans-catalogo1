@@ -1097,14 +1097,17 @@ def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, backgr
 
         # 🚨 LA MAGIA: BYPASS DE INVENTARIO Y LOYVERSE 🚨
         if total_final <= 0 or pedido_req.cupon == "VENTA-PRESENCIAL":
+            
+            # 1. ⚡ Refrescamos PRIMERO para que la base de datos se actualice
+            db.refresh(nuevo_pedido)
+            
+            # 2. ⚡ AHORA SÍ cambiamos el estatus a PAGADO (para que no se borre)
             nuevo_pedido.estatus = "PAGADO"
             
             # ⚡ PUNTOS
             if cliente_db:
                 cliente_db.puntos += puntos_ganados
                 db.commit()
-
-            db.refresh(nuevo_pedido)
 
             # ⚡ RECIBO VIRTUAL (Este hace el descuento automático en Loyverse)
             items_para_recibo = []
@@ -1120,7 +1123,7 @@ def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, backgr
                     if variante_db.pantalon:
                         variante_db.pantalon.stock -= detalle.cantidad 
                         
-                    # 2. Guardamos para armar el recibo (Loyverse descontará su lado con esto)
+                    # 2. Guardamos para armar el recibo
                     items_para_recibo.append({
                         "sku": variante_db.sku,
                         "cantidad": detalle.cantidad,

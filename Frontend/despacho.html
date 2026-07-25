@@ -72,10 +72,26 @@
         let socket = null;
         let historialPedidos = []; // Guardará los datos para el Excel
 
-        // ⚡ NUEVA FUNCIÓN MATEMÁTICA DE SONIDO DE ESCÁNER (100% Libre de Internet)
+        // ⚡ EL SECRETO: Motor de audio matemático global (Cero bloqueos)
+        let motorAudioGlobal = null;
+
+        // Desbloqueamos el audio en el primer clic (Al darle a "Entrar")
+        document.addEventListener('click', () => {
+            if (!motorAudioGlobal) {
+                motorAudioGlobal = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (motorAudioGlobal.state === 'suspended') {
+                motorAudioGlobal.resume();
+            }
+        }, { once: true });
+
+        // ⚡ NUEVA FUNCIÓN MATEMÁTICA INFALIBLE
         function reproducirSonidoEscaneo() {
             try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                if (!motorAudioGlobal) return;
+                const ctx = motorAudioGlobal;
+                if (ctx.state === 'suspended') ctx.resume();
+                
                 function beep(freq, time, dur) {
                     const osc = ctx.createOscillator();
                     const gain = ctx.createGain();
@@ -88,10 +104,11 @@
                     osc.start(ctx.currentTime + time);
                     osc.stop(ctx.currentTime + time + dur);
                 }
-                // Doble bip rápido y agudo estilo "Escáner Láser de Caja"
+                
+                // Doble bip rápido y agudo estilo "Escáner Láser"
                 beep(1500, 0, 0.08);
                 beep(2000, 0.1, 0.15);
-            } catch(e) { console.log("Sonido web no soportado", e); }
+            } catch(e) { console.log("Sonido web no soportado"); }
         }
 
         function conectarTúnelEnVivo() {
@@ -109,7 +126,7 @@
 
             socket.onmessage = function(event) {
                 if (event.data === "NUEVO_PEDIDO") {
-                    sonidoDin.currentTime = 0; // Reinicia el audio para que no se atore
+                    sonidoDin.currentTime = 0;
                     sonidoDin.play().catch(e => console.log("El navegador bloqueó el sonido."));
                     Swal.fire({
                         title: '¡Nuevo Pedido! 📦',
@@ -120,10 +137,10 @@
                     cargarPedidos(); 
                 } 
                 else if (event.data === "ACTUALIZAR_ADMIN") {
-                    // ⚡ 1. HACEMOS QUE SUENE LA CAMPANILLA SINTÉTICA (Cero fallos)
+                    // ⚡ 1. LLAMAMOS A LA FUNCIÓN MATEMÁTICA
                     reproducirSonidoEscaneo();
                     
-                    // ⚡ 2. MOSTRAMOS UNA ALERTA VERDE CONFIRMANDO EL ENVÍO
+                    // ⚡ 2. ALERTA VERDE
                     Swal.fire({
                         title: '¡Paquete Escaneado! 🚀',
                         text: 'El pedido se movió a ENVIADO.',
@@ -131,7 +148,6 @@
                         showConfirmButton: false, timer: 3000
                     });
 
-                    // ⚡ 3. ACTUALIZAMOS LOS CARRITOS EN PANTALLA
                     cargarPedidos();
                 }
             };
@@ -141,6 +157,8 @@
                 setTimeout(conectarTúnelEnVivo, 5000); 
             };
         }
+
+        async function marcarEntregado(id) {
 
             socket.onmessage = function(event) {
                 if (event.data === "NUEVO_PEDIDO") {
@@ -174,7 +192,7 @@
                 console.log("El túnel se durmió. Reconectando...");
                 setTimeout(conectarTúnelEnVivo, 5000); 
             };
-        
+        }
 
         async function marcarEntregado(id) {
             const result = await Swal.fire({
