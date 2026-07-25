@@ -225,7 +225,10 @@
                 if (res.ok) {
                     const data = await res.json();
                     tokenPrivado = data.access_token; 
-                    sessionStorage.setItem('refresh_token_despacho', data.refresh_token); // ⚡ NUEVA LÍNEA 
+                    
+                    // ⚡ FIX: Guardamos la llave principal en la memoria del navegador
+                    sessionStorage.setItem('token_despacho', tokenPrivado); 
+                    sessionStorage.setItem('refresh_token_despacho', data.refresh_token); 
                     
                     document.getElementById('pantalla-login').classList.add('hidden');
                     document.getElementById('nav-botones').classList.remove('hidden');
@@ -241,7 +244,12 @@
             }
         }
 
-        function cerrarSesion() { window.location.reload(); }
+        function cerrarSesion() { 
+            // ⚡ FIX: Limpiamos la memoria al salir
+            sessionStorage.removeItem('token_despacho');
+            sessionStorage.removeItem('refresh_token_despacho');
+            window.location.reload(); 
+        }
 
         function cambiarPestana(pestana) {
             const btnPedidos = document.getElementById('tab-pedidos');
@@ -285,6 +293,16 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             iniciarRenovacionDespacho();
+            
+            // ⚡ FIX AUTO-LOGIN: Si ya hay llave guardada, saltamos la pantalla de contraseña
+            const tokenGuardado = sessionStorage.getItem('token_despacho');
+            if (tokenGuardado) {
+                tokenPrivado = tokenGuardado;
+                document.getElementById('pantalla-login').classList.add('hidden');
+                document.getElementById('nav-botones').classList.remove('hidden');
+                conectarTúnelEnVivo();
+                cambiarPestana('pedidos');
+            }
         });
 
         // ==========================================

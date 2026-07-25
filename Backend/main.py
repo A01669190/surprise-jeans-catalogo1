@@ -820,9 +820,10 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=(100*mm, 150*mm)) 
     
-    # Encabezado
-    p.setFont("Helvetica-Bold", 16)
-    p.drawString(10*mm, 135*mm, "SURPRISE JEANS - ENVÍO OFICIAL")
+    # Encabezado (⚡ FIX: Centrado Perfecto)
+    p.setFont("Helvetica-Bold", 14) # Un poco más pequeña para que encaje elegante
+    p.drawCentredString(50*mm, 135*mm, "SURPRISE JEANS - ENVÍO OFICIAL") # 50mm es el centro exacto
+    
     p.setFont("Helvetica-Bold", 12)
     p.drawString(10*mm, 125*mm, f"FOLIO: SJ-{pedido.id:04d}")
     
