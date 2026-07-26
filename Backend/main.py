@@ -824,17 +824,17 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
     # ⚡ TODA LA PARTE DE ARRIBA: DIRECCIÓN (LLENANDO LA HOJA)
     # ==========================================
 
-    # ⚡ EL FOLIO REGRESA A LA CIMA
-    y_text = 142*mm 
+    # ⚡ EL FOLIO REGRESA A LA CIMA (Alineado a la izquierda)
+    y_text = 144*mm # Lo subimos 2mm más para que respire
     p.setFont("Helvetica-Bold", 14)
-    p.drawString(5*mm, y_text, f"FOLIO: SJ-{pedido.id:04d}")
+    p.drawString(7*mm, y_text, f"FOLIO: SJ-{pedido.id:04d}")
+    
+    # ⚡ FIX: Le restamos espacio para bajar un renglón antes del nombre
+    y_text -= 10*mm 
     
     p.setFont("Helvetica-Bold", 26) # ⚡ Nombre Titánico
-    
-    # Empezamos desde bien arriba para aprovechar la hoja completa
-    y_text = 140*mm 
-    
     p.drawString(7*mm, y_text, f"{pedido.nombre_cliente.upper()[:22]}")
+    
     y_text -= 13*mm # Mucho más espacio hacia abajo
     
     p.setFont("Helvetica-Bold", 16) # ⚡ Dirección enorme y legible
