@@ -820,46 +820,77 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=(100*mm, 150*mm)) 
     
-    # Encabezado (⚡ FIX: Centrado Perfecto)
-    p.setFont("Helvetica-Bold", 14) # Un poco más pequeña para que encaje elegante
-    p.drawCentredString(50*mm, 135*mm, "SURPRISE JEANS - ENVÍO OFICIAL") # 50mm es el centro exacto
+    # ⚡ ENCABEZADO CON LOGO REAL
+    ruta_logo = os.path.join(STATIC_DIR, "logo.png")
     
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(10*mm, 125*mm, f"FOLIO: SJ-{pedido.id:04d}")
-    
-    # Datos del Cliente
-    p.setFont("Helvetica", 11)
-    p.drawString(10*mm, 110*mm, f"Entregar a: {pedido.nombre_cliente.upper()}")
-    p.drawString(10*mm, 100*mm, f"Teléfono: {pedido.telefono}")
-    
-    p.setFont("Helvetica-Bold", 11)
-    p.drawString(10*mm, 85*mm, "Dirección de Entrega:")
-    p.setFont("Helvetica", 10)
-    p.drawString(10*mm, 75*mm, f"{pedido.calle_numero}")
-    p.drawString(10*mm, 65*mm, f"Col. {pedido.colonia}, {pedido.ciudad}")
-    p.drawString(10*mm, 55*mm, f"{pedido.estado}, C.P. {pedido.codigo_postal}")
-    if pedido.referencias:
-        p.drawString(10*mm, 45*mm, f"Ref: {pedido.referencias[:50]}")
-
-    # ⚡ EL TOQUE PERSONAL DE YESSICA (Firmas y Logo)
-    p.setFont("Times-Italic", 14)
-    p.drawString(10*mm, 32*mm, "Muchas gracias por tu compra ♥")
-    
-    # Simulando el logo "Surprise by YSK"
-    p.setFont("Times-BoldItalic", 18)
-    p.drawString(10*mm, 23*mm, "Surprise")
+    if os.path.exists(ruta_logo):
+        # Si encuentra la foto, la dibuja centrada (X=20mm, Ancho=60mm)
+        p.drawImage(ImageReader(ruta_logo), 20*mm, 134*mm, width=60*mm, height=14*mm, preserveAspectRatio=True, mask='auto')
+    else:
+        # Plan de emergencia por si olvidas subir la foto del logo
+        p.setFont("Helvetica-Bold", 15)
+        p.drawCentredString(50*mm, 140*mm, "SURPRISE JEANS")
+        
     p.setFont("Helvetica-Bold", 10)
-    p.drawString(35*mm, 23*mm, "- by YSK")
+    p.drawCentredString(50*mm, 131*mm, f"FOLIO: SJ-{pedido.id:04d}")
+    
+    p.line(10*mm, 128*mm, 90*mm, 128*mm) # Línea divisoria elegante
+    
+    # ⚡ EL FORMATO DE TU MAMÁ (Todo Negritas, Datos Directos)
+    p.setFont("Helvetica-Bold", 12)
+    y_text = 118*mm
+    
+    # Nombre
+    p.drawString(10*mm, y_text, f"{pedido.nombre_cliente.upper()}")
+    y_text -= 7*mm
+    
+    # Calle, Número y Colonia
+    p.drawString(10*mm, y_text, f"{pedido.calle_numero}, Col. {pedido.colonia}")
+    y_text -= 7*mm
+    
+    # Código Postal
+    p.drawString(10*mm, y_text, f"CP {pedido.codigo_postal}")
+    y_text -= 7*mm
+    
+    # Ciudad y Estado
+    p.drawString(10*mm, y_text, f"{pedido.ciudad.upper()}, {pedido.estado.upper()}")
+    y_text -= 7*mm
+    
+    # Teléfono
+    p.drawString(10*mm, y_text, f"{pedido.telefono}")
+    y_text -= 7*mm
 
-    # Código de Barras (Se baja para no chocar con las firmas)
+    # Referencias (Si el cliente las puso, un pelín más chicas para que quepan)
+    if pedido.referencias:
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(10*mm, y_text, f"Ref: {pedido.referencias[:55]}") 
+        y_text -= 7*mm
+
+    p.line(10*mm, y_text - 2*mm, 90*mm, y_text - 2*mm)
+
+    # ⚡ EL TEXTO DE TU FLYER / TARJETA ORIGINAL
+    y_footer = y_text - 12*mm
+    p.setFont("Helvetica-Bold", 14)
+    p.drawCentredString(50*mm, y_footer, "¡Muchas gracias!")
+    
+    p.setFont("Helvetica", 9)
+    y_footer -= 6*mm
+    p.drawCentredString(50*mm, y_footer, "Por tu compra y por apoyar el emprendimiento!")
+    y_footer -= 5*mm
+    p.drawCentredString(50*mm, y_footer, "Si estás contenta con todo estaremos muy")
+    y_footer -= 5*mm
+    p.drawCentredString(50*mm, y_footer, "agradecidas de que nos compartas en tus")
+    y_footer -= 5*mm
+    p.drawCentredString(50*mm, y_footer, "historias y nos etiquetes!")
+
+    # Código de Barras (Hasta abajo)
     barcode = code128.Code128(f"SJ-{pedido.id:04d}", barHeight=12*mm, barWidth=1.5)
-    barcode.drawOn(p, 10*mm, 6*mm)
+    barcode.drawOn(p, 10*mm, 8*mm)
 
     p.showPage()
     p.save()
     buffer.seek(0)
     
-    # 3. Enviamos el archivo listo para imprimir
     return Response(content=buffer.getvalue(), media_type="application/pdf")
 
 async def robot_respaldos_diarios():
