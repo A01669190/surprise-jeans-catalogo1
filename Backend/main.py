@@ -1636,7 +1636,7 @@ def subir_fotos_magicas(
     if not API_KEY:
         raise HTTPException(status_code=500, detail="Falta configurar la llave de ImgBB en el servidor.")
 
-    # 1. Revisamos si la categoría existe, si no, la creamos
+    # 1. Revisamos si la categoría existe
     categoria = db.query(models.Categoria).filter(models.Categoria.nombre.ilike(categoria_destino)).first()
     if not categoria:
         categoria = models.Categoria(nombre=categoria_destino)
@@ -1646,55 +1646,47 @@ def subir_fotos_magicas(
 
     exitos = 0
     errores = 0
+    datos_excel = [] # ⚡ AQUÍ GUARDAMOS LOS DATOS PARA EL EXCEL AUTOMÁTICO
 
     for foto in archivos_fotos:
-        # Extraemos el nombre sin la extensión (Ej: SJ-001_Skinny_350.jpg -> SJ-001_Skinny_350)
+        # Formato esperado: CÓDIGO_NOMBRE_PRECIO_PAQUETES.jpg
         nombre_base = foto.filename.rsplit('.', 1)[0]
         partes = nombre_base.split('_')
         
-        if len(partes) < 3:
+        # ⚡ EXIGIMOS 4 PARTES AHORA
+        if len(partes) < 4:
             errores += 1
             continue
 
-        sku_padre = partes[0]
-        # Regex para separar palabras pegadas (Ej: MomJeans -> Mom Jeans)
-        nombre_limpio = re.sub(r'([a-z])([A-Z])', r'\1 \2', partes[1])
+        sku_padre = partes[0].strip()
+        nombre_limpio = re.sub(r'([a-z])([A-Z])', r'\1 \2', partes[1]).strip()
         
         try:
             precio = float(partes[2])
+            paquetes = int(partes[3]) # ⚡ NÚMERO DE PAQUETES DE 12 PIEZAS
         except ValueError:
             errores += 1
             continue
 
-        # Si trae color en el nombre, lo usamos; si no, es 'Original'
         color = "Original"
-        if len(partes) >= 4:
-            color = re.sub(r'([a-z])([A-Z])', r'\1 \2', partes[3])
-        color_sku = color.replace(" ", "").upper()
+        color_sku = "ORIGINAL"
+        
+        # ⚡ CÁLCULO DE STOCK MATEMÁTICO (12 Piezas por paquete)
+        stock_total = paquetes * 12
 
         # 2. COMPRESIÓN WEBP Y SUBIDA A IMGBB
         contenido_original = foto.file.read()
-        
         try:
-            # Abrimos la foto pesada original
             imagen_pil = Image.open(io.BytesIO(contenido_original))
-            
-            # La convertimos a formato RGB (por si era un PNG con transparencia)
             if imagen_pil.mode in ("RGBA", "P"):
                 imagen_pil = imagen_pil.convert("RGB")
-                
-            # Creamos un archivo temporal en la memoria RAM
             buffer_webp = io.BytesIO()
-            
-            # Guardamos la imagen como WebP con 80% de calidad (Compresión masiva)
             imagen_pil.save(buffer_webp, format="webp", quality=80)
             buffer_webp.seek(0)
-            
-            # Extraemos la nueva foto ultraligera
             contenido_comprimido = buffer_webp.read()
         except Exception as e:
-            print(f"Error comprimiendo imagen: {e}. Usando original.")
-            contenido_comprimido = contenido_original # Respaldo de seguridad
+            print(f"Error comprimiendo: {e}")
+            contenido_comprimido = contenido_original
 
         imagen_base64 = base64.b64encode(contenido_comprimido).decode("utf-8")
         respuesta = requests.post("https://api.imgbb.com/1/upload", data={"key": API_KEY, "image": imagen_base64})
@@ -1708,33 +1700,63 @@ def subir_fotos_magicas(
         # 3. Guardamos el pantalón papá en la BD
         nuevo_pantalon = models.Pantalon(
             codigo=sku_padre, nombre=nombre_limpio, precio=precio, 
-            stock=0, categoria_id=categoria.id, imagen_url=url_permanente
+            stock=stock_total, categoria_id=categoria.id, imagen_url=url_permanente
         )
         db.add(nuevo_pantalon)
         db.commit()
         db.refresh(nuevo_pantalon)
 
-        # 4. Creamos las 7 tallas (hijos) con stock en 0
+        # 4. ⚡ Creamos las 7 tallas (hijos) MULTIPLICADAS POR EL NÚMERO DE PAQUETES
         distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
-        for talla_str in distribucion.keys():
+        for talla_str, piezas_por_paquete in distribucion.items():
+            stock_talla = paquetes * piezas_por_paquete # Matemáticas puras
             sku_variante = f"{sku_padre}-{color_sku}-{talla_str}"
+            
             nueva_variante = models.VarianteTalla(
                 pantalon_id=nuevo_pantalon.id, 
                 talla=talla_str, 
                 color=color, 
-                stock=0, 
+                stock=stock_talla, 
                 sku=sku_variante
             )
             db.add(nueva_variante)
+            
+            if stock_talla > 0:
+                background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, sku_variante, stock_talla)
         
         db.commit()
 
-        # 5. Le avisamos a Loyverse que existe este modelo (en segundo plano)
+        # 5. Avisamos a Loyverse
         background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre_limpio, sku_padre, precio, categoria.nombre, color)
+        
+        # 6. ⚡ REGISTRAMOS EL MODELO PARA EL EXCEL CON LA FUNCIÓN =IMAGEN()
+        datos_excel.append({
+            "Código": sku_padre,
+            "Nombre": nombre_limpio,
+            "Precio": precio,
+            "Paquetes Físicos": paquetes,
+            "Stock Total (Piezas)": stock_total,
+            "Categoría": categoria.nombre,
+            "Foto Visual": f'=IMAGEN("{url_permanente}")',
+            "Link Web": url_permanente
+        })
         
         exitos += 1
 
-    return {"mensaje": f"Se subieron {exitos} modelos con éxito. Hubo {errores} archivos ignorados por mal formato."}
+    if exitos == 0:
+        raise HTTPException(status_code=400, detail=f"No se subió ningún modelo. Revisa el formato de los nombres.")
+
+    # 7. ⚡ CREACIÓN DEL ARCHIVO EXCEL EN MEMORIA
+    df = pd.DataFrame(datos_excel)
+    buffer = BytesIO()
+    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Nuevos Modelos')
+    
+    buffer.seek(0)
+    
+    # ⚡ DEVOLVEMOS EL ARCHIVO FÍSICO A LA PÁGINA WEB EN VEZ DE UN TEXTO
+    headers = {'Content-Disposition': 'attachment; filename="Carga_Magica_YSK.xlsx"'}
+    return Response(content=buffer.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers=headers)
 
 @app.post("/pantalones/excel")
 @limiter.limit("5/minute") 

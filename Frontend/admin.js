@@ -498,11 +498,9 @@ async function descargarBaseDeDatos() {
     }
 }
 
+
 // ==========================================
-// 10. CARGA MÁGICA DE FOTOS (NIVEL HACKER)
-// ==========================================
-// ==========================================
-// 10. CARGA MÁGICA DE FOTOS (100% SEGURA)
+// 10. CARGA MÁGICA DE FOTOS (EXCEL AUTOMÁTICO)
 // ==========================================
 async function procesarFotosMagicas() {
     const inputFotos = document.getElementById('fotos-magicas');
@@ -514,7 +512,7 @@ async function procesarFotosMagicas() {
         return;
     }
     
-    btnMagico.innerHTML = 'Enviando al servidor... ⏳';
+    btnMagico.innerHTML = 'Procesando y creando Excel... ⏳';
     btnMagico.disabled = true;
 
     const selectorMagico = document.getElementById('categoria-magica');
@@ -527,46 +525,59 @@ async function procesarFotosMagicas() {
     for (let i = 0; i < archivos.length; i++) {
         if (!archivos[i].type.startsWith('image/')) continue;
         
-        // ⚡ BUG ARREGLADO: Soporta nombres con múltiples puntos (ej. pantalon.roto.jpg)
         const nombreSinExtension = archivos[i].name.substring(0, archivos[i].name.lastIndexOf('.'));
         const partes = nombreSinExtension.split('_'); 
         
-        if (partes.length >= 3) {
+        // ⚡ AHORA ESPERAMOS 4 PARTES: CÓDIGO_NOMBRE_PRECIO_PAQUETES
+        if (partes.length >= 4) {
             formDataSegura.append('archivos_fotos', archivos[i]);
             validFiles++;
         }
     }
 
     if (validFiles === 0) {
-        alert("Ninguna foto tenía el formato correcto (SKU_Nombre_Precio.jpg).");
+        alert("Ninguna foto tenía el formato correcto.\nEjemplo: SJ-001_Skinny_250_3.jpg");
         btnMagico.innerHTML = '<span>🚀</span> SUBIR FOTOS';
         btnMagico.disabled = false;
         return;
     }
 
     try {
-        // ⚡ ENVIAMOS TODO AL BACKEND. Python hará el trabajo pesado y usará su propia llave segura.
         const respuesta = await fetch(`${API_URL}/pantalones/magico`, {
             method: 'POST',
-            headers: obtenerTokenHeader(), // Cuidamos la seguridad
+            headers: obtenerTokenHeader(),
             body: formDataSegura
         });
 
-        const data = await respuesta.json();
-
         if (respuesta.ok) {
-            alert(`¡Magia completada! ✨\nEl servidor procesó las fotos de forma segura.\n\nMensaje: ${data.mensaje}`);
+            // ⚡ ATRAPAMOS EL EXCEL Y FORZAMOS SU DESCARGA EN LA COMPUTADORA
+            const blob = await respuesta.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            
+            const hoy = new Date().toISOString().split('T')[0];
+            link.download = `Catálogo_Nuevos_${hoy}.xlsx`;
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            
+            alert(`¡Magia completada! ✨\nLos modelos se subieron a la Web, a Loyverse y tu archivo Excel ha sido descargado.`);
             cargarInventarioAdmin(); 
             inputFotos.value = ''; 
         } else if (respuesta.status === 401) {
             alert('Tu sesión ha caducado por seguridad.');
             window.location.reload();
         } else {
+            // Si hubo un error en Python, nos regresa un JSON normal
+            const data = await respuesta.json();
             alert(`Error del servidor: ${data.detail || data.error}`);
         }
     } catch (error) {
         console.error("Error en la carga mágica:", error);
-        alert("Hubo un problema de red. Revisa tu conexión.");
+        alert("Hubo un problema de red al intentar generar el Excel.");
     } finally {
         btnMagico.innerHTML = '<span>🚀</span> SUBIR FOTOS';
         btnMagico.disabled = false;
