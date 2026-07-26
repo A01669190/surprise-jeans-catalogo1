@@ -821,45 +821,45 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
     p = canvas.Canvas(buffer, pagesize=(100*mm, 150*mm)) 
     
     # ==========================================
-    # ⚡ TODA LA PARTE DE ARRIBA: DIRECCIÓN (MÁS CENTRADA HACIA ABAJO)
+    # ⚡ TODA LA PARTE DE ARRIBA: DIRECCIÓN (LLENANDO LA HOJA)
     # ==========================================
-    p.setFont("Helvetica-Bold", 22) # ⚡ Nombre Gigante
+    p.setFont("Helvetica-Bold", 26) # ⚡ Nombre Titánico
     
-    # ⚡ FIX: Bajamos el texto 3 centímetros para matar el espacio en blanco
-    y_text = 110*mm 
+    # Empezamos desde bien arriba para aprovechar la hoja completa
+    y_text = 140*mm 
     
-    p.drawString(5*mm, y_text, f"{pedido.nombre_cliente.upper()[:25]}")
-    y_text -= 10*mm
+    p.drawString(5*mm, y_text, f"{pedido.nombre_cliente.upper()[:22]}")
+    y_text -= 13*mm # Mucho más espacio hacia abajo
     
-    p.setFont("Helvetica-Bold", 14)
+    p.setFont("Helvetica-Bold", 17) # ⚡ Dirección enorme y legible
     
     p.drawString(5*mm, y_text, f"{pedido.calle_numero}")
-    y_text -= 7*mm
+    y_text -= 10*mm
     p.drawString(5*mm, y_text, f"Col. {pedido.colonia}")
-    y_text -= 7*mm
+    y_text -= 10*mm
     
     p.drawString(5*mm, y_text, f"CP {pedido.codigo_postal}")
-    y_text -= 7*mm
+    y_text -= 10*mm
     
     p.drawString(5*mm, y_text, f"{pedido.ciudad.upper()}, {pedido.estado.upper()}")
-    y_text -= 7*mm
+    y_text -= 10*mm
     
     p.drawString(5*mm, y_text, f"{pedido.telefono}")
-    y_text -= 7*mm
+    y_text -= 10*mm
 
     if pedido.referencias:
-        p.setFont("Helvetica-Bold", 11)
+        p.setFont("Helvetica-Bold", 12)
         p.drawString(5*mm, y_text, f"Ref: {pedido.referencias[:60]}") 
-        y_text -= 7*mm
+        y_text -= 10*mm
 
-    # Línea divisoria
-    p.line(5*mm, y_text, 95*mm, y_text) 
+    # Línea divisoria (se ajusta dinámicamente donde termine el texto para cerrar el bloque)
+    p.line(5*mm, y_text + 2*mm, 95*mm, y_text + 2*mm) 
 
     # ==========================================
-    # ⚡ PARTE DE ABAJO: SUBIMOS TODO PARA PEGARLO AL TEXTO
+    # ⚡ PARTE DE ABAJO (Mantiene su diseño estético y equilibrado)
     # ==========================================
     
-    # 1. LOGO DE SURPRISE (Lado Izquierdo, un poco más arriba)
+    # 1. LOGO DE SURPRISE
     y_logo = 32*mm 
     ruta_logo = os.path.join(STATIC_DIR, "logo.png")
     if os.path.exists(ruta_logo):
@@ -868,11 +868,11 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
         p.setFont("Helvetica-Bold", 14)
         p.drawCentredString(27*mm, y_logo + 5*mm, "SURPRISE JEANS")
 
-    # 2. CÓDIGO DE BARRAS (Lado Izquierdo, sube junto con el logo)
+    # 2. CÓDIGO DE BARRAS
     barcode = code128.Code128(f"SJ-{pedido.id:04d}", barHeight=14*mm, barWidth=1.0)
     barcode.drawOn(p, 5*mm, 15*mm)
 
-    # 3. FIRMA MANUSCRITA (Lado Derecho, sube un poco)
+    # 3. FIRMA MANUSCRITA
     y_firma = 42*mm 
     ruta_gracias = os.path.join(STATIC_DIR, "gracias.png")
     if os.path.exists(ruta_gracias):
@@ -881,7 +881,7 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
         p.setFont("Times-Italic", 18)
         p.drawCentredString(75*mm, y_firma + 5*mm, "Muchas gracias!")
 
-    # 4. TEXTO DE AGRADECIMIENTO (Lado Derecho, alineado)
+    # 4. TEXTO DE AGRADECIMIENTO
     p.setFont("Helvetica", 7) 
     y_text_footer = 38*mm 
     centro_derecha = 74*mm 
