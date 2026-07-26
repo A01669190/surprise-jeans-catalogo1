@@ -1688,30 +1688,25 @@ def subir_fotos_magicas(
             imagen_pil.save(buffer_webp, format="webp", quality=80)
             buffer_webp.seek(0)
             contenido_comprimido = buffer_webp.read()
+            formato_envio = "webp"
         except Exception as e:
             contenido_comprimido = contenido_original
+            formato_envio = "jpeg"
 
-        # ⚡ BLINDAJE ANTI-BLOQUEO: Disfrazamos al servidor como si fuera Google Chrome en una Mac
-        imagen_base64 = base64.b64encode(contenido_comprimido).decode("utf-8")
-        headers_imgbb = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
-        
+        # ⚡ SOLUCIÓN DEFINITIVA ANTI-CLOUDFLARE
+        # En vez de mandar un texto gigante, mandamos el archivo adjunto "físico"
         try:
-            # Mandamos la llave dentro del payload (data) que es el método más seguro
             respuesta = requests.post(
                 "https://api.imgbb.com/1/upload", 
-                data={"key": API_KEY, "image": imagen_base64},
-                headers=headers_imgbb
+                data={"key": API_KEY}, # Solo mandamos la llave como dato
+                files={"image": (f"foto.{formato_envio}", contenido_comprimido, f"image/{formato_envio}")} # La imagen va como archivo real
             )
             
             if respuesta.status_code != 200:
-                # Si ImgBB falla, a veces devuelve una página HTML de bloqueo en vez de un JSON.
-                # Aquí lo manejamos con cuidado para que no explote.
                 try:
                     error_real = respuesta.json().get("error", {}).get("message", "Error desconocido")
                 except:
-                    error_real = "Bloqueo de seguridad de ImgBB (Posible IP bloqueada o Llave cancelada)"
+                    error_real = "Bloqueo de seguridad (Cloudflare)."
                 
                 raise HTTPException(status_code=400, detail=f"ImgBB rechazó la foto. Razón: {error_real}")
                 
