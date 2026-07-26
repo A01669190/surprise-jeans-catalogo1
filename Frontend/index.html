@@ -1037,11 +1037,8 @@
             
             // ⚡ FIX: Usamos tu dominio real para que WhatsApp lo acepte siempre, incluso si pruebas en tu Mac
             const link = `https://surprisejeanysk.com/?wishlist=${idsCodificados}`;
-            const corazon = String.fromCodePoint(0x1F496); // 💖
-            const regalo = String.fromCodePoint(0x1F381);  // 🎁
-            const jeans = String.fromCodePoint(0x1F456);   // 👖
             
-            const mensaje = `¡Hola! ${corazon} Hice mi wishlist en Surprise Jeans. Aquí te dejo mis modelos favoritos para que no batalles con mi regalo ${regalo}${jeans}:\n\n${link}`;            
+            const mensaje = `¡Hola! Hice mi wishlist en Surprise Jeans. Aquí te dejo mis modelos favoritos para que no batalles con mi regalo:\n\n${link}`;            
             window.open(`https://wa.me/?text=${encodeURIComponent(mensaje)}`, '_blank');
         }
 
