@@ -75,7 +75,7 @@
         <div class="bg-gradient-to-r from-emerald-50 to-teal-50 p-6 rounded-2xl shadow-lg border border-emerald-100 mb-6">
             <div class="mb-2">
                 <h2 class="text-xl font-black text-emerald-900">✨ Carga Mágica (Solo Fotos)</h2>
-                <p class="text-xs text-emerald-700 font-medium mt-1">Selecciona las fotos con el nombre correcto (Ej. SJ-001_Skinny_350.jpg). El sistema creará el catálogo y subirá las fotos automáticamente.</p>
+                <p class="text-xs text-emerald-700 font-medium mt-1">Nombra tus fotos como: <b>CÓDIGO_NOMBRE_PRECIO_PAQUETES.jpg</b> (Ej: SJ-001_Skinny_250_4.jpg). El sistema creará el catálogo y descargará el Excel.</p>
             </div>
 
             <!-- ⚡ NUEVO: Selector de Categoría para Carga Mágica -->
@@ -307,16 +307,6 @@
                 
                 // Dibujamos las gráficas solo cuando abren la pestaña para que se vean frescas
                 renderizarDashboard();
-            }
-        }
-
-        // ⚡ VIGILANTE OPTIMIZADO (Cero Lag)
-        // ⚡ VIGILANTE OPTIMIZADO (Cero Lag)
-        function verificarEstadoMenu() {
-            if (sessionStorage.getItem('token_vip')) {
-                document.getElementById('nav-admin').classList.remove('hidden');
-                // ⚡ EL FIX: Ocultar la pantalla de login para que no estorbe al dar F5
-                document.getElementById('panel-login').style.display = 'none'; 
             }
         }
         // Solo se ejecuta una vez cuando abres la página

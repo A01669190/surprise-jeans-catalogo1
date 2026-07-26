@@ -1646,35 +1646,44 @@ def subir_fotos_magicas(
 
     exitos = 0
     errores = 0
-    datos_excel = [] # ⚡ AQUÍ GUARDAMOS LOS DATOS PARA EL EXCEL AUTOMÁTICO
+    datos_excel = [] 
 
     for foto in archivos_fotos:
-        # Formato esperado: CÓDIGO_NOMBRE_PRECIO_PAQUETES.jpg
         nombre_base = foto.filename.rsplit('.', 1)[0]
         partes = nombre_base.split('_')
         
-        # ⚡ EXIGIMOS 4 PARTES AHORA
+        # ⚡ BLINDAJE 1: Mínimo 4 partes separadas por guión bajo
         if len(partes) < 4:
             errores += 1
             continue
 
         sku_padre = partes[0].strip()
-        nombre_limpio = re.sub(r'([a-z])([A-Z])', r'\1 \2', partes[1]).strip()
         
+        # ⚡ BLINDAJE 2: Tomamos SIEMPRE los dos últimos datos para precio y paquetes.
+        # Así, si tu mamá le pone guiones bajos al nombre del pantalón, el sistema no se confunde.
         try:
-            precio = float(partes[2])
-            paquetes = int(partes[3]) # ⚡ NÚMERO DE PAQUETES DE 12 PIEZAS
-        except ValueError:
+            # Filtramos mágicamente símbolos de "$" o letras como "pzs"
+            str_precio = ''.join(c for c in partes[-2] if c.isdigit() or c == '.')
+            str_paquetes = ''.join(c for c in partes[-1] if c.isdigit())
+            
+            if not str_precio or not str_paquetes:
+                raise ValueError("Faltan números")
+                
+            precio = float(str_precio)
+            paquetes = int(str_paquetes)
+        except Exception:
             errores += 1
             continue
 
+        # Todo lo que quede en el medio se convierte en el nombre
+        nombre_crudo = " ".join(partes[1:-2])
+        nombre_limpio = re.sub(r'([a-z])([A-Z])', r'\1 \2', nombre_crudo).strip()
+
         color = "Original"
         color_sku = "ORIGINAL"
-        
-        # ⚡ CÁLCULO DE STOCK MATEMÁTICO (12 Piezas por paquete)
         stock_total = paquetes * 12
 
-        # 2. COMPRESIÓN WEBP Y SUBIDA A IMGBB
+        # 2. COMPRESIÓN WEBP
         contenido_original = foto.file.read()
         try:
             imagen_pil = Image.open(io.BytesIO(contenido_original))
@@ -1685,19 +1694,19 @@ def subir_fotos_magicas(
             buffer_webp.seek(0)
             contenido_comprimido = buffer_webp.read()
         except Exception as e:
-            print(f"Error comprimiendo: {e}")
             contenido_comprimido = contenido_original
 
+        # 3. IMGBB
         imagen_base64 = base64.b64encode(contenido_comprimido).decode("utf-8")
         respuesta = requests.post("https://api.imgbb.com/1/upload", data={"key": API_KEY, "image": imagen_base64})
         
         if respuesta.status_code != 200:
-            errores += 1
-            continue
+            # ⚡ BLINDAJE 3: Si ImgBB falla, te avisamos exactamente por qué
+            raise HTTPException(status_code=400, detail=f"ImgBB rechazó la foto {foto.filename}. Verifica tu API Key.")
             
         url_permanente = respuesta.json()["data"]["url"]
 
-        # 3. Guardamos el pantalón papá en la BD
+        # 4. BD PANTALON
         nuevo_pantalon = models.Pantalon(
             codigo=sku_padre, nombre=nombre_limpio, precio=precio, 
             stock=stock_total, categoria_id=categoria.id, imagen_url=url_permanente
@@ -1706,18 +1715,16 @@ def subir_fotos_magicas(
         db.commit()
         db.refresh(nuevo_pantalon)
 
-        # 4. ⚡ Creamos las 7 tallas (hijos) MULTIPLICADAS POR EL NÚMERO DE PAQUETES
+        # 5. TALLAS EXACTAS
         distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
         for talla_str, piezas_por_paquete in distribucion.items():
-            stock_talla = paquetes * piezas_por_paquete # Matemáticas puras
+            stock_talla = paquetes * piezas_por_paquete 
             sku_variante = f"{sku_padre}-{color_sku}-{talla_str}"
             
             nueva_variante = models.VarianteTalla(
                 pantalon_id=nuevo_pantalon.id, 
-                talla=talla_str, 
-                color=color, 
-                stock=stock_talla, 
-                sku=sku_variante
+                talla=talla_str, color=color, 
+                stock=stock_talla, sku=sku_variante
             )
             db.add(nueva_variante)
             
@@ -1725,11 +1732,8 @@ def subir_fotos_magicas(
                 background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, sku_variante, stock_talla)
         
         db.commit()
-
-        # 5. Avisamos a Loyverse
         background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre_limpio, sku_padre, precio, categoria.nombre, color)
         
-        # 6. ⚡ REGISTRAMOS EL MODELO PARA EL EXCEL CON LA FUNCIÓN =IMAGEN()
         datos_excel.append({
             "Código": sku_padre,
             "Nombre": nombre_limpio,
@@ -1740,21 +1744,21 @@ def subir_fotos_magicas(
             "Foto Visual": f'=IMAGEN("{url_permanente}")',
             "Link Web": url_permanente
         })
-        
         exitos += 1
 
     if exitos == 0:
-        raise HTTPException(status_code=400, detail=f"No se subió ningún modelo. Revisa el formato de los nombres.")
+        raise HTTPException(status_code=400, detail=f"No se subió ningún modelo. Tuvimos {errores} errores. Usa formato exacto separado por guión bajo: CÓDIGO_NOMBRE_PRECIO_PAQUETES.jpg")
 
-    # 7. ⚡ CREACIÓN DEL ARCHIVO EXCEL EN MEMORIA
+    # 6. CREACIÓN DEL EXCEL AUTOMÁTICO
     df = pd.DataFrame(datos_excel)
     buffer = BytesIO()
-    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='Nuevos Modelos')
-    
+    try:
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Nuevos Modelos')
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="El servidor no tiene 'openpyxl'. Agrégalo a tu archivo requirements.txt y sube los cambios a Render.")
+        
     buffer.seek(0)
-    
-    # ⚡ DEVOLVEMOS EL ARCHIVO FÍSICO A LA PÁGINA WEB EN VEZ DE UN TEXTO
     headers = {'Content-Disposition': 'attachment; filename="Carga_Magica_YSK.xlsx"'}
     return Response(content=buffer.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers=headers)
 
