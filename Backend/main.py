@@ -824,18 +824,38 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
     # ⚡ TODA LA PARTE DE ARRIBA: DIRECCIÓN (LLENANDO LA HOJA)
     # ==========================================
 
-    # ⚡ EL FOLIO REGRESA A LA CIMA (Alineado a la izquierda)
-    y_text = 144*mm # Lo subimos 2mm más para que respire
+    # ⚡ EL FOLIO REGRESA A LA CIMA
+    y_text = 144*mm # Subimos 2mm
     p.setFont("Helvetica-Bold", 14)
     p.drawString(7*mm, y_text, f"FOLIO: SJ-{pedido.id:04d}")
     
-    # ⚡ FIX: Le restamos espacio para bajar un renglón antes del nombre
     y_text -= 10*mm 
     
     p.setFont("Helvetica-Bold", 26) # ⚡ Nombre Titánico
-    p.drawString(7*mm, y_text, f"{pedido.nombre_cliente.upper()[:22]}")
     
-    y_text -= 13*mm # Mucho más espacio hacia abajo
+    # ⚡ FIX: Motor inteligente para dar "Enter" si el nombre es muy largo
+    nombre_completo = pedido.nombre_cliente.upper()
+    palabras = nombre_completo.split()
+    linea_actual = ""
+    lineas_nombre = []
+    
+    for palabra in palabras:
+        # Límite de 15 letras por renglón para este tamaño gigante
+        if len(linea_actual) + len(palabra) <= 15: 
+            linea_actual += palabra + " "
+        else:
+            if linea_actual:
+                lineas_nombre.append(linea_actual.strip())
+            linea_actual = palabra + " "
+    if linea_actual:
+        lineas_nombre.append(linea_actual.strip())
+
+    # Imprimimos máximo 2 renglones de nombre para no aplastar lo de abajo
+    for linea in lineas_nombre[:2]:
+        p.drawString(7*mm, y_text, linea)
+        y_text -= 10*mm # Baja al siguiente renglón dinámicamente
+        
+    y_text -= 2*mm # Espacio extra de respiro antes de empezar con la dirección
     
     p.setFont("Helvetica-Bold", 16) # ⚡ Dirección enorme y legible
     
@@ -858,11 +878,11 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
         p.drawString(5*mm, y_text, f"Ref: {pedido.referencias[:60]}") 
         y_text -= 10*mm
 
-    # Línea divisoria (se ajusta dinámicamente donde termine el texto para cerrar el bloque)
+    # Línea divisoria
     p.line(5*mm, y_text + 2*mm, 95*mm, y_text + 2*mm) 
 
     # ==========================================
-    # ⚡ PARTE DE ABAJO (Mantiene su diseño estético y equilibrado)
+    # ⚡ PARTE DE ABAJO (Se queda tal cual te gustó)
     # ==========================================
     
     # 1. LOGO DE SURPRISE
