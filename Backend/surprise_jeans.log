@@ -2085,3 +2085,10 @@
 2026-07-26 16:28:02,343 [INFO] Added job "cron_reporte_mensual" to job store "default"
 2026-07-26 16:28:02,343 [INFO] Added job "cron_respaldo_semanal" to job store "default"
 2026-07-26 16:28:02,343 [INFO] Scheduler started
+2026-07-26 16:37:06,900 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-26 16:37:06,911 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-26 16:37:06,911 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-07-26 16:37:06,911 [INFO] Added job "cron_recuperar_carritos" to job store "default"
+2026-07-26 16:37:06,911 [INFO] Added job "cron_reporte_mensual" to job store "default"
+2026-07-26 16:37:06,912 [INFO] Added job "cron_respaldo_semanal" to job store "default"
+2026-07-26 16:37:06,912 [INFO] Scheduler started

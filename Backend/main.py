@@ -1619,8 +1619,6 @@ def eliminar_pantalon(
     db.commit()
     return {"mensaje": "Pantalón eliminado de la web y de Loyverse"}
 
-# ==========================================
-# ⚡ RUTA DE CARGA MÁGICA DE FOTOS (100% SEGURA)
 @app.post("/pantalones/magico")
 @limiter.limit("5/minute")
 def subir_fotos_magicas(
@@ -1632,7 +1630,11 @@ def subir_fotos_magicas(
     token: str = Depends(verificar_token)
 ):
     print("\n" + "="*50)
-    print("🚀 INICIANDO CARGA MÁGICA (SISTEMA INDEPENDIENTE)")
+    print("🚀 INICIANDO CARGA MÁGICA (DESDE MAIN.PY A IMGBB)")
+
+    API_KEY = os.getenv("IMGBB_API_KEY", "").strip() 
+    if not API_KEY:
+        raise HTTPException(status_code=500, detail="Falta configurar la llave de ImgBB en el servidor.")
 
     categoria = db.query(models.Categoria).filter(models.Categoria.nombre.ilike(categoria_destino)).first()
     if not categoria:
@@ -1645,10 +1647,6 @@ def subir_fotos_magicas(
     errores = 0
     datos_excel = [] 
     detalles_errores = [] 
-
-    # ⚡ CREAMOS LA BÓVEDA DE FOTOS EN TU PROPIO SERVIDOR
-    UPLOAD_DIR = os.path.join(STATIC_DIR, "uploads")
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
 
     for foto in archivos_fotos:
         print(f"\n📸 Procesando archivo: {foto.filename}")
@@ -1683,7 +1681,7 @@ def subir_fotos_magicas(
         color_sku = "ORIGINAL"
         stock_total = paquetes * 12
 
-        # ⚡ FIX: COMPRESIÓN EN FORMATO JPEG (100% COMPATIBLE CON EXCEL)
+        # 1. COMPRESIÓN JPEG (Para que Excel la lea sin problemas)
         print("🗜️ Comprimiendo imagen a JPG...")
         contenido_original = foto.file.read()
         try:
@@ -1691,7 +1689,6 @@ def subir_fotos_magicas(
             if imagen_pil.mode in ("RGBA", "P"):
                 imagen_pil = imagen_pil.convert("RGB")
             buffer_img = io.BytesIO()
-            # Guardamos como JPEG con alta compresión para que no pese nada
             imagen_pil.save(buffer_img, format="jpeg", quality=80) 
             buffer_img.seek(0)
             contenido_comprimido = buffer_img.read()
@@ -1701,24 +1698,37 @@ def subir_fotos_magicas(
             contenido_comprimido = contenido_original
             extension = "jpg"
 
-        # Guardamos la foto en nuestro propio servidor
-        nombre_final_foto = f"{sku_padre}_{int(datetime.now().timestamp())}.{extension}"
-        ruta_guardado = os.path.join(UPLOAD_DIR, nombre_final_foto)
-        
+        # 2. ⚡ SUBIDA DIRECTA A IMGBB (BYPASS DE CLOUDFLARE)
+        # Al enviarlo como "files", ImgBB lo acepta sin bloquear a Render
+        print("🌐 Subiendo a ImgBB...")
         try:
-            with open(ruta_guardado, "wb") as f:
-                f.write(contenido_comprimido)
+            respuesta = requests.post(
+                "https://api.imgbb.com/1/upload", 
+                data={"key": API_KEY}, 
+                files={"image": (f"foto.{extension}", contenido_comprimido, f"image/{extension}")} 
+            )
             
-            # Generamos la URL oficial usando tu propio dominio
-            url_permanente = f"https://surprise-jeans-api-denz.onrender.com/static/uploads/{nombre_final_foto}"
-            print(f"✅ ¡Éxito! Foto guardada en servidor propio: {url_permanente}")
-        except Exception as e:
-            razon = f"El servidor no pudo guardar el archivo en el disco. Detalle: {str(e)}"
+            if respuesta.status_code != 200:
+                try:
+                    error_real = respuesta.json().get("error", {}).get("message", "Error desconocido")
+                except:
+                    error_real = "Bloqueo de seguridad (Cloudflare)."
+                raise HTTPException(status_code=400, detail=f"ImgBB rechazó la foto. Razón: {error_real}")
+                
+            url_permanente = respuesta.json()["data"]["url"]
+            print(f"✅ ¡Éxito! Foto subida a ImgBB: {url_permanente}")
+            
+        except requests.exceptions.RequestException:
+            razon = "Fallo la conexión de red con ImgBB."
             detalles_errores.append(f"{nombre_archivo_limpio}: {razon}")
             errores += 1
             continue
+        except Exception as e:
+            detalles_errores.append(f"{nombre_archivo_limpio}: {str(e)}")
+            errores += 1
+            continue
 
-        # BD PANTALON
+        # 3. BD PANTALON
         print("💾 Guardando en Base de Datos...")
         nuevo_pantalon = models.Pantalon(
             codigo=sku_padre, nombre=nombre_limpio, precio=precio, 
@@ -1728,7 +1738,7 @@ def subir_fotos_magicas(
         db.commit()
         db.refresh(nuevo_pantalon)
 
-        # TALLAS EXACTAS
+        # 4. TALLAS EXACTAS
         distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
         for talla_str, piezas_por_paquete in distribucion.items():
             stock_talla = paquetes * piezas_por_paquete 
@@ -1747,8 +1757,7 @@ def subir_fotos_magicas(
         db.commit()
         background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre_limpio, sku_padre, precio, categoria.nombre, color)
         
-        # ⚡ FIX: USAMOS LA FÓRMULA EN INGLÉS 'IMAGE' CON PREFIJO '_xlfn.'
-        # (casi al final del ciclo for)
+        # 5. PREPARAMOS EXCEL
         datos_excel.append({
             "Código": sku_padre,
             "Nombre": nombre_limpio,
@@ -1756,7 +1765,7 @@ def subir_fotos_magicas(
             "Paquetes Físicos": paquetes,
             "Stock Total (Piezas)": stock_total,
             "Categoría": categoria.nombre,
-            "Foto Visual": f'=IMAGE("{url_permanente}")', # ⚡ En inglés puro, Excel lo traducirá
+            "Foto Visual": f'=IMAGE("{url_permanente}")',
             "Link Web": url_permanente
         })
         exitos += 1
@@ -1768,31 +1777,33 @@ def subir_fotos_magicas(
         reporte_final = "\n".join(detalles_errores)
         raise HTTPException(status_code=400, detail=f"No se subió ningún modelo.\n\nDetalles del error:\n{reporte_final}")
 
-    # CREACIÓN DEL EXCEL AUTOMÁTICO
+    # 6. CREACIÓN DEL EXCEL AUTOMÁTICO
     df = pd.DataFrame(datos_excel)
     buffer = BytesIO()
     try:
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
             df.to_excel(writer, index=False, sheet_name='Nuevos Modelos')
             
-            # ⚡ MAGIA PARA HACER LAS CELDAS MÁS GRANDES AUTOMÁTICAMENTE
             worksheet = writer.sheets['Nuevos Modelos']
             
-            worksheet.column_dimensions['A'].width = 15  # Código
-            worksheet.column_dimensions['B'].width = 30  # Nombre
-            worksheet.column_dimensions['G'].width = 25  # Foto Visual 
-            worksheet.column_dimensions['H'].width = 45  # Link Web
+            # Ajuste de Columnas
+            worksheet.column_dimensions['A'].width = 15  
+            worksheet.column_dimensions['B'].width = 30  
+            worksheet.column_dimensions['G'].width = 25  
+            worksheet.column_dimensions['H'].width = 45  
             
+            # Ajuste de Filas con Candado para Mac
             for fila in range(2, len(datos_excel) + 2):
                 worksheet.row_dimensions[fila].height = 110  
-                worksheet.row_dimensions[fila].customHeight = True # ⚡ EL CANDADO PARA MAC
+                worksheet.row_dimensions[fila].customHeight = True 
                 
     except Exception as e:
-        raise HTTPException(status_code=500, detail="El servidor no tiene 'openpyxl'.")
+        raise HTTPException(status_code=500, detail="El servidor no tiene 'openpyxl'. Agrégalo a tu requirements.txt.")
         
     buffer.seek(0)
     headers = {'Content-Disposition': 'attachment; filename="Carga_Magica_YSK.xlsx"'}
     return Response(content=buffer.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers=headers)
+
 
 @app.post("/pantalones/excel")
 @limiter.limit("5/minute") 
