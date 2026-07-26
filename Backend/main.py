@@ -821,66 +821,74 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
     p = canvas.Canvas(buffer, pagesize=(100*mm, 150*mm)) 
     
     # ==========================================
-    # ⚡ TODA LA PARTE DE ARRIBA: DIRECCIÓN DEL CLIENTE
+    # ⚡ TODA LA PARTE DE ARRIBA: DIRECCIÓN (TAMAÑO MAXIMIZADO)
     # ==========================================
-    p.setFont("Helvetica-Bold", 14)
-    y_text = 140*mm # Empezamos desde lo más alto
+    p.setFont("Helvetica-Bold", 18) # ⚡ Nombre mucho más grande
+    y_text = 140*mm 
     
-    p.drawString(10*mm, y_text, f"{pedido.nombre_cliente.upper()}")
-    y_text -= 8*mm
+    p.drawString(8*mm, y_text, f"{pedido.nombre_cliente.upper()}")
+    y_text -= 10*mm
     
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(10*mm, y_text, f"{pedido.calle_numero}, Col. {pedido.colonia}")
-    y_text -= 7*mm
+    p.setFont("Helvetica-Bold", 14) # ⚡ Datos más grandes y espaciados
+    p.drawString(8*mm, y_text, f"{pedido.calle_numero}, Col. {pedido.colonia}")
+    y_text -= 9*mm
     
-    p.drawString(10*mm, y_text, f"CP {pedido.codigo_postal}")
-    y_text -= 7*mm
+    p.drawString(8*mm, y_text, f"CP {pedido.codigo_postal}")
+    y_text -= 9*mm
     
-    p.drawString(10*mm, y_text, f"{pedido.ciudad.upper()}, {pedido.estado.upper()}")
-    y_text -= 7*mm
+    p.drawString(8*mm, y_text, f"{pedido.ciudad.upper()}, {pedido.estado.upper()}")
+    y_text -= 9*mm
     
-    p.drawString(10*mm, y_text, f"{pedido.telefono}")
-    y_text -= 7*mm
+    p.drawString(8*mm, y_text, f"{pedido.telefono}")
+    y_text -= 9*mm
 
     if pedido.referencias:
-        p.setFont("Helvetica-Bold", 10)
-        p.drawString(10*mm, y_text, f"Ref: {pedido.referencias[:55]}") 
-        y_text -= 7*mm
+        p.setFont("Helvetica-Bold", 11)
+        p.drawString(8*mm, y_text, f"Ref: {pedido.referencias[:55]}") 
+        y_text -= 9*mm
 
     # Línea divisoria para separar la dirección del arte inferior
-    p.line(10*mm, y_text, 90*mm, y_text) 
+    p.line(8*mm, y_text, 92*mm, y_text) 
 
     # ==========================================
-    # ⚡ PARTE DE ABAJO: COLUMNA IZQUIERDA Y DERECHA
+    # ⚡ PARTE DE ABAJO: COLUMNAS ALINEADAS
     # ==========================================
     
-    y_imagenes = 35*mm # Altura donde irán las dos imágenes (Logo y Gracias)
+    y_imagenes = 42*mm # Altura base para las imágenes
 
-    # 1. LOGO DE SURPRISE (Lado Izquierdo)
+    # 1. LOGO DE SURPRISE (Lado Izquierdo, tamaño aumentado)
     ruta_logo = os.path.join(STATIC_DIR, "logo.png")
     if os.path.exists(ruta_logo):
-        p.drawImage(ImageReader(ruta_logo), 10*mm, y_imagenes, width=36*mm, height=10*mm, preserveAspectRatio=True, mask='auto')
+        p.drawImage(ImageReader(ruta_logo), 5*mm, y_imagenes, width=42*mm, height=14*mm, preserveAspectRatio=True, mask='auto')
     else:
-        p.setFont("Helvetica-Bold", 10)
-        p.drawCentredString(28*mm, y_imagenes + 3*mm, "SURPRISE JEANS")
+        p.setFont("Helvetica-Bold", 12)
+        p.drawCentredString(26*mm, y_imagenes + 5*mm, "SURPRISE JEANS")
 
-    # 2. FIRMA MANUSCRITA (Lado Derecho, junto al logo)
+    # 2. FIRMA MANUSCRITA (Lado Derecho, tamaño aumentado)
     ruta_gracias = os.path.join(STATIC_DIR, "gracias.png")
     if os.path.exists(ruta_gracias):
-        p.drawImage(ImageReader(ruta_gracias), 52*mm, y_imagenes, width=38*mm, height=11*mm, preserveAspectRatio=True, mask='auto')
+        # x=50mm para que inicie justo a la mitad de la hoja
+        p.drawImage(ImageReader(ruta_gracias), 50*mm, y_imagenes, width=45*mm, height=15*mm, preserveAspectRatio=True, mask='auto')
     else:
-        p.setFont("Times-Italic", 14)
-        p.drawCentredString(71*mm, y_imagenes + 3*mm, "Muchas gracias!")
+        p.setFont("Times-Italic", 18)
+        p.drawCentredString(73*mm, y_imagenes + 5*mm, "Muchas gracias!")
 
-    # 3. CÓDIGO DE BARRAS (Debajo del logo, lado izquierdo)
-    # Ajustamos barWidth a 1.0 para que no invada el lado derecho de la etiqueta
-    barcode = code128.Code128(f"SJ-{pedido.id:04d}", barHeight=12*mm, barWidth=1.0)
-    barcode.drawOn(p, 10*mm, 15*mm)
+    # 3. CÓDIGO DE BARRAS (Lado Izquierdo, debajo del logo)
+    barcode = code128.Code128(f"SJ-{pedido.id:04d}", barHeight=16*mm, barWidth=1.2)
+    barcode.drawOn(p, 6*mm, 15*mm)
 
-    # 4. TEXTO DE APOYO (Debajo de la imagen de gracias, lado derecho)
-    p.setFont("Helvetica", 9)
-    p.drawCentredString(71*mm, 22*mm, "Por tu compra y")
-    p.drawCentredString(71*mm, 17*mm, "por apoyar el emp")
+    # 4. TEXTO COMPLETO (Lado Derecho, debajo de la firma)
+    p.setFont("Helvetica", 7.5) # Tamaño ajustado para que quepa perfecto en su columna
+    y_text_footer = 33*mm
+    
+    # ⚡ Centrado en 73mm (La mitad exacta del lado derecho)
+    p.drawCentredString(73*mm, y_text_footer, "Por tu compra y por apoyar el emprendimiento!")
+    y_text_footer -= 4.5*mm
+    p.drawCentredString(73*mm, y_text_footer, "Si estás contenta con todo estaremos muy")
+    y_text_footer -= 4.5*mm
+    p.drawCentredString(73*mm, y_text_footer, "agradecidas de que nos compartas en tus")
+    y_text_footer -= 4.5*mm
+    p.drawCentredString(73*mm, y_text_footer, "historias y nos etiquetes!")
 
     p.showPage()
     p.save()
