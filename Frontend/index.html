@@ -1037,8 +1037,11 @@
             
             // ⚡ FIX: Usamos tu dominio real para que WhatsApp lo acepte siempre, incluso si pruebas en tu Mac
             const link = `https://surprisejeanysk.com/?wishlist=${idsCodificados}`;
-            const mensaje = `¡Hola! 💖 Hice mi wishlist en Surprise Jeans. Aquí te dejo mis modelos favoritos para que no batalles con mi regalo 🎁👖:\n\n${link}`;
+            const corazon = String.fromCodePoint(0x1F496); // 💖
+            const regalo = String.fromCodePoint(0x1F381);  // 🎁
+            const jeans = String.fromCodePoint(0x1F456);   // 👖
             
+            const mensaje = `¡Hola! ${corazon} Hice mi wishlist en Surprise Jeans. Aquí te dejo mis modelos favoritos para que no batalles con mi regalo ${regalo}${jeans}:\n\n${link}`;            
             window.open(`https://wa.me/?text=${encodeURIComponent(mensaje)}`, '_blank');
         }
 
@@ -1188,6 +1191,42 @@
                         
                         // 2. Limpiamos la URL para que no se vuelva a abrir si recargan la página
                         window.history.replaceState({}, document.title, "/");
+                    }
+                }
+
+                // ==========================================
+                // ⚡ MAGIA WISHLIST: LEER LISTA COMPARTIDA ⚡
+                // ==========================================
+                const wishlistCoded = parametrosURL.get('wishlist');
+                
+                if (wishlistCoded) {
+                    try {
+                        // 1. Desencriptamos el código de base64 (Ej: "MTcsMjM=" -> "17,23")
+                        const idsDecodificados = atob(wishlistCoded);
+                        
+                        // 2. Lo convertimos en un arreglo de números
+                        const idsArray = idsDecodificados.split(',').map(id => parseInt(id)).filter(id => !isNaN(id));
+                        
+                        if (idsArray.length > 0) {
+                            // 3. Cargamos los pantalones en la memoria para mostrarlos
+                            misFavoritos = idsArray;
+                            
+                            // 4. Abrimos el panel lateral mágicamente
+                            abrirFavoritos();
+                            
+                            // 5. Un mensajito sutil de éxito
+                            Swal.fire({
+                                toast: true, position: 'top-end', icon: 'success', 
+                                title: 'Lista de regalos cargada 🎁', 
+                                showConfirmButton: false, timer: 3000,
+                                background: '#10b981', color: '#ffffff', iconColor: '#ffffff'
+                            });
+                        }
+                        
+                        // 6. Limpiamos la URL para que la página quede limpia
+                        window.history.replaceState({}, document.title, "/");
+                    } catch(e) {
+                        console.error("El link de la wishlist está corrupto o es inválido.");
                     }
                 }
 
@@ -3207,6 +3246,12 @@
                         msgDiv.innerHTML = `✅ ¡${decodedText} ENVIADO! Pasa el siguiente.`;
                         msgDiv.className = "bg-emerald-50 text-emerald-600 px-4 py-3 rounded-xl text-xs font-black border border-emerald-100 shadow-sm";
                     }
+                    
+                    // ⚡ MAGIA: ACTUALIZACIÓN SILENCIOSA SIN DAR F5 ⚡
+                    // Esto actualiza el catálogo (stock) y la lista de compras al instante, por detrás.
+                    cargarCatalogo(); 
+                    cargarMisPedidos(); 
+                    
                 } else {
                     if(msgDiv) {
                         msgDiv.innerHTML = `❌ Falló ${decodedText}. Intenta de nuevo.`;
