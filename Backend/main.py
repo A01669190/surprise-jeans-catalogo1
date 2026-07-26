@@ -1632,11 +1632,12 @@ def subir_fotos_magicas(
     db: Session = Depends(get_db),
     token: str = Depends(verificar_token)
 ):
-    API_KEY = os.getenv("IMGBB_API_KEY", "")
+    # ⚡ BLINDAJE 1: Quitamos espacios invisibles que se hayan copiado por error en Render
+    API_KEY = os.getenv("IMGBB_API_KEY", "").strip() 
     if not API_KEY:
         raise HTTPException(status_code=500, detail="Falta configurar la llave de ImgBB en el servidor.")
 
-    # 1. Revisamos si la categoría existe
+    # Revisamos si la categoría existe
     categoria = db.query(models.Categoria).filter(models.Categoria.nombre.ilike(categoria_destino)).first()
     if not categoria:
         categoria = models.Categoria(nombre=categoria_destino)
@@ -1649,20 +1650,18 @@ def subir_fotos_magicas(
     datos_excel = [] 
 
     for foto in archivos_fotos:
-        nombre_base = foto.filename.rsplit('.', 1)[0]
+        # ⚡ BLINDAJE 2: Ignoramos carpetas (Ej: "surprise 2/foto.jpg" -> "foto.jpg")
+        nombre_archivo_limpio = foto.filename.split('/')[-1].split('\\')[-1]
+        nombre_base = nombre_archivo_limpio.rsplit('.', 1)[0]
         partes = nombre_base.split('_')
         
-        # ⚡ BLINDAJE 1: Mínimo 4 partes separadas por guión bajo
         if len(partes) < 4:
             errores += 1
             continue
 
         sku_padre = partes[0].strip()
         
-        # ⚡ BLINDAJE 2: Tomamos SIEMPRE los dos últimos datos para precio y paquetes.
-        # Así, si tu mamá le pone guiones bajos al nombre del pantalón, el sistema no se confunde.
         try:
-            # Filtramos mágicamente símbolos de "$" o letras como "pzs"
             str_precio = ''.join(c for c in partes[-2] if c.isdigit() or c == '.')
             str_paquetes = ''.join(c for c in partes[-1] if c.isdigit())
             
@@ -1675,7 +1674,6 @@ def subir_fotos_magicas(
             errores += 1
             continue
 
-        # Todo lo que quede en el medio se convierte en el nombre
         nombre_crudo = " ".join(partes[1:-2])
         nombre_limpio = re.sub(r'([a-z])([A-Z])', r'\1 \2', nombre_crudo).strip()
 
@@ -1683,7 +1681,7 @@ def subir_fotos_magicas(
         color_sku = "ORIGINAL"
         stock_total = paquetes * 12
 
-        # 2. COMPRESIÓN WEBP
+        # COMPRESIÓN WEBP
         contenido_original = foto.file.read()
         try:
             imagen_pil = Image.open(io.BytesIO(contenido_original))
@@ -1696,17 +1694,22 @@ def subir_fotos_magicas(
         except Exception as e:
             contenido_comprimido = contenido_original
 
-        # 3. IMGBB
+        # ⚡ BLINDAJE 3: Mandamos la llave API directamente en la URL (Es más seguro para ImgBB)
         imagen_base64 = base64.b64encode(contenido_comprimido).decode("utf-8")
-        respuesta = requests.post("https://api.imgbb.com/1/upload", data={"key": API_KEY, "image": imagen_base64})
+        url_imgbb = f"https://api.imgbb.com/1/upload?key={API_KEY}"
         
-        if respuesta.status_code != 200:
-            # ⚡ BLINDAJE 3: Si ImgBB falla, te avisamos exactamente por qué
-            raise HTTPException(status_code=400, detail=f"ImgBB rechazó la foto {foto.filename}. Verifica tu API Key.")
+        try:
+            respuesta = requests.post(url_imgbb, data={"image": imagen_base64})
             
-        url_permanente = respuesta.json()["data"]["url"]
+            if respuesta.status_code != 200:
+                error_real = respuesta.json().get("error", {}).get("message", "Error desconocido en ImgBB")
+                raise HTTPException(status_code=400, detail=f"ImgBB rechazó la foto {nombre_archivo_limpio}. Razón oficial: {error_real}")
+                
+            url_permanente = respuesta.json()["data"]["url"]
+        except requests.exceptions.RequestException:
+            raise HTTPException(status_code=400, detail="Fallo la conexión de red con ImgBB. Intenta de nuevo.")
 
-        # 4. BD PANTALON
+        # BD PANTALON
         nuevo_pantalon = models.Pantalon(
             codigo=sku_padre, nombre=nombre_limpio, precio=precio, 
             stock=stock_total, categoria_id=categoria.id, imagen_url=url_permanente
@@ -1715,7 +1718,7 @@ def subir_fotos_magicas(
         db.commit()
         db.refresh(nuevo_pantalon)
 
-        # 5. TALLAS EXACTAS
+        # TALLAS EXACTAS
         distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
         for talla_str, piezas_por_paquete in distribucion.items():
             stock_talla = paquetes * piezas_por_paquete 
@@ -1747,16 +1750,16 @@ def subir_fotos_magicas(
         exitos += 1
 
     if exitos == 0:
-        raise HTTPException(status_code=400, detail=f"No se subió ningún modelo. Tuvimos {errores} errores. Usa formato exacto separado por guión bajo: CÓDIGO_NOMBRE_PRECIO_PAQUETES.jpg")
+        raise HTTPException(status_code=400, detail=f"No se subió ningún modelo. Tuvimos {errores} errores. Asegúrate de usar el formato: CÓDIGO_NOMBRE_PRECIO_PAQUETES.jpg")
 
-    # 6. CREACIÓN DEL EXCEL AUTOMÁTICO
+    # CREACIÓN DEL EXCEL AUTOMÁTICO
     df = pd.DataFrame(datos_excel)
     buffer = BytesIO()
     try:
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
             df.to_excel(writer, index=False, sheet_name='Nuevos Modelos')
     except Exception as e:
-        raise HTTPException(status_code=500, detail="El servidor no tiene 'openpyxl'. Agrégalo a tu archivo requirements.txt y sube los cambios a Render.")
+        raise HTTPException(status_code=500, detail="El servidor no tiene 'openpyxl'. Agrégalo a tu requirements.txt y reinicia Render.")
         
     buffer.seek(0)
     headers = {'Content-Disposition': 'attachment; filename="Carga_Magica_YSK.xlsx"'}
