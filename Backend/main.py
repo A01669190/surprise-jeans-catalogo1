@@ -820,47 +820,40 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=(100*mm, 150*mm)) 
     
-    # ⚡ ENCABEZADO CON LOGO REAL
+    # ⚡ ENCABEZADO CON LOGO MÁS CHICO Y HASTA ARRIBA
     ruta_logo = os.path.join(STATIC_DIR, "logo.png")
     
     if os.path.exists(ruta_logo):
-        # Si encuentra la foto, la dibuja centrada (X=20mm, Ancho=60mm)
-        p.drawImage(ImageReader(ruta_logo), 20*mm, 134*mm, width=60*mm, height=14*mm, preserveAspectRatio=True, mask='auto')
+        # Centrado (X=30mm), más chico (Ancho=40mm) y pegado arriba (Y=138mm)
+        p.drawImage(ImageReader(ruta_logo), 30*mm, 138*mm, width=40*mm, height=10*mm, preserveAspectRatio=True, mask='auto')
     else:
-        # Plan de emergencia por si olvidas subir la foto del logo
-        p.setFont("Helvetica-Bold", 15)
-        p.drawCentredString(50*mm, 140*mm, "SURPRISE JEANS")
+        p.setFont("Helvetica-Bold", 14)
+        p.drawCentredString(50*mm, 142*mm, "SURPRISE JEANS")
         
     p.setFont("Helvetica-Bold", 10)
-    p.drawCentredString(50*mm, 131*mm, f"FOLIO: SJ-{pedido.id:04d}")
+    p.drawCentredString(50*mm, 132*mm, f"FOLIO: SJ-{pedido.id:04d}")
     
     p.line(10*mm, 128*mm, 90*mm, 128*mm) # Línea divisoria elegante
     
-    # ⚡ EL FORMATO DE TU MAMÁ (Todo Negritas, Datos Directos)
+    # ⚡ EL FORMATO DIRECTO (Todo Negritas, Datos Directos)
     p.setFont("Helvetica-Bold", 12)
     y_text = 118*mm
     
-    # Nombre
     p.drawString(10*mm, y_text, f"{pedido.nombre_cliente.upper()}")
     y_text -= 7*mm
     
-    # Calle, Número y Colonia
     p.drawString(10*mm, y_text, f"{pedido.calle_numero}, Col. {pedido.colonia}")
     y_text -= 7*mm
     
-    # Código Postal
     p.drawString(10*mm, y_text, f"CP {pedido.codigo_postal}")
     y_text -= 7*mm
     
-    # Ciudad y Estado
     p.drawString(10*mm, y_text, f"{pedido.ciudad.upper()}, {pedido.estado.upper()}")
     y_text -= 7*mm
     
-    # Teléfono
     p.drawString(10*mm, y_text, f"{pedido.telefono}")
     y_text -= 7*mm
 
-    # Referencias (Si el cliente las puso, un pelín más chicas para que quepan)
     if pedido.referencias:
         p.setFont("Helvetica-Bold", 10)
         p.drawString(10*mm, y_text, f"Ref: {pedido.referencias[:55]}") 
@@ -868,20 +861,26 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
 
     p.line(10*mm, y_text - 2*mm, 90*mm, y_text - 2*mm)
 
-    # ⚡ EL TEXTO DE TU FLYER / TARJETA ORIGINAL
-    y_footer = y_text - 12*mm
-    p.setFont("Helvetica-Bold", 14)
-    p.drawCentredString(50*mm, y_footer, "¡Muchas gracias!")
-    
+    # ⚡ EL TEXTO DE AGRADECIMIENTO (Con firma manuscrita y posición fija abajo)
+    y_footer_img = 46*mm
+    ruta_gracias = os.path.join(STATIC_DIR, "gracias.png")
+
+    if os.path.exists(ruta_gracias):
+        # Imagen "Muchas gracias!" en manuscrita posicionada abajo
+        p.drawImage(ImageReader(ruta_gracias), 25*mm, y_footer_img, width=50*mm, height=12*mm, preserveAspectRatio=True, mask='auto')
+    else:
+        p.setFont("Times-Italic", 18)
+        p.drawCentredString(50*mm, y_footer_img + 4*mm, "Muchas gracias!")
+
+    y_footer_txt = y_footer_img - 6*mm
     p.setFont("Helvetica", 9)
-    y_footer -= 6*mm
-    p.drawCentredString(50*mm, y_footer, "Por tu compra y por apoyar el emprendimiento!")
-    y_footer -= 5*mm
-    p.drawCentredString(50*mm, y_footer, "Si estás contenta con todo estaremos muy")
-    y_footer -= 5*mm
-    p.drawCentredString(50*mm, y_footer, "agradecidas de que nos compartas en tus")
-    y_footer -= 5*mm
-    p.drawCentredString(50*mm, y_footer, "historias y nos etiquetes!")
+    p.drawCentredString(50*mm, y_footer_txt, "Por tu compra y por apoyar el emprendimiento!")
+    y_footer_txt -= 5*mm
+    p.drawCentredString(50*mm, y_footer_txt, "Si estás contenta con todo estaremos muy")
+    y_footer_txt -= 5*mm
+    p.drawCentredString(50*mm, y_footer_txt, "agradecidas de que nos compartas en tus")
+    y_footer_txt -= 5*mm
+    p.drawCentredString(50*mm, y_footer_txt, "historias y nos etiquetes!")
 
     # Código de Barras (Hasta abajo)
     barcode = code128.Code128(f"SJ-{pedido.id:04d}", barHeight=12*mm, barWidth=1.5)
