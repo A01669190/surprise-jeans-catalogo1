@@ -1747,7 +1747,7 @@ def subir_fotos_magicas(
         db.commit()
         background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre_limpio, sku_padre, precio, categoria.nombre, color)
         
-        # ⚡ FIX: USAMOS LA FÓRMULA EN INGLÉS 'IMAGE' Y EL FORMATO JPG
+        # ⚡ FIX: USAMOS LA FÓRMULA EN INGLÉS 'IMAGE' CON PREFIJO '_xlfn.'
         datos_excel.append({
             "Código": sku_padre,
             "Nombre": nombre_limpio,
@@ -1755,7 +1755,8 @@ def subir_fotos_magicas(
             "Paquetes Físicos": paquetes,
             "Stock Total (Piezas)": stock_total,
             "Categoría": categoria.nombre,
-            "Foto Visual": f'=IMAGE("{url_permanente}")',
+            # Se usa _xlfn.IMAGE para evitar que Excel ponga el @ al inicio
+            "Foto Visual": f'=_xlfn.IMAGE("{url_permanente}")',
             "Link Web": url_permanente
         })
         exitos += 1
@@ -1773,6 +1774,21 @@ def subir_fotos_magicas(
     try:
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
             df.to_excel(writer, index=False, sheet_name='Nuevos Modelos')
+            
+            # ⚡ MAGIA PARA HACER LAS CELDAS MÁS GRANDES AUTOMÁTICAMENTE
+            worksheet = writer.sheets['Nuevos Modelos']
+            
+            # 1. Hacemos las columnas clave más anchas (La G es la de la Foto)
+            worksheet.column_dimensions['A'].width = 15  # Código
+            worksheet.column_dimensions['B'].width = 30  # Nombre
+            worksheet.column_dimensions['G'].width = 25  # Foto Visual (Más ancha)
+            worksheet.column_dimensions['H'].width = 45  # Link Web
+            
+            # 2. Hacemos las filas mucho más altas para que quepa la foto perfectamente
+            # Empezamos en la fila 2 (porque la 1 son los títulos) hasta el final
+            for fila in range(2, len(datos_excel) + 2):
+                worksheet.row_dimensions[fila].height = 110  # 110 puntos de alto
+                
     except Exception as e:
         raise HTTPException(status_code=500, detail="El servidor no tiene 'openpyxl'. Agrégalo a tu requirements.txt.")
         
