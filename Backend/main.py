@@ -1633,13 +1633,7 @@ def subir_fotos_magicas(
     token: str = Depends(verificar_token)
 ):
     print("\n" + "="*50)
-    print("🚀 INICIANDO CARGA MÁGICA DE FOTOS")
-    
-    API_KEY = os.getenv("IMGBB_API_KEY", "").strip() 
-    print(f"🔑 API KEY detectada: {'SÍ' if API_KEY else 'NO'} (Longitud: {len(API_KEY)})")
-    
-    if not API_KEY:
-        raise HTTPException(status_code=500, detail="Falta configurar la llave de ImgBB en el servidor.")
+    print("🚀 INICIANDO CARGA MÁGICA (SISTEMA INDEPENDIENTE)")
 
     categoria = db.query(models.Categoria).filter(models.Categoria.nombre.ilike(categoria_destino)).first()
     if not categoria:
@@ -1651,7 +1645,11 @@ def subir_fotos_magicas(
     exitos = 0
     errores = 0
     datos_excel = [] 
-    detalles_errores = [] # Aquí guardaremos la razón exacta de cada falla
+    detalles_errores = [] 
+
+    # ⚡ CREAMOS LA BÓVEDA DE FOTOS EN TU PROPIO SERVIDOR
+    UPLOAD_DIR = os.path.join(STATIC_DIR, "uploads")
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
 
     for foto in archivos_fotos:
         print(f"\n📸 Procesando archivo: {foto.filename}")
@@ -1660,11 +1658,8 @@ def subir_fotos_magicas(
         nombre_base = nombre_archivo_limpio.rsplit('.', 1)[0]
         partes = nombre_base.split('_')
         
-        print(f"✂️ Partes detectadas ({len(partes)}): {partes}")
-        
         if len(partes) < 4:
-            razon = f"Faltan guiones bajos. Se detectaron {len(partes)} partes, se necesitan 4."
-            print(f"❌ Error Formato: {razon}")
+            razon = f"Faltan guiones bajos. Usa CÓDIGO_NOMBRE_PRECIO_PAQUETES.jpg"
             detalles_errores.append(f"{nombre_archivo_limpio}: {razon}")
             errores += 1
             continue
@@ -1676,10 +1671,8 @@ def subir_fotos_magicas(
             str_paquetes = ''.join(c for c in partes[-1] if c.isdigit())
             precio = float(str_precio)
             paquetes = int(str_paquetes)
-            print(f"💰 Precio detectado: {precio} | 📦 Paquetes detectados: {paquetes}")
         except Exception as e:
-            razon = f"No se pudo extraer el precio o los paquetes. Detalle técnico: {str(e)}"
-            print(f"❌ Error Matemático: {razon}")
+            razon = "No se pudo extraer el precio o los paquetes. Revisa los números."
             detalles_errores.append(f"{nombre_archivo_limpio}: {razon}")
             errores += 1
             continue
@@ -1690,7 +1683,6 @@ def subir_fotos_magicas(
         color = "Original"
         color_sku = "ORIGINAL"
         stock_total = paquetes * 12
-        print(f"🏷️ Nombre: {nombre_limpio} | Stock Total a crear: {stock_total}")
 
         # COMPRESIÓN WEBP
         print("🗜️ Comprimiendo imagen...")
@@ -1703,36 +1695,26 @@ def subir_fotos_magicas(
             imagen_pil.save(buffer_webp, format="webp", quality=80)
             buffer_webp.seek(0)
             contenido_comprimido = buffer_webp.read()
+            extension = "webp"
         except Exception as e:
-            print(f"⚠️ Aviso: Falló la compresión ({str(e)}). Usando foto original.")
+            print(f"⚠️ Aviso: Falló la compresión. Usando original.")
             contenido_comprimido = contenido_original
+            extension = nombre_archivo_limpio.rsplit('.', 1)[-1].lower()
 
-        # REGRESAMOS AL MÉTODO ORIGINAL MÁS ESTABLE
-        imagen_base64 = base64.b64encode(contenido_comprimido).decode("utf-8")
+        # ⚡ SISTEMA INDEPENDIENTE: Guardamos la foto en nuestro propio servidor
+        # Usamos el timestamp para que el nombre de la foto siempre sea único
+        nombre_final_foto = f"{sku_padre}_{int(datetime.now().timestamp())}.{extension}"
+        ruta_guardado = os.path.join(UPLOAD_DIR, nombre_final_foto)
         
-        print("🌐 Enviando petición POST a ImgBB...")
         try:
-            respuesta = requests.post(
-                "https://api.imgbb.com/1/upload", 
-                data={"key": API_KEY, "image": imagen_base64}
-            )
+            with open(ruta_guardado, "wb") as f:
+                f.write(contenido_comprimido)
             
-            print(f"📥 ImgBB Código de estado: {respuesta.status_code}")
-            print(f"📥 ImgBB Respuesta completa: {respuesta.text[:300]}...") # Imprime los primeros 300 caracteres
-            
-            if respuesta.status_code != 200:
-                razon = f"ImgBB rechazó la conexión. Código: {respuesta.status_code}. Respuesta: {respuesta.text[:100]}"
-                print(f"❌ Error ImgBB: {razon}")
-                detalles_errores.append(f"{nombre_archivo_limpio}: {razon}")
-                errores += 1
-                continue
-                
-            url_permanente = respuesta.json()["data"]["url"]
-            print(f"✅ ¡Éxito! URL generada: {url_permanente}")
-            
+            # Generamos la URL oficial usando tu propio dominio
+            url_permanente = f"https://surprise-jeans-api-denz.onrender.com/static/uploads/{nombre_final_foto}"
+            print(f"✅ ¡Éxito! Foto guardada en servidor propio: {url_permanente}")
         except Exception as e:
-            razon = f"El servidor no pudo conectarse con ImgBB por un error de red. Detalle: {str(e)}"
-            print(f"❌ Error de Red: {razon}")
+            razon = f"El servidor no pudo guardar el archivo en el disco. Detalle: {str(e)}"
             detalles_errores.append(f"{nombre_archivo_limpio}: {razon}")
             errores += 1
             continue
@@ -1782,7 +1764,6 @@ def subir_fotos_magicas(
     print(f"🏁 RESULTADO FINAL: {exitos} éxitos | {errores} errores")
     
     if exitos == 0:
-        # ⚡ UNIMOS TODOS LOS ERRORES PARA MOSTRARLOS EN LA PANTALLA
         reporte_final = "\n".join(detalles_errores)
         raise HTTPException(status_code=400, detail=f"No se subió ningún modelo.\n\nDetalles del error:\n{reporte_final}")
 
@@ -1798,7 +1779,6 @@ def subir_fotos_magicas(
     buffer.seek(0)
     headers = {'Content-Disposition': 'attachment; filename="Carga_Magica_YSK.xlsx"'}
     return Response(content=buffer.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers=headers)
-
 
 @app.post("/pantalones/excel")
 @limiter.limit("5/minute") 
