@@ -820,24 +820,17 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=(100*mm, 150*mm)) 
     
-    # ⚡ ENCABEZADO CON LOGO MÁS CHICO Y HASTA ARRIBA
-    ruta_logo = os.path.join(STATIC_DIR, "logo.png")
-    
-    if os.path.exists(ruta_logo):
-        # Centrado (X=30mm), más chico (Ancho=40mm) y pegado arriba (Y=138mm)
-        p.drawImage(ImageReader(ruta_logo), 30*mm, 138*mm, width=40*mm, height=10*mm, preserveAspectRatio=True, mask='auto')
-    else:
-        p.setFont("Helvetica-Bold", 14)
-        p.drawCentredString(50*mm, 142*mm, "SURPRISE JEANS")
-        
+    # ⚡ ENCABEZADO TEXTUAL (Ya que el logo bajó)
+    p.setFont("Helvetica-Bold", 14)
+    p.drawCentredString(50*mm, 140*mm, "SURPRISE JEANS - ENVÍO OFICIAL")
     p.setFont("Helvetica-Bold", 10)
-    p.drawCentredString(50*mm, 132*mm, f"FOLIO: SJ-{pedido.id:04d}")
+    p.drawCentredString(50*mm, 134*mm, f"FOLIO: SJ-{pedido.id:04d}")
     
-    p.line(10*mm, 128*mm, 90*mm, 128*mm) # Línea divisoria elegante
+    p.line(10*mm, 130*mm, 90*mm, 130*mm) # Línea divisoria elegante
     
     # ⚡ EL FORMATO DIRECTO (Todo Negritas, Datos Directos)
     p.setFont("Helvetica-Bold", 12)
-    y_text = 118*mm
+    y_text = 120*mm
     
     p.drawString(10*mm, y_text, f"{pedido.nombre_cliente.upper()}")
     y_text -= 7*mm
@@ -861,30 +854,44 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
 
     p.line(10*mm, y_text - 2*mm, 90*mm, y_text - 2*mm)
 
-    # ⚡ EL TEXTO DE AGRADECIMIENTO (Con firma manuscrita y posición fija abajo)
-    y_footer_img = 46*mm
+    # ==========================================
+    # ⚡ NUEVO ACOMODO INFERIOR (Firma -> Texto -> Logo -> Código)
+    # ==========================================
+    
+    # 1. FIRMA MANUSCRITA
+    y_gracias = 56*mm
     ruta_gracias = os.path.join(STATIC_DIR, "gracias.png")
-
     if os.path.exists(ruta_gracias):
-        # Imagen "Muchas gracias!" en manuscrita posicionada abajo
-        p.drawImage(ImageReader(ruta_gracias), 25*mm, y_footer_img, width=50*mm, height=12*mm, preserveAspectRatio=True, mask='auto')
+        # Más chico y centrado
+        p.drawImage(ImageReader(ruta_gracias), 32*mm, y_gracias, width=36*mm, height=9*mm, preserveAspectRatio=True, mask='auto')
     else:
-        p.setFont("Times-Italic", 18)
-        p.drawCentredString(50*mm, y_footer_img + 4*mm, "Muchas gracias!")
+        p.setFont("Times-Italic", 16)
+        p.drawCentredString(50*mm, y_gracias + 3*mm, "Muchas gracias!")
 
-    y_footer_txt = y_footer_img - 6*mm
+    # 2. TEXTOS DE AGRADECIMIENTO
+    y_text_footer = 50*mm
     p.setFont("Helvetica", 9)
-    p.drawCentredString(50*mm, y_footer_txt, "Por tu compra y por apoyar el emprendimiento!")
-    y_footer_txt -= 5*mm
-    p.drawCentredString(50*mm, y_footer_txt, "Si estás contenta con todo estaremos muy")
-    y_footer_txt -= 5*mm
-    p.drawCentredString(50*mm, y_footer_txt, "agradecidas de que nos compartas en tus")
-    y_footer_txt -= 5*mm
-    p.drawCentredString(50*mm, y_footer_txt, "historias y nos etiquetes!")
+    p.drawCentredString(50*mm, y_text_footer, "Por tu compra y por apoyar el emprendimiento!")
+    y_text_footer -= 4.5*mm
+    p.drawCentredString(50*mm, y_text_footer, "Si estás contenta con todo estaremos muy")
+    y_text_footer -= 4.5*mm
+    p.drawCentredString(50*mm, y_text_footer, "agradecidas de que nos compartas en tus")
+    y_text_footer -= 4.5*mm
+    p.drawCentredString(50*mm, y_text_footer, "historias y nos etiquetes!")
 
-    # Código de Barras (Hasta abajo)
-    barcode = code128.Code128(f"SJ-{pedido.id:04d}", barHeight=12*mm, barWidth=1.5)
-    barcode.drawOn(p, 10*mm, 8*mm)
+    # 3. LOGO DE SURPRISE (Encima del código)
+    y_logo_bottom = 22*mm
+    ruta_logo = os.path.join(STATIC_DIR, "logo.png")
+    if os.path.exists(ruta_logo):
+        # Más chico y centrado
+        p.drawImage(ImageReader(ruta_logo), 35*mm, y_logo_bottom, width=30*mm, height=8*mm, preserveAspectRatio=True, mask='auto')
+    else:
+        p.setFont("Helvetica-Bold", 10)
+        p.drawCentredString(50*mm, y_logo_bottom + 2*mm, "SURPRISE JEANS")
+
+    # 4. CÓDIGO DE BARRAS (Centrado hasta abajo)
+    barcode = code128.Code128(f"SJ-{pedido.id:04d}", barHeight=11*mm, barWidth=1.3)
+    barcode.drawOn(p, 20*mm, 8*mm) # Movido a X=20 para centrarlo visualmente
 
     p.showPage()
     p.save()
