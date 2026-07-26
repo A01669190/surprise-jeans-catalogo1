@@ -821,17 +821,18 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
     p = canvas.Canvas(buffer, pagesize=(100*mm, 150*mm)) 
     
     # ==========================================
-    # ⚡ TODA LA PARTE DE ARRIBA: DIRECCIÓN (TAMAÑO MAXIMIZADO SIN CORTARSE)
+    # ⚡ TODA LA PARTE DE ARRIBA: DIRECCIÓN (MÁS CENTRADA HACIA ABAJO)
     # ==========================================
     p.setFont("Helvetica-Bold", 22) # ⚡ Nombre Gigante
-    y_text = 140*mm 
     
-    p.drawString(5*mm, y_text, f"{pedido.nombre_cliente.upper()[:25]}") # Límite de seguridad
+    # ⚡ FIX: Bajamos el texto 3 centímetros para matar el espacio en blanco
+    y_text = 110*mm 
+    
+    p.drawString(5*mm, y_text, f"{pedido.nombre_cliente.upper()[:25]}")
     y_text -= 10*mm
     
-    p.setFont("Helvetica-Bold", 14) # ⚡ Tamaño ideal y súper legible
+    p.setFont("Helvetica-Bold", 14)
     
-    # Separamos Calle y Colonia para que NUNCA choque con el borde derecho
     p.drawString(5*mm, y_text, f"{pedido.calle_numero}")
     y_text -= 7*mm
     p.drawString(5*mm, y_text, f"Col. {pedido.colonia}")
@@ -855,11 +856,11 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
     p.line(5*mm, y_text, 95*mm, y_text) 
 
     # ==========================================
-    # ⚡ PARTE DE ABAJO: DISEÑO EXACTO A TU IMAGEN
+    # ⚡ PARTE DE ABAJO: SUBIMOS TODO PARA PEGARLO AL TEXTO
     # ==========================================
     
-    # 1. LOGO DE SURPRISE (Lado Izquierdo, MUCHO más grande)
-    y_logo = 25*mm # Bajamos el logo para que quede pegado al código
+    # 1. LOGO DE SURPRISE (Lado Izquierdo, un poco más arriba)
+    y_logo = 32*mm 
     ruta_logo = os.path.join(STATIC_DIR, "logo.png")
     if os.path.exists(ruta_logo):
         p.drawImage(ImageReader(ruta_logo), 5*mm, y_logo, width=45*mm, height=18*mm, preserveAspectRatio=True, mask='auto')
@@ -867,12 +868,12 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
         p.setFont("Helvetica-Bold", 14)
         p.drawCentredString(27*mm, y_logo + 5*mm, "SURPRISE JEANS")
 
-    # 2. CÓDIGO DE BARRAS (Lado Izquierdo, debajo del logo)
+    # 2. CÓDIGO DE BARRAS (Lado Izquierdo, sube junto con el logo)
     barcode = code128.Code128(f"SJ-{pedido.id:04d}", barHeight=14*mm, barWidth=1.0)
-    barcode.drawOn(p, 5*mm, 8*mm)
+    barcode.drawOn(p, 5*mm, 15*mm)
 
-    # 3. FIRMA MANUSCRITA (Lado Derecho)
-    y_firma = 34*mm 
+    # 3. FIRMA MANUSCRITA (Lado Derecho, sube un poco)
+    y_firma = 42*mm 
     ruta_gracias = os.path.join(STATIC_DIR, "gracias.png")
     if os.path.exists(ruta_gracias):
         p.drawImage(ImageReader(ruta_gracias), 54*mm, y_firma, width=40*mm, height=14*mm, preserveAspectRatio=True, mask='auto')
@@ -880,17 +881,17 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
         p.setFont("Times-Italic", 18)
         p.drawCentredString(75*mm, y_firma + 5*mm, "Muchas gracias!")
 
-    # 4. TEXTO DE AGRADECIMIENTO (Lado Derecho, con la línea divisoria)
-    p.setFont("Helvetica", 7) # Letra justa para que quepa en la columna
-    y_text_footer = 30*mm
-    centro_derecha = 74*mm # Mitad exacta de la columna derecha
+    # 4. TEXTO DE AGRADECIMIENTO (Lado Derecho, alineado)
+    p.setFont("Helvetica", 7) 
+    y_text_footer = 38*mm 
+    centro_derecha = 74*mm 
     
     p.drawCentredString(centro_derecha, y_text_footer, "Por tu compra")
     y_text_footer -= 3.5*mm
     p.drawCentredString(centro_derecha, y_text_footer, "y por apoyar el emprendimiento!")
     
     y_text_footer -= 3*mm
-    p.line(55*mm, y_text_footer, 93*mm, y_text_footer) # ⚡ LA LÍNEA DIVISORIA NEGRA
+    p.line(55*mm, y_text_footer, 93*mm, y_text_footer) 
     
     y_text_footer -= 4*mm
     p.drawCentredString(centro_derecha, y_text_footer, "Si estás contenta con todo estaremos muy")
