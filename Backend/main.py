@@ -1621,7 +1621,6 @@ def eliminar_pantalon(
 
 # ==========================================
 # ⚡ RUTA DE CARGA MÁGICA DE FOTOS (100% SEGURA)
-# ==========================================
 @app.post("/pantalones/magico")
 @limiter.limit("5/minute")
 def subir_fotos_magicas(
@@ -1684,25 +1683,25 @@ def subir_fotos_magicas(
         color_sku = "ORIGINAL"
         stock_total = paquetes * 12
 
-        # COMPRESIÓN WEBP
-        print("🗜️ Comprimiendo imagen...")
+        # ⚡ FIX: COMPRESIÓN EN FORMATO JPEG (100% COMPATIBLE CON EXCEL)
+        print("🗜️ Comprimiendo imagen a JPG...")
         contenido_original = foto.file.read()
         try:
             imagen_pil = Image.open(io.BytesIO(contenido_original))
             if imagen_pil.mode in ("RGBA", "P"):
                 imagen_pil = imagen_pil.convert("RGB")
-            buffer_webp = io.BytesIO()
-            imagen_pil.save(buffer_webp, format="webp", quality=80)
-            buffer_webp.seek(0)
-            contenido_comprimido = buffer_webp.read()
-            extension = "webp"
+            buffer_img = io.BytesIO()
+            # Guardamos como JPEG con alta compresión para que no pese nada
+            imagen_pil.save(buffer_img, format="jpeg", quality=80) 
+            buffer_img.seek(0)
+            contenido_comprimido = buffer_img.read()
+            extension = "jpg"
         except Exception as e:
             print(f"⚠️ Aviso: Falló la compresión. Usando original.")
             contenido_comprimido = contenido_original
-            extension = nombre_archivo_limpio.rsplit('.', 1)[-1].lower()
+            extension = "jpg"
 
-        # ⚡ SISTEMA INDEPENDIENTE: Guardamos la foto en nuestro propio servidor
-        # Usamos el timestamp para que el nombre de la foto siempre sea único
+        # Guardamos la foto en nuestro propio servidor
         nombre_final_foto = f"{sku_padre}_{int(datetime.now().timestamp())}.{extension}"
         ruta_guardado = os.path.join(UPLOAD_DIR, nombre_final_foto)
         
@@ -1748,6 +1747,7 @@ def subir_fotos_magicas(
         db.commit()
         background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre_limpio, sku_padre, precio, categoria.nombre, color)
         
+        # ⚡ FIX: USAMOS LA FÓRMULA EN INGLÉS 'IMAGE' Y EL FORMATO JPG
         datos_excel.append({
             "Código": sku_padre,
             "Nombre": nombre_limpio,
@@ -1755,7 +1755,7 @@ def subir_fotos_magicas(
             "Paquetes Físicos": paquetes,
             "Stock Total (Piezas)": stock_total,
             "Categoría": categoria.nombre,
-            "Foto Visual": f'=IMAGEN("{url_permanente}")',
+            "Foto Visual": f'=IMAGE("{url_permanente}")',
             "Link Web": url_permanente
         })
         exitos += 1
