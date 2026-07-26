@@ -1632,7 +1632,12 @@ def subir_fotos_magicas(
     db: Session = Depends(get_db),
     token: str = Depends(verificar_token)
 ):
+    print("\n" + "="*50)
+    print("🚀 INICIANDO CARGA MÁGICA DE FOTOS")
+    
     API_KEY = os.getenv("IMGBB_API_KEY", "").strip() 
+    print(f"🔑 API KEY detectada: {'SÍ' if API_KEY else 'NO'} (Longitud: {len(API_KEY)})")
+    
     if not API_KEY:
         raise HTTPException(status_code=500, detail="Falta configurar la llave de ImgBB en el servidor.")
 
@@ -1646,13 +1651,21 @@ def subir_fotos_magicas(
     exitos = 0
     errores = 0
     datos_excel = [] 
+    detalles_errores = [] # Aquí guardaremos la razón exacta de cada falla
 
     for foto in archivos_fotos:
+        print(f"\n📸 Procesando archivo: {foto.filename}")
+        
         nombre_archivo_limpio = foto.filename.split('/')[-1].split('\\')[-1]
         nombre_base = nombre_archivo_limpio.rsplit('.', 1)[0]
         partes = nombre_base.split('_')
         
+        print(f"✂️ Partes detectadas ({len(partes)}): {partes}")
+        
         if len(partes) < 4:
+            razon = f"Faltan guiones bajos. Se detectaron {len(partes)} partes, se necesitan 4."
+            print(f"❌ Error Formato: {razon}")
+            detalles_errores.append(f"{nombre_archivo_limpio}: {razon}")
             errores += 1
             continue
 
@@ -1661,13 +1674,13 @@ def subir_fotos_magicas(
         try:
             str_precio = ''.join(c for c in partes[-2] if c.isdigit() or c == '.')
             str_paquetes = ''.join(c for c in partes[-1] if c.isdigit())
-            
-            if not str_precio or not str_paquetes:
-                raise ValueError("Faltan números")
-                
             precio = float(str_precio)
             paquetes = int(str_paquetes)
-        except Exception:
+            print(f"💰 Precio detectado: {precio} | 📦 Paquetes detectados: {paquetes}")
+        except Exception as e:
+            razon = f"No se pudo extraer el precio o los paquetes. Detalle técnico: {str(e)}"
+            print(f"❌ Error Matemático: {razon}")
+            detalles_errores.append(f"{nombre_archivo_limpio}: {razon}")
             errores += 1
             continue
 
@@ -1677,8 +1690,10 @@ def subir_fotos_magicas(
         color = "Original"
         color_sku = "ORIGINAL"
         stock_total = paquetes * 12
+        print(f"🏷️ Nombre: {nombre_limpio} | Stock Total a crear: {stock_total}")
 
         # COMPRESIÓN WEBP
+        print("🗜️ Comprimiendo imagen...")
         contenido_original = foto.file.read()
         try:
             imagen_pil = Image.open(io.BytesIO(contenido_original))
@@ -1688,33 +1703,42 @@ def subir_fotos_magicas(
             imagen_pil.save(buffer_webp, format="webp", quality=80)
             buffer_webp.seek(0)
             contenido_comprimido = buffer_webp.read()
-            formato_envio = "webp"
         except Exception as e:
+            print(f"⚠️ Aviso: Falló la compresión ({str(e)}). Usando foto original.")
             contenido_comprimido = contenido_original
-            formato_envio = "jpeg"
 
-        # ⚡ SOLUCIÓN DEFINITIVA ANTI-CLOUDFLARE
-        # En vez de mandar un texto gigante, mandamos el archivo adjunto "físico"
+        # REGRESAMOS AL MÉTODO ORIGINAL MÁS ESTABLE
+        imagen_base64 = base64.b64encode(contenido_comprimido).decode("utf-8")
+        
+        print("🌐 Enviando petición POST a ImgBB...")
         try:
             respuesta = requests.post(
                 "https://api.imgbb.com/1/upload", 
-                data={"key": API_KEY}, # Solo mandamos la llave como dato
-                files={"image": (f"foto.{formato_envio}", contenido_comprimido, f"image/{formato_envio}")} # La imagen va como archivo real
+                data={"key": API_KEY, "image": imagen_base64}
             )
             
+            print(f"📥 ImgBB Código de estado: {respuesta.status_code}")
+            print(f"📥 ImgBB Respuesta completa: {respuesta.text[:300]}...") # Imprime los primeros 300 caracteres
+            
             if respuesta.status_code != 200:
-                try:
-                    error_real = respuesta.json().get("error", {}).get("message", "Error desconocido")
-                except:
-                    error_real = "Bloqueo de seguridad (Cloudflare)."
-                
-                raise HTTPException(status_code=400, detail=f"ImgBB rechazó la foto. Razón: {error_real}")
+                razon = f"ImgBB rechazó la conexión. Código: {respuesta.status_code}. Respuesta: {respuesta.text[:100]}"
+                print(f"❌ Error ImgBB: {razon}")
+                detalles_errores.append(f"{nombre_archivo_limpio}: {razon}")
+                errores += 1
+                continue
                 
             url_permanente = respuesta.json()["data"]["url"]
-        except requests.exceptions.RequestException:
-            raise HTTPException(status_code=400, detail="Fallo la conexión de red con ImgBB. Intenta de nuevo.")
+            print(f"✅ ¡Éxito! URL generada: {url_permanente}")
+            
+        except Exception as e:
+            razon = f"El servidor no pudo conectarse con ImgBB por un error de red. Detalle: {str(e)}"
+            print(f"❌ Error de Red: {razon}")
+            detalles_errores.append(f"{nombre_archivo_limpio}: {razon}")
+            errores += 1
+            continue
 
         # BD PANTALON
+        print("💾 Guardando en Base de Datos...")
         nuevo_pantalon = models.Pantalon(
             codigo=sku_padre, nombre=nombre_limpio, precio=precio, 
             stock=stock_total, categoria_id=categoria.id, imagen_url=url_permanente
@@ -1754,8 +1778,13 @@ def subir_fotos_magicas(
         })
         exitos += 1
 
+    print("="*50)
+    print(f"🏁 RESULTADO FINAL: {exitos} éxitos | {errores} errores")
+    
     if exitos == 0:
-        raise HTTPException(status_code=400, detail=f"No se subió ningún modelo. Tuvimos {errores} errores. Asegúrate de usar el formato: CÓDIGO_NOMBRE_PRECIO_PAQUETES.jpg")
+        # ⚡ UNIMOS TODOS LOS ERRORES PARA MOSTRARLOS EN LA PANTALLA
+        reporte_final = "\n".join(detalles_errores)
+        raise HTTPException(status_code=400, detail=f"No se subió ningún modelo.\n\nDetalles del error:\n{reporte_final}")
 
     # CREACIÓN DEL EXCEL AUTOMÁTICO
     df = pd.DataFrame(datos_excel)
@@ -1764,7 +1793,7 @@ def subir_fotos_magicas(
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
             df.to_excel(writer, index=False, sheet_name='Nuevos Modelos')
     except Exception as e:
-        raise HTTPException(status_code=500, detail="El servidor no tiene 'openpyxl'. Agrégalo a tu requirements.txt y reinicia Render.")
+        raise HTTPException(status_code=500, detail="El servidor no tiene 'openpyxl'. Agrégalo a tu requirements.txt.")
         
     buffer.seek(0)
     headers = {'Content-Disposition': 'attachment; filename="Carga_Magica_YSK.xlsx"'}
