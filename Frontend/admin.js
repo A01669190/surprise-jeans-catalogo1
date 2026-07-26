@@ -211,11 +211,12 @@ if(formExcel) {
 }
 
 function descargarPlantilla() {
-    const contenido = "Codigo,Nombre,Precio,Stock,Categoria,Foto_URL\nSJ-001,Skinny Azul,150,10,Skinny,https://ejemplo.com/foto1.jpg\nSJ-002,Mom Jeans Rotos,180,5,Mom,\nSJ-003,Cargo Negro,200,20,Cargo,";
+    // ⚡ FIX: La plantilla ahora pide "Paquetes"
+    const contenido = "Codigo,Nombre,Precio,Paquetes,Categoria,Color,Foto_URL\nSJ-001,Skinny Básico,250,3,Skinny,Azul Claro,https://ejemplo.com/foto1.jpg\nSJ-002,Mom Rotos,280,5,Mom,Negro,\nSJ-003,Cargo Ancho,300,2,Cargo,Beige,";
     const blob = new Blob([contenido], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a"); 
     link.setAttribute("href", URL.createObjectURL(blob));
-    link.setAttribute("download", "Plantilla_SurpriseJeans_V2.csv");
+    link.setAttribute("download", "Plantilla_SurpriseJeans_V4.csv");
     document.body.appendChild(link); 
     link.click(); 
     document.body.removeChild(link);

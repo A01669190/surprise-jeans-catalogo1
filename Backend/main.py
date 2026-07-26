@@ -11,6 +11,8 @@ from reportlab.pdfgen import canvas
 from datetime import datetime
 from logistica_sync import generar_guia_envio
 import threading
+import cloudinary
+import cloudinary.uploader
 from fastapi.concurrency import run_in_threadpool
 from fastapi import Body
 from reportlab.graphics.barcode import code128
@@ -1512,44 +1514,40 @@ def crear_pantalon(
     precio: float = Form(...),
     stock: int = Form(...), 
     categoria_id: int = Form(...), 
-    color: str = Form("Original"), # ⚡ RECIBE EL COLOR
+    color: str = Form("Original"), 
     foto: UploadFile = File(...),
     db: Session = Depends(get_db), 
     token: str = Depends(verificar_token)
 ):
-    # 1. COMPRESIÓN WEBP Y SUBIDA A IMGBB MÁGICA
+    import cloudinary
+    import cloudinary.uploader
+    import io
+
+    # 1. COMPRESIÓN WEBP Y SUBIDA A CLOUDINARY
     contenido_original = foto.file.read()
     
     try:
-        # Abrimos la foto pesada original
         imagen_pil = Image.open(io.BytesIO(contenido_original))
-        
-        # La convertimos a formato RGB (por si era un PNG con transparencia)
         if imagen_pil.mode in ("RGBA", "P"):
             imagen_pil = imagen_pil.convert("RGB")
             
-        # Creamos un archivo temporal en la memoria RAM
         buffer_webp = io.BytesIO()
-        
-        # Guardamos la imagen como WebP con 80% de calidad (Compresión masiva)
         imagen_pil.save(buffer_webp, format="webp", quality=80)
         buffer_webp.seek(0)
-        
-        # Extraemos la nueva foto ultraligera
-        contenido_comprimido = buffer_webp.read()
     except Exception as e:
         print(f"Error comprimiendo imagen: {e}. Usando original.")
-        contenido_comprimido = contenido_original # Respaldo de seguridad
+        buffer_webp = io.BytesIO(contenido_original) 
 
-    imagen_base64 = base64.b64encode(contenido_comprimido).decode("utf-8")
-    
-    API_KEY = os.getenv("IMGBB_API_KEY", "")
-    respuesta = requests.post("https://api.imgbb.com/1/upload", data={"key": API_KEY, "image": imagen_base64})
-    
-    if respuesta.status_code == 200: 
-        url_permanente = respuesta.json()["data"]["url"]
-    else: 
-        return {"error": "Fallo la subida a ImgBB"}
+    # ⚡ SUBIDA PROFESIONAL A CLOUDINARY
+    try:
+        respuesta_cloud = cloudinary.uploader.upload(
+            buffer_webp,
+            folder="surprise_jeans_catalogo",
+            public_id=f"{codigo.strip()}_{int(datetime.now().timestamp())}"
+        )
+        url_permanente = respuesta_cloud['secure_url']
+    except Exception as e:
+        return {"error": f"Fallo la subida a Cloudinary: {str(e)}"}
 
     # ⚡ LIMPIEZA DE COLOR Y ARMADO DE PREFIJO
     color_limpio = color.strip()
@@ -1562,9 +1560,9 @@ def crear_pantalon(
     )
     db.add(nuevo_pantalon)
     db.commit()
-    db.refresh(nuevo_pantalon) # Refrescamos para obtener el ID del pantalón papá
+    db.refresh(nuevo_pantalon) 
     
-    # --- ⚡ NUEVO BLOQUE: CREACIÓN DE TALLAS PARA LA BASE DE DATOS WEB ---
+    # --- CREACIÓN DE TALLAS ---
     paquetes = max(1, stock // 12) if stock > 0 else 0
     distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
 
@@ -1575,7 +1573,7 @@ def crear_pantalon(
         nueva_variante = models.VarianteTalla(
             pantalon_id=nuevo_pantalon.id, 
             talla=talla_str, 
-            color=color_limpio, # ⚡ GUARDAMOS EL COLOR
+            color=color_limpio, 
             stock=stock_talla, 
             sku=sku_variante
         )
@@ -1585,12 +1583,10 @@ def crear_pantalon(
             background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, sku_variante, stock_talla)
 
     db.commit()
-    # ---------------------------------------------------------------------
     
     categoria_db = db.query(models.Categoria).filter(models.Categoria.id == categoria_id).first()
     nombre_cat = categoria_db.nombre if categoria_db else "Sin Categoría"
     
-    # ⚡ LLAMADA A LOYVERSE INCLUYENDO EL COLOR
     background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre, codigo, precio, nombre_cat, color_limpio)
 
     return {"mensaje": "Pantalón subido y comprimido con éxito", "url": url_permanente}
@@ -1629,12 +1625,13 @@ def subir_fotos_magicas(
     db: Session = Depends(get_db),
     token: str = Depends(verificar_token)
 ):
+    
     print("\n" + "="*50)
-    print("🚀 INICIANDO CARGA MÁGICA (DESDE MAIN.PY A IMGBB)")
+    print("☁️ INICIANDO CARGA MÁGICA (NIVEL EMPRESARIAL - CLOUDINARY)")
 
-    API_KEY = os.getenv("IMGBB_API_KEY", "").strip() 
-    if not API_KEY:
-        raise HTTPException(status_code=500, detail="Falta configurar la llave de ImgBB en el servidor.")
+    # Cloudinary detecta automáticamente la variable CLOUDINARY_URL de Render
+    if not os.getenv("CLOUDINARY_URL"):
+        raise HTTPException(status_code=500, detail="Falta configurar CLOUDINARY_URL en Render.")
 
     categoria = db.query(models.Categoria).filter(models.Categoria.nombre.ilike(categoria_destino)).first()
     if not categoria:
@@ -1681,7 +1678,7 @@ def subir_fotos_magicas(
         color_sku = "ORIGINAL"
         stock_total = paquetes * 12
 
-        # 1. COMPRESIÓN JPEG (Para que Excel la lea sin problemas)
+        # 1. COMPRESIÓN JPEG PARA EXCEL
         print("🗜️ Comprimiendo imagen a JPG...")
         contenido_original = foto.file.read()
         try:
@@ -1691,45 +1688,26 @@ def subir_fotos_magicas(
             buffer_img = io.BytesIO()
             imagen_pil.save(buffer_img, format="jpeg", quality=80) 
             buffer_img.seek(0)
-            contenido_comprimido = buffer_img.read()
-            extension = "jpg"
         except Exception as e:
             print(f"⚠️ Aviso: Falló la compresión. Usando original.")
-            contenido_comprimido = contenido_original
-            extension = "jpg"
+            buffer_img = io.BytesIO(contenido_original)
 
-        # 2. ⚡ SUBIDA DIRECTA A IMGBB (BYPASS DE CLOUDFLARE EN BACKEND)
-        print("🌐 Subiendo a ImgBB con disfraz...")
+        # 2. ⚡ SUBIDA A CLOUDINARY (SIN BLOQUEOS JAMÁS)
+        print("🌐 Subiendo a la nube de Cloudinary...")
         try:
-            # ⚡ EL DISFRAZ: Engañamos al muro de fuego fingiendo ser un humano en una Mac
-            headers_stealth = {
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-            }
-
-            respuesta = requests.post(
-                "https://api.imgbb.com/1/upload", 
-                data={"key": API_KEY}, 
-                files={"image": (f"foto.{extension}", contenido_comprimido, f"image/{extension}")},
-                headers=headers_stealth  # ⚡ Inyectamos el disfraz aquí
+            # Cloudinary recibe el buffer directamente y lo organiza en una carpeta
+            respuesta_cloud = cloudinary.uploader.upload(
+                buffer_img,
+                folder="surprise_jeans_catalogo",
+                public_id=f"{sku_padre}_{int(datetime.now().timestamp())}" # Nombre único infalible
             )
             
-            if respuesta.status_code != 200:
-                try:
-                    error_real = respuesta.json().get("error", {}).get("message", "Error desconocido")
-                except:
-                    error_real = "Bloqueo de seguridad (Cloudflare)."
-                raise HTTPException(status_code=400, detail=f"{respuesta.status_code}: ImgBB rechazó la foto. Razón: {error_real}")
-                
-            url_permanente = respuesta.json()["data"]["url"]
-            print(f"✅ ¡Éxito! Foto subida a ImgBB: {url_permanente}")
+            url_permanente = respuesta_cloud['secure_url']
+            print(f"✅ ¡Éxito! Foto subida a Cloudinary: {url_permanente}")
             
-        except requests.exceptions.RequestException:
-            razon = "Fallo la conexión de red con ImgBB."
-            detalles_errores.append(f"{nombre_archivo_limpio}: {razon}")
-            errores += 1
-            continue
         except Exception as e:
-            detalles_errores.append(f"{nombre_archivo_limpio}: {str(e)}")
+            razon = f"Error al subir a Cloudinary. Detalle: {str(e)}"
+            detalles_errores.append(f"{nombre_archivo_limpio}: {razon}")
             errores += 1
             continue
 
@@ -1762,7 +1740,7 @@ def subir_fotos_magicas(
         db.commit()
         background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre_limpio, sku_padre, precio, categoria.nombre, color)
         
-        # 5. PREPARAMOS EXCEL (Fórmula en inglés puro)
+        # 5. PREPARAMOS EXCEL 
         datos_excel.append({
             "Código": sku_padre,
             "Nombre": nombre_limpio,
@@ -1770,7 +1748,7 @@ def subir_fotos_magicas(
             "Paquetes Físicos": paquetes,
             "Stock Total (Piezas)": stock_total,
             "Categoría": categoria.nombre,
-            "Foto Visual": f'=IMAGE("{url_permanente}")', # ⚡ Sin el _xlfn.
+            "Foto Visual": f'=IMAGE("{url_permanente}")',
             "Link Web": url_permanente
         })
         exitos += 1
@@ -1800,7 +1778,7 @@ def subir_fotos_magicas(
             # Ajuste de Filas con Candado para Mac
             for fila in range(2, len(datos_excel) + 2):
                 worksheet.row_dimensions[fila].height = 110  
-                worksheet.row_dimensions[fila].customHeight = True # ⚡ CANDADO MAC
+                worksheet.row_dimensions[fila].customHeight = True 
                 
     except Exception as e:
         raise HTTPException(status_code=500, detail="El servidor no tiene 'openpyxl'. Agrégalo a tu requirements.txt.")
@@ -1825,7 +1803,6 @@ async def subir_excel(
         import pandas as pd
         from io import BytesIO
         
-        # Aislamos la lectura pesada del Excel
         def procesar_pandas():
             if archivo.filename.endswith('.csv'): 
                 return pd.read_csv(BytesIO(contenido))
@@ -1835,9 +1812,10 @@ async def subir_excel(
         df = await run_in_threadpool(procesar_pandas)
         df.columns = df.columns.str.strip()
         
-        columnas_esperadas = ["Codigo", "Nombre", "Precio", "Stock", "Categoria", "Foto_URL"]
+        # ⚡ FIX: AHORA EXIGIMOS "Paquetes" y "Color" EN LUGAR DE STOCK
+        columnas_esperadas = ["Codigo", "Nombre", "Precio", "Paquetes", "Categoria", "Color"]
         for col in columnas_esperadas:
-            if col not in df.columns: return {"error": f"Falta la columna '{col}'"}
+            if col not in df.columns: return {"error": f"Falta la columna '{col}' en tu Excel."}
 
         pantalones_creados = 0
         for index, fila in df.iterrows():
@@ -1858,18 +1836,20 @@ async def subir_excel(
             codigo = str(fila['Codigo']).strip()
             nombre = str(fila['Nombre']).strip()
             precio = float(fila['Precio'])
-            stock = int(fila['Stock'])
             
-            # ⚡ LECTURA DEL COLOR
-            color_excel = str(fila.get('Color', 'Original')).strip()
+            # ⚡ LEEMOS LOS PAQUETES Y CALCULAMOS EL STOCK TOTAL AUTOMÁTICAMENTE
+            paquetes = int(fila['Paquetes'])
+            stock_total = paquetes * 12
+            
+            color_excel = str(fila['Color']).strip()
             if color_excel == 'nan' or not color_excel:
                 color_excel = "Original"
             color_sku = color_excel.replace(" ", "").upper()
 
-            # 1. CREAMOS AL PAPÁ PRIMERO
+            # 1. CREAMOS AL PAPÁ PRIMERO (Con el stock ya multiplicado)
             nuevo_pantalon = models.Pantalon(
                 codigo=codigo, nombre=nombre, precio=precio,
-                stock=stock, categoria_id=categoria.id, imagen_url=foto_url
+                stock=stock_total, categoria_id=categoria.id, imagen_url=foto_url
             )
             db.add(nuevo_pantalon)
             db.commit()
@@ -1877,8 +1857,7 @@ async def subir_excel(
             
             pantalones_creados += 1
             
-            # 2. AHORA SÍ, CREAMOS LOS HIJOS (Tallas) CON SU COLOR
-            paquetes = max(1, stock // 12) if stock > 0 else 0
+            # 2. CREAMOS LOS HIJOS (Tallas)
             distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
 
             for talla_str, piezas_por_paquete in distribucion.items():
@@ -1888,7 +1867,7 @@ async def subir_excel(
                 nueva_talla = models.VarianteTalla(
                     pantalon_id=nuevo_pantalon.id,
                     talla=talla_str,
-                    color=color_excel, # ⚡ GUARDAMOS EL COLOR EN BD
+                    color=color_excel, 
                     stock=stock_talla,
                     sku=sku_variante
                 )
@@ -1899,13 +1878,13 @@ async def subir_excel(
             
             db.commit()
             
-            # ⚡ CREAMOS EN LOYVERSE CON COLOR
+            # ⚡ CREAMOS EN LOYVERSE
             background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre, codigo, precio, categoria.nombre, color_excel)
             
         return {"mensaje": f"Carga masiva exitosa. Se crearon {pantalones_creados} modelos."}
         
     except Exception as e:
-        return {"error": "Hubo un problema al leer el archivo."}
+        return {"error": f"Hubo un problema al leer el archivo: {str(e)}"}
         
 # ==========================================
 # CENTRO DE DESPACHO (EXCLUSIVO YESSICA)
@@ -2045,7 +2024,7 @@ def ver_clientes(db: Session = Depends(get_db)):
 
 @app.put("/pantalones/{pantalon_id}")
 @limiter.limit("20/minute")
-def editar_pantalon(  # ⚡ FIX: Quitamos el async para evitar bloqueos
+def editar_pantalon( 
     request: Request,
     pantalon_id: int,
     background_tasks: BackgroundTasks,
@@ -2059,6 +2038,10 @@ def editar_pantalon(  # ⚡ FIX: Quitamos el async para evitar bloqueos
     db: Session = Depends(get_db),
     token: str = Depends(verificar_token)
 ):
+    import cloudinary
+    import cloudinary.uploader
+    import io
+
     codigo_limpio = codigo.strip()
     color_limpio = color.strip()
     color_sku = color_limpio.replace(" ", "").upper()
@@ -2089,21 +2072,25 @@ def editar_pantalon(  # ⚡ FIX: Quitamos el async para evitar bloqueos
     pantalon.stock = stock
     pantalon.categoria_id = categoria_id
 
+    # ⚡ SUBIDA A CLOUDINARY (SOLO SI SE SUBIÓ UNA FOTO NUEVA)
     if foto and foto.filename:
-        contenido = foto.file.read()  # ⚡ FIX: Lectura segura de la memoria
-        imagen_base64 = base64.b64encode(contenido).decode("utf-8")
-        API_KEY = os.getenv("IMGBB_API_KEY", "") # ⚡ FIX: Llave encriptada desde Render
-        respuesta = requests.post("https://api.imgbb.com/1/upload", data={"key": API_KEY, "image": imagen_base64})
-        if respuesta.status_code == 200:
-            pantalon.imagen_url = respuesta.json()["data"]["url"]
+        contenido = foto.file.read() 
+        try:
+            buffer_img = io.BytesIO(contenido)
+            respuesta_cloud = cloudinary.uploader.upload(
+                buffer_img,
+                folder="surprise_jeans_catalogo",
+                public_id=f"{codigo_limpio}_update_{int(datetime.now().timestamp())}"
+            )
+            pantalon.imagen_url = respuesta_cloud['secure_url']
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Error subiendo la foto a Cloudinary: {str(e)}")
 
     paquetes = max(1, stock // 12) if stock > 0 else 0
     distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
 
     for talla_str, piezas_por_paquete in distribucion.items():
         stock_talla = paquetes * piezas_por_paquete
-        
-        # ⚡ EL FIX: ARMAMOS EL SKU EXACTO PARA LOYVERSE
         sku_variante = f"{codigo_limpio}-{color_sku}-{talla_str}"
 
         nueva_variante = models.VarianteTalla(
@@ -2122,7 +2109,6 @@ def editar_pantalon(  # ⚡ FIX: Quitamos el async para evitar bloqueos
     categoria_db = db.query(models.Categoria).filter(models.Categoria.id == categoria_id).first()
     nombre_cat = categoria_db.nombre if categoria_db else "General"
     
-    # Usamos la talla 3 como "Puntero Láser" para encontrar el artículo correcto en Loyverse
     sku_laser = f"{codigo_limpio}-{color_sku}-3" 
     background_tasks.add_task(loyverse_sync.actualizar_categoria_loyverse, sku_laser, nombre_cat)
 
