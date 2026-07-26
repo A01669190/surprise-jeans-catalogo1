@@ -818,22 +818,48 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
 
     # 2. Dibujamos el PDF en memoria (Formato Etiqueta 4x6 estándar)
     buffer = BytesIO()
-    # Pagesize es 100x150mm. Coordinate system starts at bottom-left.
-    width, height = 100*mm, 150*mm
-    p = canvas.Canvas(buffer, pagesize=(width, height)) 
+    p = canvas.Canvas(buffer, pagesize=(100*mm, 150*mm)) 
     
     # ==========================================
-    # ⚡ SECCIÓN INFERIOR (ESTÁTICA)
-    # Definimos las posiciones fijas de abajo hacia arriba
+    # ⚡ TODA LA PARTE DE ARRIBA: DIRECCIÓN (LLENANDO LA HOJA)
     # ==========================================
+    p.setFont("Helvetica-Bold", 26) # ⚡ Nombre Titánico
     
-    # 1. CÓDIGO DE BARRAS (Bien abajo)
-    y_barcode = 15*mm
-    barcode = code128.Code128(f"SJ-{pedido.id:04d}", barHeight=14*mm, barWidth=1.0)
-    barcode.drawOn(p, 5*mm, y_barcode)
+    # Empezamos desde bien arriba para aprovechar la hoja completa
+    y_text = 140*mm 
+    
+    p.drawString(7*mm, y_text, f"{pedido.nombre_cliente.upper()[:22]}")
+    y_text -= 13*mm # Mucho más espacio hacia abajo
+    
+    p.setFont("Helvetica-Bold", 16) # ⚡ Dirección enorme y legible
+    
+    p.drawString(7*mm, y_text, f"{pedido.calle_numero}")
+    y_text -= 10*mm
+    p.drawString(7*mm, y_text, f"Col. {pedido.colonia}")
+    y_text -= 10*mm
+    
+    p.drawString(7*mm, y_text, f"CP {pedido.codigo_postal}")
+    y_text -= 10*mm
+    
+    p.drawString(7*mm, y_text, f"{pedido.ciudad.upper()}, {pedido.estado.upper()}")
+    y_text -= 10*mm
+    
+    p.drawString(7*mm, y_text, f"{pedido.telefono}")
+    y_text -= 10*mm
 
-    # 2. LOGO DE SURPRISE (A la izquierda)
-    # y_logo es la base del logo. Su tope estará aprox en 32+18=50mm
+    if pedido.referencias:
+        p.setFont("Helvetica-Bold", 12)
+        p.drawString(5*mm, y_text, f"Ref: {pedido.referencias[:60]}") 
+        y_text -= 10*mm
+
+    # Línea divisoria (se ajusta dinámicamente donde termine el texto para cerrar el bloque)
+    p.line(5*mm, y_text + 2*mm, 95*mm, y_text + 2*mm) 
+
+    # ==========================================
+    # ⚡ PARTE DE ABAJO (Mantiene su diseño estético y equilibrado)
+    # ==========================================
+    
+    # 1. LOGO DE SURPRISE
     y_logo = 32*mm 
     ruta_logo = os.path.join(STATIC_DIR, "logo.png")
     if os.path.exists(ruta_logo):
@@ -842,33 +868,12 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
         p.setFont("Helvetica-Bold", 14)
         p.drawCentredString(27*mm, y_logo + 5*mm, "SURPRISE JEANS")
 
-    # 3. TEXTO DE AGRADECIMIENTO (A la derecha)
-    # Este bloque debe quedar a la par del logo y la firma
-    centro_derecha = 74*mm 
-    p.setFont("Helvetica", 7) 
-    
-    # Empezamos el texto del footer en una posición fija
-    y_text_footer = 50*mm # Un poco por debajo del tope del logo para alinear visualmente
-    
-    p.drawCentredString(centro_derecha, y_text_footer, "Si estás contenta con todo estaremos muy")
-    y_text_footer -= 3.5*mm
-    p.drawCentredString(centro_derecha, y_text_footer, "agradecidas de que nos compartas en tus")
-    y_text_footer -= 3.5*mm
-    p.drawCentredString(centro_derecha, y_text_footer, "historias y nos etiquetes!")
+    # 2. CÓDIGO DE BARRAS
+    barcode = code128.Code128(f"SJ-{pedido.id:04d}", barHeight=14*mm, barWidth=1.0)
+    barcode.drawOn(p, 5*mm, 15*mm)
 
-    # Subimos para dibujar la línea divisoria corta y el agradecimiento inicial
-    y_text_footer += 10*mm # Volvemos arriba para el inicio del bloque
-    p.setFont("Helvetica", 7)
-    p.drawCentredString(centro_derecha, y_text_footer, "Por tu compra")
-    y_text_footer -= 3.5*mm
-    p.drawCentredString(centro_derecha, y_text_footer, "y por apoyar el emprendimiento!")
-    
-    # Línea divisoria corta
-    y_text_footer -= 3*mm
-    p.line(55*mm, y_text_footer, 93*mm, y_text_footer) 
-
-    # 4. FIRMA MANUSCRITA (Justo encima del texto de agradecimiento)
-    y_firma = y_text_footer + 5*mm 
+    # 3. FIRMA MANUSCRITA
+    y_firma = 42*mm 
     ruta_gracias = os.path.join(STATIC_DIR, "gracias.png")
     if os.path.exists(ruta_gracias):
         p.drawImage(ImageReader(ruta_gracias), 54*mm, y_firma, width=40*mm, height=14*mm, preserveAspectRatio=True, mask='auto')
@@ -876,62 +881,25 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
         p.setFont("Times-Italic", 18)
         p.drawCentredString(75*mm, y_firma + 5*mm, "Muchas gracias!")
 
-    # Definimos el límite superior de la sección inferior para saber dónde poner la línea divisoria larga
-    # El punto más alto es la firma o el logo. Usemos ~65mm para dar aire.
-    limite_superior_inferior = 65*mm
-
-    # ==========================================
-    # ⚡ LÍNEA DIVISORIA PRINCIPAL
-    # ==========================================
-    # La dibujamos justo encima de todo el bloque inferior
-    p.setLineWidth(0.5)
-    p.line(5*mm, limite_superior_inferior, 95*mm, limite_superior_inferior)
-
-    # ==========================================
-    # ⚡ SECCIÓN SUPERIOR: DIRECCIÓN DEL CLIENTE
-    # Ahora dibujamos de abajo hacia arriba desde la línea divisoria
-    # ==========================================
+    # 4. TEXTO DE AGRADECIMIENTO
+    p.setFont("Helvetica", 7) 
+    y_text_footer = 38*mm 
+    centro_derecha = 74*mm 
     
-    # Espaciado base hacia arriba desde la línea
-    y_text = limite_superior_inferior + 5*mm 
-
-    # 1. Teléfono y Referencias (Lo primero arriba de la línea)
-    p.setFont("Helvetica-Bold", 17)
-    if pedido.referencias:
-        p.setFont("Helvetica-Bold", 12) # Letra más chica para referencias
-        p.drawString(5*mm, y_text, f"Ref: {pedido.referencias[:60]}") 
-        y_text += 8*mm # Subimos para el siguiente dato
-
-    p.setFont("Helvetica-Bold", 17) # Volvemos al tamaño normal
-    p.drawString(5*mm, y_text, f"{pedido.telefono}")
-    y_text += 10*mm
-
-    # 2. Ciudad y Estado
-    p.drawString(5*mm, y_text, f"{pedido.ciudad.upper()}, {pedido.estado.upper()}")
-    y_text += 10*mm
-
-    # 3. Código Postal
-    p.drawString(5*mm, y_text, f"CP {pedido.codigo_postal}")
-    y_text += 10*mm
-
-    # 4. Colonia
-    p.drawString(5*mm, y_text, f"Col. {pedido.colonia}")
-    y_text += 10*mm
-
-    # 5. Calle y Número
-    p.drawString(5*mm, y_text, f"{pedido.calle_numero}")
-    y_text += 10*mm
-
-    # 6. Nombre del Cliente (El último elemento, arriba de todo)
-    p.setFont("Helvetica-Bold", 21) # ⚡ Nombre un poco más pequeño (era 26)
+    p.drawCentredString(centro_derecha, y_text_footer, "Por tu compra")
+    y_text_footer -= 3.5*mm
+    p.drawCentredString(centro_derecha, y_text_footer, "y por apoyar el emprendimiento!")
     
-    # Aseguramos un espaciado final antes del nombre
-    y_text += 3*mm
-    p.drawString(5*mm, y_text, f"{pedido.nombre_cliente.upper()[:22]}")
+    y_text_footer -= 3*mm
+    p.line(55*mm, y_text_footer, 93*mm, y_text_footer) 
+    
+    y_text_footer -= 4*mm
+    p.drawCentredString(centro_derecha, y_text_footer, "Si estás contenta con todo estaremos muy")
+    y_text_footer -= 3.5*mm
+    p.drawCentredString(centro_derecha, y_text_footer, "agradecidas de que nos compartas en tus")
+    y_text_footer -= 3.5*mm
+    p.drawCentredString(centro_derecha, y_text_footer, "historias y nos etiquetes!")
 
-    # ==========================================
-    # FIN Y RENDER
-    # ==========================================
     p.showPage()
     p.save()
     buffer.seek(0)
