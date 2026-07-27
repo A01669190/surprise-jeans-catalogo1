@@ -11,8 +11,6 @@ from reportlab.pdfgen import canvas
 from datetime import datetime
 from logistica_sync import generar_guia_envio
 import threading
-import cloudinary
-import cloudinary.uploader
 from fastapi.concurrency import run_in_threadpool
 from fastapi import Body
 from reportlab.graphics.barcode import code128
@@ -70,6 +68,8 @@ import qrcode
 from reportlab.lib.utils import ImageReader
 from PIL import Image
 import io
+import cloudinary
+import cloudinary.uploader
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="API Surprise Jeans - Fortificada")
@@ -1519,9 +1519,6 @@ def crear_pantalon(
     db: Session = Depends(get_db), 
     token: str = Depends(verificar_token)
 ):
-    import cloudinary
-    import cloudinary.uploader
-    import io
 
     # 1. COMPRESIÓN WEBP Y SUBIDA A CLOUDINARY
     contenido_original = foto.file.read()
@@ -1625,9 +1622,6 @@ def subir_fotos_magicas(
     db: Session = Depends(get_db),
     token: str = Depends(verificar_token)
 ):
-    import cloudinary
-    import cloudinary.uploader
-    import io
     
     print("\n" + "="*50)
     print("☁️ INICIANDO CARGA MÁGICA (NIVEL EMPRESARIAL - CLOUDINARY)")
@@ -2046,9 +2040,6 @@ def editar_pantalon(
     db: Session = Depends(get_db),
     token: str = Depends(verificar_token)
 ):
-    import cloudinary
-    import cloudinary.uploader
-    import io
 
     codigo_limpio = codigo.strip()
     color_limpio = color.strip()
