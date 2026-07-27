@@ -1776,15 +1776,20 @@ def subir_fotos_magicas(
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
             df.to_excel(writer, index=False, sheet_name='Nuevos Modelos')
             worksheet = writer.sheets['Nuevos Modelos']
+            
             worksheet.column_dimensions['A'].width = 15  
             worksheet.column_dimensions['B'].width = 30  
             worksheet.column_dimensions['G'].width = 25  
             worksheet.column_dimensions['H'].width = 45  
+            
             for fila in range(2, len(datos_excel) + 2):
                 worksheet.row_dimensions[fila].height = 110  
                 worksheet.row_dimensions[fila].customHeight = True 
+                
     except Exception as e:
-        raise HTTPException(status_code=500, detail="El servidor no tiene 'openpyxl'. Agrégalo a tu requirements.txt.")
+        # ⚡ FIX: Ahora atrapamos el error REAL para que no nos engañe
+        error_real = str(e)
+        raise HTTPException(status_code=500, detail=f"Fallo al crear Excel: {error_real}. Asegúrate de haber subido el archivo requirements.txt a Github.")
         
     buffer.seek(0)
     headers = {'Content-Disposition': 'attachment; filename="Carga_Magica_YSK.xlsx"'}
