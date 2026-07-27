@@ -2080,10 +2080,8 @@
                 carrito.push({ ...pantalon, cantidad: 1, talla: seleccion.talla, sku_variante: seleccion.sku_variante });
             }
 
-            // ⚡ RESPUESTA HÁPTICA: Hace que el celular vibre suavemente (Solo en Android/Soportados)
-            if (window.navigator && window.navigator.vibrate) {
-                window.navigator.vibrate(40);
-            }
+            // ⚡ DISPARAMOS EL EFECTO HÁPTICO (Audio + Vibración)
+            dispararHaptics();
             
             actualizarUICarrito();
 
@@ -2094,12 +2092,9 @@
             // ==========================================
             if (botonElemento) {
                 const textoOriginal = botonElemento.innerHTML;
-                
-                // Forzamos el color verde esmeralda y el texto de éxito usando !important de Tailwind
                 botonElemento.innerHTML = '¡Añadido! ✓';
                 botonElemento.classList.add('!bg-emerald-500', '!text-white', '!scale-105');
                 
-                // Lo regresamos a la normalidad después de 1 segundo
                 setTimeout(() => {
                     botonElemento.innerHTML = textoOriginal;
                     botonElemento.classList.remove('!bg-emerald-500', '!text-white', '!scale-105');
@@ -2113,12 +2108,10 @@
             const badgeCarrito = document.getElementById('cart-badge');
             
             if (carritoFlotante && badgeCarrito) {
-                // El carrito hace un zoom rápido y cambia a verde
                 carritoFlotante.classList.replace('bg-stone-900', 'bg-emerald-500');
                 carritoFlotante.classList.add('scale-125');
                 badgeCarrito.classList.add('scale-150', 'bg-stone-900');
                 
-                // Regresamos el carrito a su estado original después de 400ms (un latido)
                 setTimeout(() => {
                     carritoFlotante.classList.replace('bg-emerald-500', 'bg-stone-900');
                     carritoFlotante.classList.remove('scale-125');
@@ -3412,17 +3405,6 @@
             } catch(e) {
                 // Falla silenciosa si el navegador requiere interacción previa
             }
-        }
-
-
-        function agregarAlCarrito(id, botonElemento = null) {
-            // ... (tu código de validación de tallas) ...
-
-            // ⚡ DISPARAMOS EL EFECTO HÁPTICO (Audio + Vibración)
-            dispararHaptics();
-            
-            actualizarUICarrito();
-            // ... 
         }
 
 
