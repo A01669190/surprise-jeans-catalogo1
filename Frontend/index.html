@@ -3049,7 +3049,7 @@
                 // ⚡ Fíjate que quitamos el botón de borrar "X", porque no pueden borrar tus regalos
                 li.innerHTML = `
                     <img src="${item.imagen_url}" class="w-20 h-28 object-cover rounded-xl cursor-pointer" onclick="cerrarFavoritos(); verDetalles(${item.id}, '${item.nombre.replace(/'/g, "\\'")}', '${item.imagen_url}', ${item.precio})">
-                    <div class="flex-1 pr-2">
+                    <div class="flex-1 pr-2 min-w-0">
                         <p class="font-bold text-sm text-stone-800 uppercase leading-tight mb-1 truncate" title="${item.nombre}">${item.nombre}</p>
                         <p class="font-black text-indigo-600 mb-2">$${item.precio}</p>
                         <button onclick="cerrarFavoritos(); verDetalles(${item.id}, '${item.nombre.replace(/'/g, "\\'")}', '${item.imagen_url}', ${item.precio})" class="text-[10px] bg-indigo-600 text-white font-bold px-4 py-2 rounded-lg w-full hover:bg-indigo-700 transition-colors uppercase tracking-wider shadow-md">Regalar este modelo</button>
