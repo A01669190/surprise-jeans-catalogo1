@@ -290,7 +290,8 @@
         </div>
     </footer>
 
-    <button id="btn-flotante-carrito" onclick="abrirCarrito()" class="hidden md:block fixed bottom-6 right-6 bg-stone-900 text-white p-4 rounded-full shadow-2xl transition-all duration-300 hover:scale-110 z-40">
+    <!-- ⚡ Este carrito solo aparece en computadora (md:block) -->
+    <button id="btn-flotante-carrito" onclick="abrirCarrito()" class="hidden md:flex fixed bottom-6 right-6 bg-stone-900 text-white p-4 rounded-full shadow-2xl transition-all duration-300 hover:scale-110 z-40 items-center justify-center">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
         </svg>
@@ -3401,7 +3402,7 @@
     <!-- ========================================== -->
     <!-- ⚡ BOTTOM NAV BAR ESTILO APP (Solo Celular) ⚡ -->
     <!-- ========================================== -->
-    <!-- ⚡ Se quitó el 'h-16' y se agregó padding dinámico (pb) para cubrir el Área Segura de iPhone -->
+    <!-- ⚡ 'hidden md:hidden' fuerza a que no se pelee con el flex en PC -->
     <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-between items-start px-6 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] z-50 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
         
         <button onclick="window.scrollTo({top: 0, behavior: 'smooth'})" class="flex flex-col items-center text-gray-400 hover:text-indigo-600 transition-colors">
@@ -3415,7 +3416,6 @@
         </button>
 
         <!-- CARRITO CENTRAL FLOTANTE -->
-        <!-- ⚡ Usamos margen negativo (-mt-6) para que el carrito sobresalga hacia arriba -->
         <div class="relative -mt-6">
             <button onclick="abrirCarrito()" id="btn-cart-app" class="bg-stone-900 text-white w-14 h-14 rounded-full shadow-2xl hover:scale-105 transition-transform border-4 border-white flex items-center justify-center relative z-10">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
