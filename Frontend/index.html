@@ -1825,8 +1825,6 @@
             cargarSiguienteLote();
         }
 
-        // ⚡ 2. EL DIBUJANTE: Carga solo un pedacito del catálogo a la vez
-        // ⚡ 2. EL DIBUJANTE: Carga solo un pedacito del catálogo a la vez
         function cargarSiguienteLote() {
             const grid = document.getElementById('grid-pantalones');
             const fin = indiceRenderizado + LIMITE_POR_CARGA;
@@ -1841,7 +1839,16 @@
             lote.forEach(p => {
                 const estaAgotado = p.stock === 0;
                 
-                // ⚡ NUEVA LÓGICA DE ESCASEZ PSICOLÓGICA ⚡
+                // ⚡ DECLARACIÓN DE VARIABLES OBLIGATORIAS ⚡
+                const etiquetaAgotado = estaAgotado ? '<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-600 text-white text-lg font-black px-6 py-2 rounded-xl shadow-2xl tracking-widest z-20 -rotate-12 border-2 border-white">AGOTADO</div>' : '';
+                
+                const ratingDOM = p.promedio_estrellas > 0 
+                    ? `<div class="flex items-center gap-1 text-xs text-amber-400 font-black mb-1">
+                        ${'⭐'.repeat(Math.round(p.promedio_estrellas))} <span class="text-gray-400 font-medium">(${p.total_resenas})</span>
+                       </div>`
+                    : `<p class="text-[10px] text-gray-400 italic mb-1">Nuevo modelo</p>`;
+
+                // ⚡ LÓGICA DE ESCASEZ PSICOLÓGICA ⚡
                 let textoStock = `Disp: ${p.stock}`;
                 let claseStock = estaAgotado ? 'text-rose-500' : 'text-stone-400';
                 
@@ -3353,11 +3360,6 @@
         function onScanFailure(error) {
             // Silencio total mientras busca códigos
         }
-        
-
-        function onScanFailure(error) {
-            // Ignoramos los fallos cuadro por cuadro
-        }
 
         // ==========================================
         // ⚡ BOTÓN SECRETO (EASTER EGG) PARA ALMACÉN
@@ -3383,9 +3385,6 @@
             }
         }
 
-        function onScanFailure(error) {
-            // Ignoramos los fallos cuadro por cuadro
-        }
 
         // ⚡ ESCONDER TECLADO AL HACER SCROLL EN LA BÚSQUEDA
         const ventanaResultados = document.getElementById('resultados-predictivos');
