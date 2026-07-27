@@ -1776,14 +1776,13 @@ def subir_fotos_magicas(
             worksheet.column_dimensions['G'].width = 25  
             worksheet.column_dimensions['H'].width = 45  
             
+            # ⚡ FIX DEFINITIVO: En esta versión de openpyxl, solo asignar el height basta
             for fila in range(2, len(datos_excel) + 2):
                 worksheet.row_dimensions[fila].height = 110  
-                worksheet.row_dimensions[fila].customHeight = True 
                 
     except Exception as e:
-        # ⚡ FIX: Ahora atrapamos el error REAL para que no nos engañe
         error_real = str(e)
-        raise HTTPException(status_code=500, detail=f"Fallo al crear Excel: {error_real}. Asegúrate de haber subido el archivo requirements.txt a Github.")
+        raise HTTPException(status_code=500, detail=f"Fallo al crear Excel: {error_real}")
         
     buffer.seek(0)
     headers = {'Content-Disposition': 'attachment; filename="Carga_Magica_YSK.xlsx"'}
