@@ -161,7 +161,7 @@
 
             <!-- Columna Derecha (Iconos) -->
             <!-- ⚡ Se cambió a space-x-0 para juntarlos. Su padding (p-1.5) les dará la separación ideal -->
-            <div class="flex-1 flex justify-end items-center space-x-0 sm:space-x-5 z-20">
+            <div class="hidden md:flex flex-1 justify-end items-center space-x-0 sm:space-x-5 z-20"></div>
                 <!-- Icono WhatsApp -->
                 <a href="https://wa.me/525513220695" target="_blank" class="text-gray-400 hover:text-green-500 transition-colors p-1.5">
                     <svg class="w-6 h-6 sm:w-7 sm:h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
@@ -197,8 +197,6 @@
         </div>
     </header>
 
-    <!-- ⚡ NUEVA PORTADA (HERO BANNER) ⚡ -->
-    <!-- ⚡ PORTADA MINIMALISTA (Fondo Rosa Elegante) ⚡ -->
     <section class="bg-rose-50 py-16 md:py-24 text-center px-4 border-y border-rose-100">
         <h2 class="text-4xl md:text-6xl font-serif mb-4 text-stone-800 tracking-tight">Realza tu figura</h2>
         <p class="text-stone-500 mb-10 max-w-lg mx-auto text-sm md:text-base font-medium">Descubre nuestra nueva colección. El fit perfecto diseñado para ti, directo de fábrica.</p>
@@ -2180,6 +2178,11 @@
             }
 
             badge.innerText = cantidadTotal;
+            
+            // ⚡ NUEVA LÍNEA PARA LA BARRA DE APP:
+            const badgeApp = document.getElementById('cart-badge-app');
+            if(badgeApp) badgeApp.innerText = cantidadTotal;
+            
             totalEl.innerText = `$${total.toFixed(2)}`;
             renderizarCrossSell();
 
@@ -2773,7 +2776,16 @@
                             </div>
                         `;
                     }
-                    botonPrincipalModal = `<button onclick="agregarAlCarrito(${id}, this); setTimeout(() => Swal.close(), 800);" class="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-3.5 rounded-xl mt-2 shadow-lg transition-all duration-300">AÑADIR A LA BOLSA</button>`;
+                    botonPrincipalModal = `
+                        <div class="flex gap-2 mt-3">
+                            <button onclick="agregarAlCarrito(${id}, this)" class="w-1/2 bg-gray-100 hover:bg-gray-200 text-stone-900 font-bold py-3.5 rounded-xl shadow-sm transition-all duration-300 text-[10px] sm:text-xs tracking-wider">
+                                AÑADIR A BOLSA
+                            </button>
+                            <button onclick="agregarAlCarrito(${id}, this); setTimeout(() => abrirCheckout(), 500);" class="w-1/2 bg-stone-900 hover:bg-stone-800 text-white font-black py-3.5 rounded-xl shadow-lg transition-all duration-300 text-[10px] sm:text-xs tracking-wider">
+                                COMPRAR AHORA
+                            </button>
+                        </div>
+                    `;
                 } else {
                     // Si no hay stock, mostramos el botón de la campanita
                     botonPrincipalModal = `<button onclick="abrirModalEspera(${id}, '${nombre.replace(/'/g, "\\'")}')" class="w-full bg-rose-50 text-rose-600 border border-rose-200 font-bold py-3.5 rounded-xl hover:bg-rose-100 transition-all duration-300 text-xs uppercase tracking-wider shadow-sm mt-2 flex items-center justify-center gap-2"><span>🔔</span> ¡Avísame cuando llegue!</button>`;
@@ -3357,6 +3369,42 @@
 
 
     </script>
+    
+    <!-- ========================================== -->
+    <!-- ⚡ BOTTOM NAV BAR ESTILO APP (Solo Celular) ⚡ -->
+    <!-- ========================================== -->
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-between items-center px-6 h-16 z-50 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
+        
+        <button onclick="window.scrollTo({top: 0, behavior: 'smooth'})" class="flex flex-col items-center text-gray-400 hover:text-indigo-600 transition-colors">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+            <span class="text-[9px] mt-1 font-bold">Inicio</span>
+        </button>
+
+        <button onclick="abrirFavoritos()" class="flex flex-col items-center text-gray-400 hover:text-rose-500 transition-colors">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+            <span class="text-[9px] mt-1 font-bold">Favoritos</span>
+        </button>
+
+        <!-- CARRITO CENTRAL FLOTANTE -->
+        <div class="relative -top-5">
+            <button onclick="abrirCarrito()" id="btn-cart-app" class="bg-stone-900 text-white w-14 h-14 rounded-full shadow-2xl hover:scale-105 transition-transform border-4 border-gray-50 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <span id="cart-badge-app" class="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm">0</span>
+            </button>
+        </div>
+
+        <button onclick="abrirRastreo()" class="flex flex-col items-center text-gray-400 hover:text-indigo-600 transition-colors">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 1h2a2 2 0 012 2v3l-2.5 1.5H19m-4 2a2 2 0 11-4 0 2 2 0 014 0zm-8 0a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+            <span class="text-[9px] mt-1 font-bold">Rastrear</span>
+        </button>
+
+        <button onclick="abrirPerfilCliente()" class="flex flex-col items-center text-gray-400 hover:text-indigo-600 transition-colors">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+            <span class="text-[9px] mt-1 font-bold">Perfil</span>
+        </button>
+    </nav>
     
 </body>
 </html>
