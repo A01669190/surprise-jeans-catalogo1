@@ -1625,11 +1625,13 @@ def subir_fotos_magicas(
     db: Session = Depends(get_db),
     token: str = Depends(verificar_token)
 ):
+    import cloudinary
+    import cloudinary.uploader
+    import io
     
     print("\n" + "="*50)
     print("☁️ INICIANDO CARGA MÁGICA (NIVEL EMPRESARIAL - CLOUDINARY)")
 
-    # Cloudinary detecta automáticamente la variable CLOUDINARY_URL de Render
     if not os.getenv("CLOUDINARY_URL"):
         raise HTTPException(status_code=500, detail="Falta configurar CLOUDINARY_URL en Render.")
 
@@ -1659,6 +1661,14 @@ def subir_fotos_magicas(
             continue
 
         sku_padre = partes[0].strip()
+
+        # ⚡ NUEVO ESCUDO: Verificamos si el pantalón ya existe antes de hacer nada
+        pantalon_existente = db.query(models.Pantalon).filter(models.Pantalon.codigo == sku_padre).first()
+        if pantalon_existente:
+            razon = f"El código '{sku_padre}' ya existe en el catálogo. Ignorado para evitar duplicados."
+            detalles_errores.append(f"{nombre_archivo_limpio}: {razon}")
+            errores += 1
+            continue # Salta a la siguiente foto sin explotar
         
         try:
             str_precio = ''.join(c for c in partes[-2] if c.isdigit() or c == '.')
@@ -1692,14 +1702,13 @@ def subir_fotos_magicas(
             print(f"⚠️ Aviso: Falló la compresión. Usando original.")
             buffer_img = io.BytesIO(contenido_original)
 
-        # 2. ⚡ SUBIDA A CLOUDINARY (SIN BLOQUEOS JAMÁS)
+        # 2. ⚡ SUBIDA A CLOUDINARY 
         print("🌐 Subiendo a la nube de Cloudinary...")
         try:
-            # Cloudinary recibe el buffer directamente y lo organiza en una carpeta
             respuesta_cloud = cloudinary.uploader.upload(
                 buffer_img,
                 folder="surprise_jeans_catalogo",
-                public_id=f"{sku_padre}_{int(datetime.now().timestamp())}" # Nombre único infalible
+                public_id=f"{sku_padre}_{int(datetime.now().timestamp())}" 
             )
             
             url_permanente = respuesta_cloud['secure_url']
@@ -1758,7 +1767,7 @@ def subir_fotos_magicas(
     
     if exitos == 0:
         reporte_final = "\n".join(detalles_errores)
-        raise HTTPException(status_code=400, detail=f"Detalles del error:\n{reporte_final}")
+        raise HTTPException(status_code=400, detail=f"No se subieron modelos nuevos.\n\nDetalles:\n{reporte_final}")
 
     # 6. CREACIÓN DEL EXCEL AUTOMÁTICO
     df = pd.DataFrame(datos_excel)
@@ -1766,20 +1775,14 @@ def subir_fotos_magicas(
     try:
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
             df.to_excel(writer, index=False, sheet_name='Nuevos Modelos')
-            
             worksheet = writer.sheets['Nuevos Modelos']
-            
-            # Ajuste de Columnas
             worksheet.column_dimensions['A'].width = 15  
             worksheet.column_dimensions['B'].width = 30  
             worksheet.column_dimensions['G'].width = 25  
             worksheet.column_dimensions['H'].width = 45  
-            
-            # Ajuste de Filas con Candado para Mac
             for fila in range(2, len(datos_excel) + 2):
                 worksheet.row_dimensions[fila].height = 110  
                 worksheet.row_dimensions[fila].customHeight = True 
-                
     except Exception as e:
         raise HTTPException(status_code=500, detail="El servidor no tiene 'openpyxl'. Agrégalo a tu requirements.txt.")
         
