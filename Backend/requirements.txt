@@ -13,3 +13,8 @@ mercadopago
 bcrypt
 resend
 qrcode
+cloudinary
+Pillow
+reportlab
+apscheduler
+google-auth
