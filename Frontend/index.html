@@ -69,7 +69,7 @@
 
 </head>
 
-<body class="bg-gray-50 text-gray-800 font-sans relative pb-20">
+<body class="bg-gray-50 text-gray-800 font-sans relative pb-28">
 
     <div id="overlay-menu" onclick="cerrarMenuLateral()" class="fixed inset-0 bg-stone-900 bg-opacity-50 z-40 hidden transition-opacity"></div>
     
@@ -150,10 +150,10 @@
                 </button>
             </div>
 
-            <!-- Columna Central (Logo Forzado al Centro Exacto) -->
-            <div class="absolute left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap z-10">
+            <!-- ⚡ Cambiamos a z-30 para que ninguna caja invisible bloquee los clics -->
+            <div class="absolute left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap z-30">
                 <!-- ⚡ Se redujo a text-lg en celular para que no choque con los botones grandes -->
-                <h1 onclick="activarBotonSecreto()" class="text-lg sm:text-2xl font-black text-indigo-500 italic tracking-tighter cursor-pointer select-none touch-manipulation flex items-baseline gap-1 sm:gap-1.5">
+                <h1 onclick="activarBotonSecreto()" class="relative z-30 text-lg sm:text-2xl font-black text-indigo-500 italic tracking-tighter cursor-pointer select-none touch-manipulation flex items-baseline gap-1 sm:gap-1.5">
                     Surprise Jeans
                     <span class="hidden sm:inline-block text-[10px] font-bold text-gray-400 not-italic uppercase tracking-widest">by YSK</span>
                 </h1>
@@ -3373,7 +3373,8 @@
     <!-- ========================================== -->
     <!-- ⚡ BOTTOM NAV BAR ESTILO APP (Solo Celular) ⚡ -->
     <!-- ========================================== -->
-    <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-between items-center px-6 h-16 z-50 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
+    <!-- ⚡ Se quitó el 'h-16' y se agregó padding dinámico (pb) para cubrir el Área Segura de iPhone -->
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-between items-start px-6 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] z-50 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
         
         <button onclick="window.scrollTo({top: 0, behavior: 'smooth'})" class="flex flex-col items-center text-gray-400 hover:text-indigo-600 transition-colors">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
@@ -3386,8 +3387,9 @@
         </button>
 
         <!-- CARRITO CENTRAL FLOTANTE -->
-        <div class="relative -top-5">
-            <button onclick="abrirCarrito()" id="btn-cart-app" class="bg-stone-900 text-white w-14 h-14 rounded-full shadow-2xl hover:scale-105 transition-transform border-4 border-gray-50 flex items-center justify-center">
+        <!-- ⚡ Usamos margen negativo (-mt-6) para que el carrito sobresalga hacia arriba -->
+        <div class="relative -mt-6">
+            <button onclick="abrirCarrito()" id="btn-cart-app" class="bg-stone-900 text-white w-14 h-14 rounded-full shadow-2xl hover:scale-105 transition-transform border-4 border-white flex items-center justify-center relative z-10">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
