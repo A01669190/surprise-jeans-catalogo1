@@ -1153,6 +1153,11 @@ def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, backgr
 
         lista_ropa = []
         for item in pedido_req.items:
+            # ⚡ ESCUDO ANTI-FANTASMAS: Verificamos que el pantalón realmente exista en la BD
+            pantalon_check = db.query(models.Pantalon).filter(models.Pantalon.id == item.id).first()
+            if not pantalon_check:
+                continue # Si ya fue borrado o no existe, lo saltamos para evitar que truene el pago
+
             precio_final = float(item.precio) * (1.0 - (descuento_porc / 100.0))
             db.add(models.DetallePedido(
                 pedido_id=nuevo_pedido.id, 
