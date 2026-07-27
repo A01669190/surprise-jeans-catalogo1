@@ -3384,16 +3384,56 @@
                 abrirEscanerAlmacen();
             }
         }
-
-
-        // ⚡ ESCONDER TECLADO AL HACER SCROLL EN LA BÚSQUEDA
-        const ventanaResultados = document.getElementById('resultados-predictivos');
-        if(ventanaResultados) {
-            ventanaResultados.addEventListener('touchmove', () => {
-                // Si el cliente desliza el dedo, ocultamos el teclado al instante
-                document.activeElement.blur(); 
-            }, { passive: true });
+        
+        // ⚡ SIMULADOR HÁPTICO UNIVERSAL (Audio para iOS + Vibración para Android)
+        function dispararHaptics() {
+            // 1. Vibración física (Funciona perfecto en Android)
+            if (window.navigator && window.navigator.vibrate) {
+                window.navigator.vibrate(40);
+            }
+            
+            // 2. Micro-clic de audio (Engaña al cerebro en iPhone y navegadores bloqueados)
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime); // Tono grave muy sutil
+                
+                gain.gain.setValueAtTime(0.08, audioCtx.currentTime); // Volumen bajito para que sea elegante
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.03); // Dura solo 30ms
+                
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.03);
+            } catch(e) {
+                // Falla silenciosa si el navegador requiere interacción previa
+            }
         }
+
+
+        function agregarAlCarrito(id, botonElemento = null) {
+            // ... (tu código de validación de tallas) ...
+
+            // ⚡ DISPARAMOS EL EFECTO HÁPTICO (Audio + Vibración)
+            dispararHaptics();
+            
+            actualizarUICarrito();
+            // ... 
+        }
+
+
+        // ⚡ CERRAR TECLADO GLOBAL AL HACER SCROLL EN CELULAR
+        window.addEventListener('scroll', () => {
+            const inputBusq = document.getElementById('buscador-tienda');
+            // Si el buscador está seleccionado y la gente hace scroll, quitamos el foco para cerrar el teclado
+            if (document.activeElement === inputBusq) {
+                inputBusq.blur();
+            }
+        }, { passive: true });
 
 
     </script>
