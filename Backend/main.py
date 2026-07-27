@@ -1622,6 +1622,9 @@ def subir_fotos_magicas(
     db: Session = Depends(get_db),
     token: str = Depends(verificar_token)
 ):
+    import cloudinary
+    import cloudinary.uploader
+    import io
     
     print("\n" + "="*50)
     print("☁️ INICIANDO CARGA MÁGICA (NIVEL EMPRESARIAL - CLOUDINARY)")
@@ -1656,13 +1659,13 @@ def subir_fotos_magicas(
 
         sku_padre = partes[0].strip()
 
-        # ⚡ NUEVO ESCUDO: Verificamos si el pantalón ya existe antes de hacer nada
+        # ⚡ ESCUDO: Verificamos si el pantalón ya existe antes de hacer nada
         pantalon_existente = db.query(models.Pantalon).filter(models.Pantalon.codigo == sku_padre).first()
         if pantalon_existente:
             razon = f"El código '{sku_padre}' ya existe en el catálogo. Ignorado para evitar duplicados."
             detalles_errores.append(f"{nombre_archivo_limpio}: {razon}")
             errores += 1
-            continue # Salta a la siguiente foto sin explotar
+            continue 
         
         try:
             str_precio = ''.join(c for c in partes[-2] if c.isdigit() or c == '.')
@@ -1724,7 +1727,9 @@ def subir_fotos_magicas(
         db.commit()
         db.refresh(nuevo_pantalon)
 
-        # 4. TALLAS EXACTAS
+        # 4. ORDEN OMNICANAL PERFECTO (Primero creamos el artículo en Loyverse, luego descontamos stock)
+        background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre_limpio, sku_padre, precio, categoria.nombre, color)
+
         distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
         for talla_str, piezas_por_paquete in distribucion.items():
             stock_talla = paquetes * piezas_por_paquete 
@@ -1741,7 +1746,6 @@ def subir_fotos_magicas(
                 background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, sku_variante, stock_talla)
         
         db.commit()
-        background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre_limpio, sku_padre, precio, categoria.nombre, color)
         
         # 5. PREPARAMOS EXCEL 
         datos_excel.append({
@@ -1776,7 +1780,6 @@ def subir_fotos_magicas(
             worksheet.column_dimensions['G'].width = 25  
             worksheet.column_dimensions['H'].width = 45  
             
-            # ⚡ FIX DEFINITIVO: En esta versión de openpyxl, solo asignar el height basta
             for fila in range(2, len(datos_excel) + 2):
                 worksheet.row_dimensions[fila].height = 110  
                 
