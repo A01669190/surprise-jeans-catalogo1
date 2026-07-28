@@ -35,11 +35,13 @@ def generar_guia_envio(pedido_id: int, nombre_cliente: str, direccion: dict, pes
 
     try:
         respuesta = requests.post(URL_SKYDROPX, headers=headers, json=payload)
-        datos = respuesta.json()
         
-        if respuesta.status_code != 200:
-            logger.error(f"Error Skydropx [Pedido {pedido_id}]: {datos}")
+        # ⚡ FIX: Primero revisamos si hubo error ANTES de intentar leer el JSON
+        if respuesta.status_code not in [200, 201]:
+            logger.error(f"Error Skydropx [Pedido {pedido_id}] HTTP {respuesta.status_code}: {respuesta.text}")
             return None
+            
+        datos = respuesta.json()
 
         embarque_id = datos["data"]["id"]
         rates = datos.get("included", [])

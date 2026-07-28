@@ -292,7 +292,8 @@ def registrar_cliente(cliente: schemas.ClienteRegistro, background_tasks: Backgr
     return {"mensaje": "Cuenta creada con éxito."}
 
 @app.post("/login-cliente")
-def login_cliente(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+@limiter.limit("5/minute") # ⚡ MEJORA 3: Bloqueo anti-bots (Máx 5 intentos)
+def login_cliente(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     cliente = db.query(models.Cliente).filter(models.Cliente.correo == form_data.username).first()
     
     if not cliente or not verificar_password(form_data.password, cliente.password_hash):
@@ -507,14 +508,14 @@ async def webhook_skydropx(request: Request, background_tasks: BackgroundTasks, 
         return {"status": "error"}
 
 @app.post("/recuperar-password")
-async def recuperar_password(request: Request, db: Session = Depends(get_db)):
+async def recuperar_password(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     data = await request.json()
     correo = data.get("correo")
     cliente = db.query(models.Cliente).filter(models.Cliente.correo == correo).first()
     
-    # Seguridad anti-rastreo
+    # ⚡ SEGURIDAD: Siempre decimos lo mismo para que los hackers no sepan si el correo existe
     if not cliente:
-        return {"mensaje": "Proceso completado.", "nueva_pass": None}
+        return {"mensaje": "Si el correo existe, hemos enviado las instrucciones."}
     
     # 1. Generamos contraseña temporal
     caracteres = string.ascii_letters + string.digits
@@ -524,8 +525,22 @@ async def recuperar_password(request: Request, db: Session = Depends(get_db)):
     cliente.password_hash = obtener_hash_password(nueva_pass)
     db.commit()
 
-    # 3. Devolvemos la clave a la página web directamente
-    return {"mensaje": "Proceso completado.", "nueva_pass": nueva_pass}
+    # 3. ⚡ MEJORA 1: ENVIARLA POR CORREO INTERNAMENTE EN 2DO PLANO
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff;">
+        <h2 style="color: #4f46e5; text-align: center; font-style: italic; font-size: 28px; margin-bottom: 5px;">Surprise Jeans</h2>
+        <h3 style="color: #111827; text-align: center; margin-top: 30px;">Recuperación de cuenta 🔐</h3>
+        <p style="color: #4b5563; font-size: 15px; text-align: center;">Hola {cliente.nombre_completo.split()[0]}, hemos generado una contraseña temporal para que puedas volver a entrar a tu cuenta.</p>
+        <div style="text-align: center; margin: 30px 0; background-color: #f9fafb; padding: 20px; border-radius: 8px; border: 1px dashed #d1d5db;">
+            <span style="font-size: 24px; font-weight: 900; color: #4f46e5; letter-spacing: 4px;">{nueva_pass}</span>
+        </div>
+        <p style="color: #6b7280; font-size: 12px; text-align: center;">Inicia sesión con esta clave y cámbiala por una tuya desde la sección "Mi Cuenta".</p>
+    </div>
+    """
+    enviar_correo_gmail(cliente.correo, "🔑 Tu nueva contraseña temporal", html_content, bg_tasks=background_tasks)
+
+    # 4. Mensaje genérico a la pantalla
+    return {"mensaje": "Si el correo existe, hemos enviado las instrucciones."}
 
 
 class CambioPasswordReq(BaseModel):
@@ -558,7 +573,8 @@ def cambiar_password(
     return {"mensaje": "Contraseña actualizada con éxito."}
 
 @app.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
+@limiter.limit("5/minute") # ⚡ MEJORA 3: Bloqueo anti-bots para Admin
+def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     if form_data.username == "admin" and form_data.password == "yessica2026":
         # Gafete de acceso (15 min)
         exp_access = datetime.utcnow() + timedelta(minutes=15)
@@ -690,6 +706,30 @@ def generar_cupon_prueba(db: Session = Depends(get_db)):
         return {"mensaje": "¡Cupón BIENVENIDA10 (10% de descuento) creado y listo para usar!"}
     return {"mensaje": "El cupón ya existía."}
 
+import time
+from sqlalchemy import event
+
+# ==========================================
+# ⚡ MEJORA 1: MEMORIA RAM (Caché de Ultra Velocidad)
+# ==========================================
+CACHE_TIENDA = {
+    "pantalones": None,
+    "timestamp": 0
+}
+
+def purgar_cache(mapper, connection, target):
+    """ Este robot vacía la memoria automáticamente si Yessica sube/edita algo o hay una venta """
+    global CACHE_TIENDA
+    CACHE_TIENDA["pantalones"] = None
+    print("🧹 Caché limpiada automáticamente por cambios en Base de Datos.")
+
+# Escuchamos los cambios en PostgreSQL y disparamos el robot
+event.listen(models.Pantalon, 'after_insert', purgar_cache)
+event.listen(models.Pantalon, 'after_update', purgar_cache)
+event.listen(models.Pantalon, 'after_delete', purgar_cache)
+event.listen(models.VarianteTalla, 'after_update', purgar_cache)
+
+
 # ==========================================
 # 4. RUTAS PÚBLICAS
 # ==========================================
@@ -698,37 +738,45 @@ def generar_cupon_prueba(db: Session = Depends(get_db)):
 def obtener_categorias(request: Request, db: Session = Depends(get_db)):
     return db.query(models.Categoria).all()
 
-@app.get("/pantalones", response_model=List[schemas.PantalonRespuesta])
-@limiter.limit("60/minute")
+@app.get("/pantalones")
+@limiter.limit("120/minute")
 def obtener_pantalones(
-    request: Request, skip: int = 0, limit: int = 20, 
+    request: Request, skip: int = 0, limit: int = 1000, 
     busqueda: Optional[str] = None, categoria_id: Optional[int] = None,
-    precio_min: Optional[float] = None, # ⚡ NUEVO: Rango inicial
-    precio_max: Optional[float] = None, # ⚡ NUEVO: Rango límite
-    orden: Optional[str] = None,        # ⚡ NUEVO: "precio_asc", "precio_desc", o "recientes"
-    db: Session = Depends(get_db)
+    precio_min: Optional[float] = None, precio_max: Optional[float] = None, 
+    orden: Optional[str] = None, db: Session = Depends(get_db)
 ):
-    logger.info("🗄️ BASE DE DATOS: Buscando catálogo con filtros avanzados...")
-    query = db.query(models.Pantalon)
+    global CACHE_TIENDA
     
-    # 1. Filtros exactos y de texto
-    if categoria_id: query = query.filter(models.Pantalon.categoria_id == categoria_id)
-    if busqueda: query = query.filter(models.Pantalon.nombre.ilike(f"%{busqueda}%"))
+    # 1. ⚡ Si la RAM está vacía, hacemos la consulta pesada UNA SOLA VEZ
+    if CACHE_TIENDA["pantalones"] is None or (time.time() - CACHE_TIENDA["timestamp"]) > 3600:
+        CACHE_TIENDA["pantalones"] = db.query(models.Pantalon).order_by(models.Pantalon.id.desc()).all()
+        CACHE_TIENDA["timestamp"] = time.time()
+        print("🚀 Catálogo cargado desde PostgreSQL a la RAM (Cero Latencia)")
     
-    # 2. ⚡ Filtros de Presupuesto
-    if precio_min is not None: query = query.filter(models.Pantalon.precio >= precio_min)
-    if precio_max is not None: query = query.filter(models.Pantalon.precio <= precio_max)
+    # Trabajamos con los datos en la RAM (No gasta CPU)
+    resultados = CACHE_TIENDA["pantalones"]
     
-    # 3. ⚡ Algoritmos de Ordenamiento
-    if orden == "precio_asc":
-        query = query.order_by(models.Pantalon.precio.asc()) # Los más baratos primero
-    elif orden == "precio_desc":
-        query = query.order_by(models.Pantalon.precio.desc()) # Los más caros primero
-    else: 
-        query = query.order_by(models.Pantalon.id.desc()) # "recientes" por defecto
+    # 2. Aplicamos los filtros a la velocidad de la luz
+    if categoria_id: 
+        resultados = [p for p in resultados if p.categoria_id == categoria_id]
+    if busqueda: 
+        b = busqueda.lower()
+        resultados = [p for p in resultados if b in p.nombre.lower() or (p.codigo and b in p.codigo.lower())]
+    if precio_min is not None: 
+        resultados = [p for p in resultados if p.precio >= precio_min]
+    if precio_max is not None: 
+        resultados = [p for p in resultados if p.precio <= precio_max]
         
-    resultados = query.offset(skip).limit(limit).all()
-    return resultados
+    if orden == "precio_asc":
+        resultados.sort(key=lambda x: x.precio)
+    elif orden == "precio_desc":
+        resultados.sort(key=lambda x: x.precio, reverse=True)
+        
+    # 3. ⚡ MEJORA 2: Paginación Real (Corta la lista antes de enviarla)
+    resultados_paginados = resultados[skip : skip + limit]
+    
+    return resultados_paginados
 
 @app.get("/generar-cupon-100")
 def generar_cupon_100(db: Session = Depends(get_db)):
@@ -1263,9 +1311,32 @@ def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, backgr
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/webhook/mercadopago")
-def webhook_mercadopago(background_tasks: BackgroundTasks, datos: dict = Body(...), db: Session = Depends(get_db)):
-    # datos se extrae automáticamente, ya no bloquea el servidor
+async def webhook_mercadopago(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    # ⚡ AHORA ES ASÍNCRONA PARA PODER LEER LOS HEADERS Y EL JSON
+    datos = await request.json()
     
+    # ⚡ MEJORA 3: BLINDAJE CRIPTOGRÁFICO (HMAC)
+    secreto_mp = os.getenv("MERCADOPAGO_WEBHOOK_SECRET", "")
+    if secreto_mp:
+        x_signature = request.headers.get("x-signature", "")
+        x_request_id = request.headers.get("x-request-id", "")
+        # MP manda el data.id en la URL a veces, o en el body
+        data_id = request.query_params.get("data.id") or str(datos.get("data", {}).get("id", ""))
+        
+        if x_signature and x_request_id and data_id:
+            partes = dict(p.split('=') for p in x_signature.split(',') if '=' in p)
+            ts = partes.get('ts')
+            v1 = partes.get('v1')
+            
+            if ts and v1:
+                manifest = f"id:{data_id};request-id:{x_request_id};ts:{ts};"
+                firma_calculada = hmac.new(secreto_mp.encode('utf-8'), manifest.encode('utf-8'), hashlib.sha256).hexdigest()
+                
+                if not hmac.compare_digest(v1, firma_calculada):
+                    print("🚨 INTENTO DE HACKEO BANCARIO BLOQUEADO: Firma inválida")
+                    raise HTTPException(status_code=403, detail="Firma criptográfica inválida")
+
+    # 2. Lógica Original (Protegida)
     if datos.get("type") == "payment":
         pago_id = datos.get("data", {}).get("id")
         info_pago = sdk.payment().get(pago_id)
@@ -1279,9 +1350,9 @@ def webhook_mercadopago(background_tasks: BackgroundTasks, datos: dict = Body(..
                 pedido_db = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
                 
                 if pedido_db and pedido_db.estatus in ["PENDIENTE", "RECORDATORIO_ENVIADO"]:
-                    print(f"\n💰 [RASTREADOR MP 1] ¡Pago real aprobado en Mercado Pago! Pedido: SJ-{pedido_db.id:04d}")
+                    print(f"\n💰 [RASTREADOR MP] ¡Pago real aprobado en Mercado Pago! Pedido: SJ-{pedido_db.id:04d}")
                     pedido_db.estatus = "PAGADO"
-                    pedido_db.pago_id = str(pago_id) # ⚡ GUARDAMOS LA LLAVE AQUÍ
+                    pedido_db.pago_id = str(pago_id) 
                     lista_ropa = []
                     items_para_recibo = []
                     
@@ -1292,19 +1363,16 @@ def webhook_mercadopago(background_tasks: BackgroundTasks, datos: dict = Body(..
                         ).first()
                         
                         if variante_db and variante_db.stock >= detalle.cantidad:
-                            # Descuenta localmente en tu servidor web
                             variante_db.stock -= detalle.cantidad
                             if variante_db.pantalon:
                                 variante_db.pantalon.stock -= detalle.cantidad 
 
-                            # Guardamos el item para el recibo de Loyverse
                             items_para_recibo.append({
                                 "sku": variante_db.sku, 
                                 "cantidad": detalle.cantidad,
                                 "precio": detalle.precio_unitario
                             })
 
-                            # Bot Espía
                             nombre_pantalon = variante_db.pantalon.nombre if variante_db.pantalon else "Modelo"
                             background_tasks.add_task(enviar_alarma_inventario, nombre_pantalon, variante_db.talla, variante_db.stock)
                         
@@ -1312,15 +1380,11 @@ def webhook_mercadopago(background_tasks: BackgroundTasks, datos: dict = Body(..
                         nombre_final = f"{nombre_base} (Talla {detalle.talla})" if detalle.talla else nombre_base
                         lista_ropa.append({"cantidad": detalle.cantidad, "nombre": nombre_final, "precio": detalle.precio_unitario})
                     
-                    # 🎉 DISPARAMOS EL RECIBO VIRTUAL EN LOYVERSE 🎉
                     if items_para_recibo:
-                        print("💰 [RASTREADOR MP 5] Mandando recibo virtual a Loyverse...")
                         background_tasks.add_task(loyverse_sync.generar_recibo_virtual, pedido_db.correo_cliente, pedido_db.id, items_para_recibo, pedido_db.total)
                     
                     db.commit()
-                    print("💰 [RASTREADOR MP 6] Base de datos guardada y proceso completado.\n")
                     
-                    # Sonido Din por WebSocket
                     import asyncio
                     try:
                         loop = asyncio.get_event_loop()
@@ -1333,19 +1397,15 @@ def webhook_mercadopago(background_tasks: BackgroundTasks, datos: dict = Body(..
                     except:
                         pass
                     
-                    # 🎁 GESTIÓN DE SURPRISE POINTS (SOLO PAGOS APROBADOS)
                     cliente_db = db.query(models.Cliente).filter(models.Cliente.correo == pedido_db.correo_cliente).first()
                     puntos_ganados = pedido_db.total * 0.05
                     
                     if cliente_db:
-                        # Solo SUMAMOS los puntos ganados (Lo que gastó ya se descontó antes)
                         cliente_db.puntos += puntos_ganados
                         db.commit()
                     
-                    # 📧 ENVIAR CORREO
                     if pedido_db.correo_cliente:
                         try:
-                            # ⚡ FIX: Usamos background_tasks de FastAPI
                             enviar_correo_recibo(pedido_db.correo_cliente, pedido_db.nombre_cliente, f"{pedido_db.id:04d}", pedido_db.total, lista_ropa, puntos_ganados, bg_tasks=background_tasks)
                         except:
                             pass
@@ -1518,22 +1578,6 @@ def eliminar_categoria(
     db.commit()
     return {"mensaje": "Categoría eliminada"}
 
-from fastapi.concurrency import run_in_threadpool
-
-def comprimir_imagen_sincrona(contenido):
-    try:
-        imagen_pil = Image.open(io.BytesIO(contenido))
-        if imagen_pil.mode in ("RGBA", "P"):
-            imagen_pil = imagen_pil.convert("RGB")
-            
-        buffer_webp = io.BytesIO()
-        imagen_pil.save(buffer_webp, format="webp", quality=80)
-        buffer_webp.seek(0)
-        return buffer_webp
-    except Exception as e:
-        print(f"Error comprimiendo imagen: {e}. Usando original.")
-        return io.BytesIO(contenido)
-
 # ⚡ FUNCIÓN MATEMÁTICA PESADA AISLADA
 def comprimir_imagen_sincrona(contenido):
     import io
@@ -1635,17 +1679,36 @@ def eliminar_pantalon(
     pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == pantalon_id).first()
     if not pantalon: return {"error": "Pantalón no encontrado"}
     
-    # ⚡ ENVIAMOS EL SKU DE LA PRIMERA TALLA PARA TENER PRECISIÓN LÁSER
+    # ⚡ ENVIAMOS EL SKU DE LA PRIMERA TALLA PARA TENER PRECISIÓN LÁSER EN LOYVERSE
     if pantalon.tallas and len(pantalon.tallas) > 0:
         sku_laser = pantalon.tallas[0].sku
         background_tasks.add_task(loyverse_sync.eliminar_articulo_loyverse, sku_laser)
     elif pantalon.codigo:
-        # Respaldo por si es un pantalón viejo o un fantasma sin tallas
         background_tasks.add_task(loyverse_sync.eliminar_articulo_loyverse, pantalon.codigo)
+        
+    # ⚡ MEJORA 2: LIMPIEZA DE BASURA EN CLOUDINARY
+    url_imagen = pantalon.imagen_url
+    if url_imagen and "cloudinary.com" in url_imagen:
+        partes = url_imagen.split('/upload/')
+        if len(partes) > 1:
+            ruta = partes[1] 
+            if ruta.startswith('v'):
+                ruta = ruta.split('/', 1)[1] 
+            public_id = ruta.rsplit('.', 1)[0] 
+            
+            def borrar_nube(pid):
+                import cloudinary.uploader
+                try:
+                    cloudinary.uploader.destroy(pid)
+                    print(f"☁️ Basura Digital Limpiada de Cloudinary: {pid}")
+                except Exception:
+                    pass
+            
+            background_tasks.add_task(borrar_nube, public_id)
         
     db.delete(pantalon)
     db.commit()
-    return {"mensaje": "Pantalón eliminado de la web y de Loyverse"}
+    return {"mensaje": "Pantalón eliminado de la web, Loyverse y Cloudinary."}
 
 @app.post("/pantalones/magico")
 @limiter.limit("5/minute")
