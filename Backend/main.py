@@ -1359,7 +1359,12 @@ def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, backgr
         preference_response = sdk.preference().create(preference_data)
         return {"link_pago": preference_response["response"]["init_point"]}
 
+    except HTTPException as http_exc:
+        # Si es un error 400 provocado por nosotros (ej. "El artículo no existe"), lo dejamos pasar limpio
+        db.rollback()
+        raise http_exc
     except Exception as e:
+        # Si es un error real de código o del banco, lanzamos el 500
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -2132,6 +2137,10 @@ def marcar_pedido_entregado(pedido_id: int, db: Session = Depends(get_db)):
 
 @app.get("/reset-db-total")
 def reset_db_total():
+    # ⚡ NUEVO: Forzamos la limpieza de la memoria RAM
+    global CACHE_TIENDA
+    CACHE_TIENDA["pantalones"] = None
+    
     with engine.begin() as conn:
         if engine.name == "sqlite":
             conn.execute(text("DROP TABLE IF EXISTS variantes_talla, resenas, detalles_pedido, pedidos, pantalones, categorias, clientes, cupones;"))
@@ -2139,7 +2148,7 @@ def reset_db_total():
             conn.execute(text("DROP TABLE IF EXISTS variantes_talla, resenas, detalles_pedido, pedidos, pantalones, categorias, clientes, cupones CASCADE;"))
 
     models.Base.metadata.create_all(bind=engine)
-    return {"mensaje": "Base de datos formateada al 100%."}
+    return {"mensaje": "Base de datos formateada al 100% y Caché RAM limpia."}
 
 @app.get("/backup/descargar")
 @limiter.limit("3/minute")
