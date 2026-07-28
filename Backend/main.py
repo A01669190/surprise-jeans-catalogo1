@@ -267,7 +267,7 @@ def verificar_password(plain_password: str, hashed_password: str):
 # SISTEMA DE CLIENTES (REGISTRO Y LOGIN)
 # ==========================================
 @app.post("/registro")
-def registrar_cliente(cliente: schemas.ClienteRegistro, db: Session = Depends(get_db)):
+def registrar_cliente(cliente: schemas.ClienteRegistro, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     # 1. Verificación
     db_cliente = db.query(models.Cliente).filter(models.Cliente.correo == cliente.correo).first()
     if db_cliente:
@@ -286,10 +286,9 @@ def registrar_cliente(cliente: schemas.ClienteRegistro, db: Session = Depends(ge
     db.add(nuevo_cliente)
     db.commit()
 
-    # ⚡ FIDELIDAD OMNICANAL: Guardamos al cliente en la tablet
-    loyverse_sync.crear_cliente_loyverse(cliente.nombre_completo, cliente.correo, cliente.telefono)
+    # ⚡ FIDELIDAD OMNICANAL Y ASÍNCRONA: Guardamos al cliente en la tablet de fondo
+    background_tasks.add_task(loyverse_sync.crear_cliente_loyverse, cliente.nombre_completo, cliente.correo, cliente.telefono)
 
-    # NOTA: Motor de correo desactivado para evitar el bloqueo del puerto 587 en Render Gratuito.
     return {"mensaje": "Cuenta creada con éxito."}
 
 @app.post("/login-cliente")
@@ -1026,13 +1025,13 @@ async def enviar_whatsapp_api(telefono_destino, texto_mensaje):
     except Exception as e:
         print(f"❌ Error de red con WhatsApp API: {e}")
 
-def enviar_alarma_inventario(nombre_modelo, talla, stock_actual):
+async def enviar_alarma_inventario(nombre_modelo, talla, stock_actual):
     """ 🤖 Bot espía que avisa a Yessica si queda poco stock """
     if stock_actual <= 12:
         mensaje = f"🚨 *ALERTA DE INVENTARIO* 🚨\n\nYessica, el modelo *{nombre_modelo}* (Talla {talla}) se está agotando.\n\n⚠️ Solo quedan *{stock_actual} piezas* en bodega."
         # Usamos el número de la tienda que ya tienes en tus variables de entorno
         telefono_admin = os.getenv("WHATSAPP_NUMERO", "525513220695") 
-        enviar_whatsapp_api(telefono_admin, mensaje)
+        await enviar_whatsapp_api(telefono_admin, mensaje) # ⚡ FIX: Agregamos await
 
 async def auto_destruir_abandonado(pedido_id: int):
     """ Bomba de tiempo: Espera 30 minutos y si no hay pago, destruye el carrito """
@@ -1535,9 +1534,25 @@ def comprimir_imagen_sincrona(contenido):
         print(f"Error comprimiendo imagen: {e}. Usando original.")
         return io.BytesIO(contenido)
 
+# ⚡ FUNCIÓN MATEMÁTICA PESADA AISLADA
+def comprimir_imagen_sincrona(contenido):
+    import io
+    from PIL import Image
+    try:
+        imagen_pil = Image.open(io.BytesIO(contenido))
+        if imagen_pil.mode in ("RGBA", "P"):
+            imagen_pil = imagen_pil.convert("RGB")
+        buffer_webp = io.BytesIO()
+        imagen_pil.save(buffer_webp, format="webp", quality=80)
+        buffer_webp.seek(0)
+        return buffer_webp
+    except Exception as e:
+        print(f"Error comprimiendo imagen: {e}. Usando original.")
+        return io.BytesIO(contenido)
+
 @app.post("/pantalones")
 @limiter.limit("20/minute")
-def crear_pantalon(
+async def crear_pantalon(  # ⚡ FIX: Convertido a asíncrono
     request: Request, 
     background_tasks: BackgroundTasks, 
     codigo: str = Form(...), 
@@ -1551,20 +1566,9 @@ def crear_pantalon(
     token: str = Depends(verificar_token)
 ):
 
-    # 1. COMPRESIÓN WEBP Y SUBIDA A CLOUDINARY
-    contenido_original = foto.file.read()
-    
-    try:
-        imagen_pil = Image.open(io.BytesIO(contenido_original))
-        if imagen_pil.mode in ("RGBA", "P"):
-            imagen_pil = imagen_pil.convert("RGB")
-            
-        buffer_webp = io.BytesIO()
-        imagen_pil.save(buffer_webp, format="webp", quality=80)
-        buffer_webp.seek(0)
-    except Exception as e:
-        print(f"Error comprimiendo imagen: {e}. Usando original.")
-        buffer_webp = io.BytesIO(contenido_original) 
+    # 1. COMPRESIÓN WEBP EN HILO SECUNDARIO (Cero lag)
+    contenido_original = await foto.read()
+    buffer_webp = await run_in_threadpool(comprimir_imagen_sincrona, contenido_original)
 
     # ⚡ SUBIDA PROFESIONAL A CLOUDINARY
     try:
@@ -1645,7 +1649,7 @@ def eliminar_pantalon(
 
 @app.post("/pantalones/magico")
 @limiter.limit("5/minute")
-def subir_fotos_magicas(
+async def subir_fotos_magicas(
     request: Request,
     background_tasks: BackgroundTasks,
     categoria_destino: str = Form("Nuevos"),
@@ -1716,19 +1720,24 @@ def subir_fotos_magicas(
         color_sku = "ORIGINAL"
         stock_total = paquetes * 12
 
-        # 1. COMPRESIÓN JPEG PARA EXCEL
+        # 1. COMPRESIÓN JPEG PARA EXCEL EN HILO SECUNDARIO
         print("🗜️ Comprimiendo imagen a JPG...")
-        contenido_original = foto.file.read()
-        try:
-            imagen_pil = Image.open(io.BytesIO(contenido_original))
-            if imagen_pil.mode in ("RGBA", "P"):
-                imagen_pil = imagen_pil.convert("RGB")
-            buffer_img = io.BytesIO()
-            imagen_pil.save(buffer_img, format="jpeg", quality=80) 
-            buffer_img.seek(0)
-        except Exception as e:
-            print(f"⚠️ Aviso: Falló la compresión. Usando original.")
-            buffer_img = io.BytesIO(contenido_original)
+        contenido_original = await foto.read()
+        
+        def comprimir_jpg_hilo(cont):
+            import io
+            from PIL import Image
+            try:
+                img_pil = Image.open(io.BytesIO(cont))
+                if img_pil.mode in ("RGBA", "P"): img_pil = img_pil.convert("RGB")
+                buf = io.BytesIO()
+                img_pil.save(buf, format="jpeg", quality=80)
+                buf.seek(0)
+                return buf
+            except Exception:
+                return io.BytesIO(cont)
+                
+        buffer_img = await run_in_threadpool(comprimir_jpg_hilo, contenido_original)
 
         # 2. ⚡ SUBIDA A CLOUDINARY 
         print("🌐 Subiendo a la nube de Cloudinary...")
@@ -2483,7 +2492,7 @@ class GoogleLoginReq(BaseModel):
     token: str
 
 @app.post("/login-google")
-def login_google(req: GoogleLoginReq, db: Session = Depends(get_db)):
+async def login_google(req: GoogleLoginReq, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
     if not GOOGLE_CLIENT_ID:
         raise HTTPException(status_code=500, detail="Falta configurar GOOGLE_CLIENT_ID en Render.")
@@ -2513,10 +2522,9 @@ def login_google(req: GoogleLoginReq, db: Session = Depends(get_db)):
             
             # La metemos a Loyverse silenciosamente
             try:
-                import loyverse_sync
-                loyverse_sync.crear_cliente_loyverse(nombre, correo, "")
+                # ⚡ FIX ASÍNCRONO: Lo mandamos al fondo para evitar choques de compatibilidad
+                background_tasks.add_task(loyverse_sync.crear_cliente_loyverse, nombre, correo, "")
             except Exception as e:
-                # ⚡ AHORA SÍ NOS VA A IMPRIMIR EL ERROR EN RENDER
                 print(f"❌ Error al enviar cliente a Loyverse desde Google: {e}")
 
         # 4. Le damos las llaves de acceso de Surprise Jeans
