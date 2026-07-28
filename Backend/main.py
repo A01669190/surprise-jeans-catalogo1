@@ -924,20 +924,22 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
 
 # ⚡ AHORA ES UNA FUNCIÓN NORMAL (Sin async ni while True)
 def robot_respaldos_diarios():
-    """ Respaldo diario administrado por APScheduler a prueba de caídas """
     try:
         db = SessionLocal()
-        pedidos = db.query(models.Pedido).all()
-        clientes = db.query(models.Cliente).all()
+        # ⚡ Procesamiento por lotes para no saturar la RAM
+        pedidos_query = db.query(models.Pedido).yield_per(100)
+        clientes_query = db.query(models.Cliente).yield_per(100)
+        
+        lista_pedidos = [{"id": p.id, "folio": getattr(p, 'folio', p.id), "total": p.total, "estatus": p.estatus} for p in pedidos_query]
+        lista_clientes = [{"id": c.id, "nombre": c.nombre_completo, "correo": c.correo} for c in clientes_query]
         
         fecha = datetime.now().strftime("%Y-%m-%d")
-        
         respaldo = {
             "fecha_respaldo": fecha,
-            "total_pedidos": len(pedidos),
-            "total_clientes": len(clientes),
-            "pedidos": [{"id": p.id, "folio": getattr(p, 'folio', p.id), "total": p.total, "estatus": p.estatus} for p in pedidos],
-            "clientes": [{"id": c.id, "nombre": c.nombre_completo, "correo": c.correo} for c in clientes]
+            "total_pedidos": len(lista_pedidos),
+            "total_clientes": len(lista_clientes),
+            "pedidos": lista_pedidos,
+            "clientes": lista_clientes
         }
         
         archivo_json = json.dumps(respaldo, ensure_ascii=False, indent=4).encode('utf-8')
@@ -983,8 +985,8 @@ def iniciar_programador_automatico():
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN", "")
 WHATSAPP_PHONE_ID = os.getenv("WHATSAPP_PHONE_ID", "")
 
-def enviar_whatsapp_api(telefono_destino, texto_mensaje):
-    """ Función maestra para disparar mensajes de WhatsApp por Meta API """
+async def enviar_whatsapp_api(telefono_destino, texto_mensaje):
+    """ Función maestra asíncrona para disparar mensajes de WhatsApp por Meta API """
     # Si las variables están vacías, no hace nada (modo dormido)
     if not WHATSAPP_TOKEN or not WHATSAPP_PHONE_ID:
         print("⚠️ WhatsApp API apagada. Faltan credenciales.")
@@ -1013,14 +1015,16 @@ def enviar_whatsapp_api(telefono_destino, texto_mensaje):
         }
     }
     
+    # ⚡ AQUÍ ESTÁ LA MAGIA ASÍNCRONA CON HTTPX
     try:
-        req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
-        urllib.request.urlopen(req)
-        print(f"✅ WA enviado silenciosamente a {telefono_limpio}")
+        async with httpx.AsyncClient() as client:
+            respuesta = await client.post(url, json=payload, headers=headers, timeout=5.0)
+            respuesta.raise_for_status() # Lanza error si Facebook responde algo distinto a 200 OK
+            print(f"✅ WA enviado silenciosamente a {telefono_limpio}")
+    except httpx.HTTPStatusError as exc:
+        print(f"❌ Error WhatsApp API: {exc.response.text}")
     except Exception as e:
-        # Extraemos el error exacto que nos dé Facebook
-        error_msg = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
-        print(f"❌ Error WhatsApp API: {error_msg}")
+        print(f"❌ Error de red con WhatsApp API: {e}")
 
 def enviar_alarma_inventario(nombre_modelo, talla, stock_actual):
     """ 🤖 Bot espía que avisa a Yessica si queda poco stock """
@@ -1514,6 +1518,22 @@ def eliminar_categoria(
     db.delete(categoria)
     db.commit()
     return {"mensaje": "Categoría eliminada"}
+
+from fastapi.concurrency import run_in_threadpool
+
+def comprimir_imagen_sincrona(contenido):
+    try:
+        imagen_pil = Image.open(io.BytesIO(contenido))
+        if imagen_pil.mode in ("RGBA", "P"):
+            imagen_pil = imagen_pil.convert("RGB")
+            
+        buffer_webp = io.BytesIO()
+        imagen_pil.save(buffer_webp, format="webp", quality=80)
+        buffer_webp.seek(0)
+        return buffer_webp
+    except Exception as e:
+        print(f"Error comprimiendo imagen: {e}. Usando original.")
+        return io.BytesIO(contenido)
 
 @app.post("/pantalones")
 @limiter.limit("20/minute")
