@@ -1139,6 +1139,7 @@ def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, backgr
             precio_con_descuento = precio_verdadero * (1.0 - (descuento_porc / 100.0))
             items_para_banco.append({
                 "title": f"[{item.codigo}] {item.nombre}",
+                "description": f"Pantalón modelo {item.nombre} en Talla {item.talla}", # ⚡ NUEVO: Sube puntos de calidad
                 "quantity": item.cantidad, 
                 "unit_price": round(precio_con_descuento, 2),
                 "currency_id": "MXN"
@@ -1291,6 +1292,9 @@ def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, backgr
         # 5. MERCADO PAGO NORMAL
         preference_data = {
             "items": items_para_banco,
+            "payer": {
+                "email": cliente_db.correo if cliente_db else "ventas.surprisejeans@gmail.com"
+            }, # ⚡ NUEVO: Envía el correo del cliente (o de respaldo si compró como invitado)
             "metadata": {"pedido_interno_id": nuevo_pedido.id}, 
             "external_reference": str(nuevo_pedido.id),
             "back_urls": {
