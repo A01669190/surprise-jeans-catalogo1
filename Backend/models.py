@@ -1,8 +1,10 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
-from sqlalchemy.orm import relationship, object_session
+from sqlalchemy.orm import relationship
 from sqlalchemy import func
 from datetime import datetime, timezone
 from database import Base
+from sqlalchemy.orm import column_property
+from sqlalchemy import select
 
 class Categoria(Base):
     __tablename__ = "categorias"
@@ -24,22 +26,6 @@ class Pantalon(Base):
     categoria = relationship("Categoria", back_populates="pantalones")
     resenas = relationship("Resena", back_populates="pantalon", cascade="all, delete-orphan")
     detalles = relationship("DetallePedido", back_populates="pantalon")
-
-    # ⚡ CALCULADORA OPTIMIZADA POR BASE DE DATOS (N+1 FIXED)
-    @property
-    def promedio_estrellas(self):
-        session = object_session(self)
-        if session:
-            resultado = session.query(func.avg(Resena.calificacion)).filter(Resena.pantalon_id == self.id, Resena.calificacion >= 3).scalar()
-            return float(resultado) if resultado else 0.0
-        return 0.0
-
-    @property
-    def total_resenas(self):
-        session = object_session(self)
-        if session:
-            return session.query(func.count(Resena.id)).filter(Resena.pantalon_id == self.id, Resena.calificacion >= 3).scalar() or 0
-        return 0
     tallas = relationship("VarianteTalla", back_populates="pantalon", cascade="all, delete-orphan")
 
 class VarianteTalla(Base):
@@ -63,6 +49,22 @@ class Resena(Base):
     fecha = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     pantalon = relationship("Pantalon", back_populates="resenas")
     cliente = relationship("Cliente")
+
+# ⚡ AHORA SÍ: CALCULADORA OPTIMIZADA DIRECTO EN SQL (Adiós N+1)
+# Se define aquí abajo para que Python ya sepa qué es la tabla "Resena"
+Pantalon.promedio_estrellas = column_property(
+    select(func.coalesce(func.avg(Resena.calificacion), 0.0))
+    .where((Resena.pantalon_id == Pantalon.id) & (Resena.calificacion >= 3))
+    .correlate_except(Resena)
+    .scalar_subquery()
+)
+
+Pantalon.total_resenas = column_property(
+    select(func.count(Resena.id))
+    .where((Resena.pantalon_id == Pantalon.id) & (Resena.calificacion >= 3))
+    .correlate_except(Resena)
+    .scalar_subquery()
+)
 
 # ==========================================
 # TABLAS DE SEGURIDAD (PEDIDOS)
@@ -99,7 +101,7 @@ class DetallePedido(Base):
     pantalon = relationship("Pantalon")
 
 # ==========================================
-# TABLA DE CLIENTES Y CUPONES (Sin cambios)
+# TABLA DE CLIENTES Y CUPONES
 class Cliente(Base):
     __tablename__ = "clientes"
     id = Column(Integer, primary_key=True, index=True)

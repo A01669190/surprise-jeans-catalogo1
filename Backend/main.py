@@ -4,6 +4,7 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from pydantic import BaseModel
 import string
+import httpx
 import random
 import loyverse_sync
 from fastapi.responses import Response
@@ -78,12 +79,6 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
-@app.on_event("startup")
-async def iniciar_tareas_fondo():
-    import asyncio
-    loop = asyncio.get_event_loop()
-    loop.create_task(robot_respaldos_diarios())
-    print("🤖 Robot de respaldos inicializado.")
 
 # ==========================================
 # 📝 SISTEMA DE LOGS PROFESIONAL (Caja Negra)
@@ -156,34 +151,21 @@ API_KEY_CALLMEBOT = os.getenv("WHATSAPP_API_KEY", "")
 
 @app.exception_handler(Exception)
 async def whatsapp_exception_handler(request: Request, exc: Exception):
-    """ Atrapa cualquier error 500 y te lo manda por WhatsApp """
+    """ Atrapa cualquier error 500 y te lo manda por WhatsApp sin congelar la app """
     error_trace = traceback.format_exc()
     mensaje = f"🚨 *ERROR FATAL - SURPRISE JEANS* 🚨\n\nRuta: {request.url}\nError: {str(exc)}"
     
     try:
-        # Codificamos el texto para URL (para que WhatsApp entienda los espacios y saltos de línea)
         mensaje_url = urllib.parse.quote(mensaje)
         url_whatsapp = f"https://api.callmebot.com/whatsapp.php?phone={TELEFONO_WHATSAPP}&text={mensaje_url}&apikey={API_KEY_CALLMEBOT}"
         
-        # Lo mandamos con un timeout corto para no congelar el servidor si WhatsApp falla
-        requests.get(url_whatsapp, timeout=5) 
+        # ⚡ FIX: Usamos httpx asíncrono para no bloquear el servidor
+        async with httpx.AsyncClient() as client:
+            await client.get(url_whatsapp, timeout=5.0)
     except:
-        pass # Si falla el mensaje, el servidor sigue vivo
+        pass 
         
-    return JSONResponse(status_code=500, content={"message": "Error interno. El administrador ha sido notificado por WhatsApp."})
-
-@app.on_event("startup")
-def iniciar_programador_automatico():
-    # Se ejecuta cada 1 hora automáticamente
-    scheduler.add_job(cron_recuperar_carritos, 'interval', hours=1)
-    
-    # ⚡ EL FIX: Descomentamos esta línea para que funcione el reporte PDF
-    scheduler.add_job(cron_reporte_mensual, 'cron', hour=8, minute=0) 
-
-    scheduler.add_job(cron_respaldo_semanal, 'cron', day_of_week='sun', hour=3, minute=0)
-    
-    scheduler.start()
-    print("⏰ Robot de Carritos y Reportes (APScheduler) Activado y Corriendo.")
+    return JSONResponse(status_code=500, content={"message": "Error interno. El administrador ha sido notificado."})
 
 # 1. ANTI-DDOS
 limiter = Limiter(key_func=get_remote_address)
@@ -377,7 +359,7 @@ def _enviar_async(correo_destino, asunto, html_content, gmail_user, gmail_passwo
     except Exception as e:
         print(f"❌ Correo bloqueado (Posible restricción de Render): {e}")
 
-def enviar_correo_gmail(correo_destino, asunto, html_content):
+def enviar_correo_gmail(correo_destino, asunto, html_content, bg_tasks: BackgroundTasks = None):
     gmail_user = os.getenv("GMAIL_USER", "denzellopezcabrera@gmail.com")
     gmail_password = os.getenv("GMAIL_PASSWORD", "") 
     
@@ -385,14 +367,15 @@ def enviar_correo_gmail(correo_destino, asunto, html_content):
         print("Advertencia: GMAIL_PASSWORD no está configurada.")
         return False
 
-    # ⚡ BLINDAJE 2: Disparamos el correo en un "hilo fantasma" paralelo. 
-    # Así la clienta no se queda viendo la pantalla de carga trabada si Render bloquea el puerto.
-    hilo = threading.Thread(target=_enviar_async, args=(correo_destino, asunto, html_content, gmail_user, gmail_password))
-    hilo.start()
+    # ⚡ FIX: Usamos BackgroundTasks oficiales si existen (Rutas Web), si no, lo corre directo (Cron Jobs)
+    if bg_tasks:
+        bg_tasks.add_task(_enviar_async, correo_destino, asunto, html_content, gmail_user, gmail_password)
+    else:
+        _enviar_async(correo_destino, asunto, html_content, gmail_user, gmail_password)
     
     return True
     
-def enviar_correo_actualizacion_envio(correo_destino, nombre, folio, estatus_envio, guia, link_rastreo):
+def enviar_correo_actualizacion_envio(correo_destino, nombre, folio, estatus_envio, guia, link_rastreo, bg_tasks: BackgroundTasks = None):
     mensajes = {
         "en_transito": "🚚 ¡Tu paquete ya está en camino! Ha salido de nuestro almacén y va directo a ti.",
         "entregado": "🎉 ¡Tu paquete ha sido entregado! Esperamos que disfrutes mucho tus Surprise Jeans."
@@ -412,9 +395,9 @@ def enviar_correo_actualizacion_envio(correo_destino, nombre, folio, estatus_env
         </div>
     </div>
     """
-    enviar_correo_gmail(correo_destino, f"Actualización de Envío - Pedido SJ-{folio}", html_content)
+    enviar_correo_gmail(correo_destino, f"Actualización de Envío - Pedido SJ-{folio}", html_content, bg_tasks)
 
-def enviar_correo_recibo(correo_destino, nombre, folio, total, lista_ropa, puntos_ganados):
+def enviar_correo_recibo(correo_destino, nombre, folio, total, lista_ropa, puntos_ganados, bg_tasks: BackgroundTasks = None):
     items_html = "".join([f"<li style='margin-bottom: 5px; color: #4b5563;'><b>{i['cantidad']}x</b> {i['nombre']} - ${i['precio']}</li>" for i in lista_ropa])
     
     html_content = f"""
@@ -447,9 +430,9 @@ def enviar_correo_recibo(correo_destino, nombre, folio, total, lista_ropa, punto
         </div>
     </div>
     """
-    enviar_correo_gmail(correo_destino, f"¡Tu pedido SJ-{folio} está confirmado! 🎉", html_content)
+    enviar_correo_gmail(correo_destino, f"¡Tu pedido SJ-{folio} está confirmado! 🎉", html_content, bg_tasks)
 
-def enviar_correo_carrito_abandonado(correo_destino, nombre, folio):
+def enviar_correo_carrito_abandonado(correo_destino, nombre, folio, bg_tasks: BackgroundTasks = None):
     link_tienda = "https://surprisejeanysk.com/"
     
     html_content = f"""
@@ -469,7 +452,7 @@ def enviar_correo_carrito_abandonado(correo_destino, nombre, folio):
         </div>
     </div>
     """
-    enviar_correo_gmail(correo_destino, "🛒 ¡Olvidaste algo en tu carrito!", html_content)
+    enviar_correo_gmail(correo_destino, "🛒 ¡Olvidaste algo en tu carrito!", html_content, bg_tasks)
 
 def verificar_token(token: str = Depends(oauth2_scheme)):
     try:
@@ -489,7 +472,7 @@ def verificar_token_cliente(token: str = Depends(oauth2_scheme)):
         raise HTTPException(status_code=401, detail="Token expirado o inválido")
 
 @app.post("/webhook/skydropx")
-async def webhook_skydropx(request: Request, db: Session = Depends(get_db)):
+async def webhook_skydropx(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     try:
         datos = await request.json()
         evento = datos.get("event_type")
@@ -507,12 +490,11 @@ async def webhook_skydropx(request: Request, db: Session = Depends(get_db)):
                 if nuevo_estado == "in_transit" and pedido.estatus != "EN_TRANSITO":
                     pedido.estatus = "EN_TRANSITO"
                     db.commit()
-                    enviar_correo_actualizacion_envio(pedido.correo_cliente, pedido.nombre_cliente, f"{pedido.id:04d}", "en_transito", guia, pedido.guia_rastreo)
-                    
+                    enviar_correo_actualizacion_envio(pedido.correo_cliente, pedido.nombre_cliente, f"{pedido.id:04d}", "en_transito", guia, pedido.guia_rastreo, bg_tasks=background_tasks)
                 elif nuevo_estado == "delivered" and pedido.estatus != "ENTREGADO":
                     pedido.estatus = "ENTREGADO"
                     db.commit()
-                    enviar_correo_actualizacion_envio(pedido.correo_cliente, pedido.nombre_cliente, f"{pedido.id:04d}", "entregado", guia, pedido.guia_rastreo)
+                    enviar_correo_actualizacion_envio(pedido.correo_cliente, pedido.nombre_cliente, f"{pedido.id:04d}", "entregado", guia, pedido.guia_rastreo, bg_tasks=background_tasks)
                     
         return {"status": "procesado"}
     except Exception as e:
@@ -934,53 +916,61 @@ def generar_etiqueta_pdf(pedido_id: int, token: str, db: Session = Depends(get_d
     
     return Response(content=buffer.getvalue(), media_type="application/pdf")
 
-async def robot_respaldos_diarios():
-    """ Despierta cada 24 horas para hacer un backup y ENVIARLO POR CORREO a salvo de Render """
-    while True:
-        # 86400 segundos = 24 horas
-        await asyncio.sleep(86400) 
+# ⚡ AHORA ES UNA FUNCIÓN NORMAL (Sin async ni while True)
+def robot_respaldos_diarios():
+    """ Respaldo diario administrado por APScheduler a prueba de caídas """
+    try:
+        db = SessionLocal()
+        pedidos = db.query(models.Pedido).all()
+        clientes = db.query(models.Cliente).all()
+        
+        fecha = datetime.now().strftime("%Y-%m-%d")
+        
+        respaldo = {
+            "fecha_respaldo": fecha,
+            "total_pedidos": len(pedidos),
+            "total_clientes": len(clientes),
+            "pedidos": [{"id": p.id, "folio": getattr(p, 'folio', p.id), "total": p.total, "estatus": p.estatus} for p in pedidos],
+            "clientes": [{"id": c.id, "nombre": c.nombre_completo, "correo": c.correo} for c in clientes]
+        }
+        
+        archivo_json = json.dumps(respaldo, ensure_ascii=False, indent=4).encode('utf-8')
+        
+        msg = MIMEMultipart()
+        msg["Subject"] = f"🛡️ Respaldo Diario Automático - {fecha}"
+        msg["From"] = f"Surprise Jeans <{os.getenv('GMAIL_USER')}>"
+        msg["To"] = os.getenv('GMAIL_USER') 
+        
+        msg.attach(MIMEText("Adjunto el respaldo de seguridad de hoy. Este archivo está a salvo de los reinicios de Render.", "plain"))
+        
+        adjunto = MIMEApplication(archivo_json, Name=f"respaldo_sj_{fecha}.json")
+        adjunto['Content-Disposition'] = f'attachment; filename="respaldo_sj_{fecha}.json"'
+        msg.attach(adjunto)
+        
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as servidor:
+            servidor.login(os.getenv("GMAIL_USER"), os.getenv("GMAIL_PASSWORD"))
+            servidor.sendmail(os.getenv("GMAIL_USER"), os.getenv("GMAIL_USER"), msg.as_string())
+            
+        print(f"🛡️✅ Bóveda asegurada: Respaldo diario enviado por correo con éxito.")
+    except Exception as e:
+        print(f"❌ Error al crear el respaldo diario: {e}")
+    finally:
         try:
-            db = SessionLocal()
-            pedidos = db.query(models.Pedido).all()
-            clientes = db.query(models.Cliente).all()
-            
-            fecha = datetime.now().strftime("%Y-%m-%d")
-            
-            respaldo = {
-                "fecha_respaldo": fecha,
-                "total_pedidos": len(pedidos),
-                "total_clientes": len(clientes),
-                "pedidos": [{"id": p.id, "folio": getattr(p, 'folio', p.id), "total": p.total, "estatus": p.estatus} for p in pedidos],
-                "clientes": [{"id": c.id, "nombre": c.nombre_completo, "correo": c.correo} for c in clientes]
-            }
-            
-            # Convertimos el diccionario a un archivo en memoria
-            archivo_json = json.dumps(respaldo, ensure_ascii=False, indent=4).encode('utf-8')
-            
-            # ⚡ ENVIAMOS POR CORREO PARA NO DEPENDER DEL DISCO DE RENDER
-            msg = MIMEMultipart()
-            msg["Subject"] = f"🛡️ Respaldo Diario Automático - {fecha}"
-            msg["From"] = f"Surprise Jeans <{os.getenv('GMAIL_USER')}>"
-            msg["To"] = os.getenv('GMAIL_USER') # Te lo envías a ti mismo
-            
-            msg.attach(MIMEText("Adjunto el respaldo de seguridad de hoy. Este archivo está a salvo de los reinicios de Render.", "plain"))
-            
-            adjunto = MIMEApplication(archivo_json, Name=f"respaldo_sj_{fecha}.json")
-            adjunto['Content-Disposition'] = f'attachment; filename="respaldo_sj_{fecha}.json"'
-            msg.attach(adjunto)
-            
-            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as servidor:
-                servidor.login(os.getenv("GMAIL_USER"), os.getenv("GMAIL_PASSWORD"))
-                servidor.sendmail(os.getenv("GMAIL_USER"), os.getenv("GMAIL_USER"), msg.as_string())
-                
-            print(f"🛡️✅ Bóveda asegurada: Respaldo diario enviado por correo con éxito.")
-        except Exception as e:
-            print(f"❌ Error al crear el respaldo diario: {e}")
-        finally:
-            try:
-                db.close()
-            except:
-                pass
+            db.close()
+        except:
+            pass
+
+@app.on_event("startup")
+def iniciar_programador_automatico():
+    scheduler.add_job(cron_recuperar_carritos, 'interval', hours=1)
+    scheduler.add_job(cron_reporte_mensual, 'cron', hour=8, minute=0) 
+    scheduler.add_job(cron_respaldo_semanal, 'cron', day_of_week='sun', hour=3, minute=0)
+    
+    # ⚡ NUEVO: Se lo delegamos al Scheduler para que no trabe la memoria
+    scheduler.add_job(robot_respaldos_diarios, 'cron', hour=2, minute=0)
+    
+    scheduler.start()
+    print("⏰ Robot de Carritos y Reportes (APScheduler) Activado y Corriendo.")
 
 
 # Cuando tengas tu cuenta, las pondrás en las variables de entorno de Render
@@ -1224,7 +1214,8 @@ def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, backgr
             # Correo al cliente
             if cliente_db:
                 try:
-                    enviar_correo_recibo(cliente_db.correo, cliente_db.nombre_completo, f"{nuevo_pedido.id:04d}", total_final, lista_ropa, puntos_ganados)
+                    # ⚡ FIX: Usamos background_tasks de FastAPI
+                    enviar_correo_recibo(cliente_db.correo, cliente_db.nombre_completo, f"{nuevo_pedido.id:04d}", total_final, lista_ropa, puntos_ganados, bg_tasks=background_tasks)
                 except:
                     pass
                 
@@ -1336,7 +1327,8 @@ def webhook_mercadopago(background_tasks: BackgroundTasks, datos: dict = Body(..
                     # 📧 ENVIAR CORREO
                     if pedido_db.correo_cliente:
                         try:
-                            enviar_correo_recibo(pedido_db.correo_cliente, pedido_db.nombre_cliente, f"{pedido_db.id:04d}", pedido_db.total, lista_ropa, puntos_ganados)
+                            # ⚡ FIX: Usamos background_tasks de FastAPI
+                            enviar_correo_recibo(pedido_db.correo_cliente, pedido_db.nombre_cliente, f"{pedido_db.id:04d}", pedido_db.total, lista_ropa, puntos_ganados, bg_tasks=background_tasks)
                         except:
                             pass
 
@@ -1414,8 +1406,7 @@ def procesar_logistica_asincrona(pedido_id: int):
         db.close()
 
 @app.post("/admin/lanzar-recuperacion")
-def lanzar_recuperacion_carritos(db: Session = Depends(get_db), token: str = Depends(verificar_token)):
-    # 1. Calculamos la hora exacta de hace 1 hora
+def lanzar_recuperacion_carritos( background_tasks: BackgroundTasks, db: Session = Depends(get_db), token: str = Depends(verificar_token)):    # 1. Calculamos la hora exacta de hace 1 hora
     hace_una_hora = datetime.utcnow() - timedelta(minutes=1)
     
     # 2. Buscamos pedidos PENDIENTES, que tengan correo, y que sean viejos
@@ -1428,7 +1419,7 @@ def lanzar_recuperacion_carritos(db: Session = Depends(get_db), token: str = Dep
     correos_enviados = 0
     for pedido in pedidos_abandonados:
         # Disparamos el correo
-        enviar_correo_carrito_abandonado(pedido.correo_cliente, pedido.nombre_cliente, f"{pedido.id:04d}")
+        enviar_correo_carrito_abandonado(pedido.correo_cliente, pedido.nombre_cliente, f"{pedido.id:04d}", bg_tasks=background_tasks)
         
         # 3. Le cambiamos el estatus para no hacerle "Spam" y mandarle 100 correos
         pedido.estatus = "RECORDATORIO_ENVIADO"
