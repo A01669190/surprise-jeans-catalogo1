@@ -870,7 +870,7 @@ def asistente_virtual(req: ChatRequest, request: Request):
     """
     try:
         respuesta = gemini_client.models.generate_content(
-            model='gemini-1.5-flash', # ⚡ FIX: Cambiamos de 2.5 a 1.5
+            model='gemini-3-flash-preview', # ⚡ FIX: Usando el modelo más nuevo de tu panel
             contents=f"{prompt_sistema}\n\nClienta: {req.mensaje}"
         )
         return {"respuesta": respuesta.text}
