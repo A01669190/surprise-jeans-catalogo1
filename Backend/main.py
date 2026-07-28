@@ -870,11 +870,13 @@ def asistente_virtual(req: ChatRequest, request: Request):
     """
     try:
         respuesta = gemini_client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-1.5-flash', # ⚡ FIX: Cambiamos de 2.5 a 1.5
             contents=f"{prompt_sistema}\n\nClienta: {req.mensaje}"
         )
         return {"respuesta": respuesta.text}
     except Exception as e:
+        # ⚡ NUEVO: Imprime el error real en tu consola de Render
+        print(f"🚨 Error interno del Asistente Virtual: {str(e)}") 
         return {"respuesta": "¡Hola! En este momento estoy acomodando cajas en la bodega 📦. ¿Me preguntas de nuevo en unos segundos?"}
 
 # ==========================================
