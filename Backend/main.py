@@ -542,10 +542,13 @@ async def recuperar_password(request: Request, background_tasks: BackgroundTasks
     # 4. Mensaje genérico a la pantalla
     return {"mensaje": "Si el correo existe, hemos enviado las instrucciones."}
 
+class ChatRequest(BaseModel):
+    mensaje: str
 
 class CambioPasswordReq(BaseModel):
     password_actual: str
     password_nueva: str
+    
 
 @app.post("/cambiar-password")
 def cambiar_password(
@@ -837,6 +840,42 @@ def recomendaciones_inteligentes(pantalon_id: int, db: Session = Depends(get_db)
     resultado = [{"id": p.id, "nombre": p.nombre, "precio": p.precio, "imagen_url": p.imagen_url} for p in recomendados]
     
     return resultado
+
+# ==========================================
+# 🤖 ASISTENTE VIRTUAL (PERSONAL SHOPPER)
+# ==========================================
+from google import genai
+gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+@app.post("/api/chat")
+@limiter.limit("15/minute")
+def asistente_virtual(req: ChatRequest, request: Request):
+    global CACHE_TIENDA
+    
+    inventario_texto = "Catálogo con stock:\n"
+    if CACHE_TIENDA["pantalones"]:
+        # Leemos los primeros 40 para no saturar al bot
+        for p in CACHE_TIENDA["pantalones"][:40]:
+            if p.stock > 0:
+                inventario_texto += f"- {p.nombre} a ${p.precio}. Link: https://surprisejeanysk.com/?producto={p.id}\n"
+    
+    prompt_sistema = f"""
+    Eres 'Surprise Bot', la personal shopper experta de Surprise Jeans.
+    Ayuda a las clientas a encontrar pantalones, sé muy amable y usa emojis.
+    Básate ÚNICAMENTE en el stock actual. Si te piden algo que está en el inventario, dales el Link de compra exacto que aparece. Si no, recomienda otra cosa.
+    Nunca inventes precios o links.
+    
+    INVENTARIO EN VIVO:
+    {inventario_texto}
+    """
+    try:
+        respuesta = gemini_client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=f"{prompt_sistema}\n\nClienta: {req.mensaje}"
+        )
+        return {"respuesta": respuesta.text}
+    except Exception as e:
+        return {"respuesta": "¡Hola! En este momento estoy acomodando cajas en la bodega 📦. ¿Me preguntas de nuevo en unos segundos?"}
 
 # ==========================================
 # 🖨️ GENERADOR DE ETIQUETAS TÉRMICAS PDF
@@ -1625,7 +1664,8 @@ async def crear_pantalon(  # ⚡ FIX: Convertido a asíncrono
             folder="surprise_jeans_catalogo",
             public_id=f"{codigo.strip()}_{int(datetime.now().timestamp())}"
         )
-        url_permanente = respuesta_cloud['secure_url']
+        url_cruda = respuesta_cloud['secure_url']
+        url_permanente = url_cruda.replace("/upload/", "/upload/f_auto,q_auto/")
     except Exception as e:
         return {"error": f"Fallo la subida a Cloudinary: {str(e)}"}
 
@@ -2190,7 +2230,8 @@ def editar_pantalon(
                 folder="surprise_jeans_catalogo",
                 public_id=f"{codigo_limpio}_update_{int(datetime.now().timestamp())}"
             )
-            pantalon.imagen_url = respuesta_cloud['secure_url']
+            url_cruda = respuesta_cloud['secure_url']
+            pantalon.imagen_url = url_cruda.replace("/upload/", "/upload/f_auto,q_auto/")
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Error subiendo la foto a Cloudinary: {str(e)}")
 
