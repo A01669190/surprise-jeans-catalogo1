@@ -172,11 +172,17 @@ limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# 2. CORS SEGURO (Anti-Crash)
+# 2. CORS SEGURO (Anti-Hackers)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Permitimos el acceso desde el frontend
-    allow_credentials=False, # ⚡ FIX: Apagamos esto para evitar el bloqueo interno de FastAPI
+    # ⚡ FIX: Solo tu página web oficial y tu entorno local pueden usar esta API
+    allow_origins=[
+        "https://surprisejeanysk.com", 
+        "https://www.surprisejeanysk.com",
+        "http://127.0.0.1:5500", # Live Server de VS Code (Para cuando programes)
+        "http://localhost:5500"
+    ], 
+    allow_credentials=True, 
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -1068,10 +1074,18 @@ def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, backgr
         items_para_banco = []
         
         for item in pedido_req.items:
-            total_item = float(item.precio) * item.cantidad 
+            # ⚡ ESCUDO ANTI-HACKERS: No confiamos en el precio que manda el navegador web.
+            # Buscamos el precio REAL e inmutable en nuestra base de datos.
+            pantalon_real = db.query(models.Pantalon).filter(models.Pantalon.id == item.id).first()
+            if not pantalon_real:
+                raise HTTPException(status_code=400, detail=f"El artículo {item.nombre} ya no existe.")
+                
+            precio_verdadero = float(pantalon_real.precio)
+            
+            total_item = precio_verdadero * item.cantidad 
             total_pedido += total_item
             
-            precio_con_descuento = float(item.precio) * (1.0 - (descuento_porc / 100.0))
+            precio_con_descuento = precio_verdadero * (1.0 - (descuento_porc / 100.0))
             items_para_banco.append({
                 "title": f"[{item.codigo}] {item.nombre}",
                 "quantity": item.cantidad, 
@@ -1148,7 +1162,8 @@ def crear_pago_seguro(request: Request, pedido_req: schemas.PedidoSeguro, backgr
             if not pantalon_check:
                 continue # Si ya fue borrado o no existe, lo saltamos para evitar que truene el pago
 
-            precio_final = float(item.precio) * (1.0 - (descuento_porc / 100.0))
+            # ⚡ FIX: Usamos el precio de la base de datos (pantalon_check), no el de la solicitud (item)
+            precio_final = float(pantalon_check.precio) * (1.0 - (descuento_porc / 100.0))
             db.add(models.DetallePedido(
                 pedido_id=nuevo_pedido.id, 
                 pantalon_id=item.id, 

@@ -25,7 +25,14 @@ if URL_BASE_DATOS.startswith("postgres://"):
 if URL_BASE_DATOS.startswith("sqlite"):
     engine = create_engine(URL_BASE_DATOS, connect_args={"check_same_thread": False})
 else:
-    engine = create_engine(URL_BASE_DATOS)
+    # ⚡ FIX EMPRESARIAL: Pool de conexiones blindado para Render
+    engine = create_engine(
+        URL_BASE_DATOS, 
+        pool_size=10,          # Mantiene 10 conexiones listas siempre
+        max_overflow=20,       # Si hay pico de ventas, abre hasta 20 más
+        pool_pre_ping=True,    # ⚡ Verifica que la conexión no esté "dormida" antes de consultar
+        pool_recycle=1800      # Recicla las conexiones cada 30 minutos
+    )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

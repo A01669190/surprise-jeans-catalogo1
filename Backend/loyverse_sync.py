@@ -4,6 +4,7 @@ import os
 import time  # ⚡ NUEVO: Importamos el control de tiempo
 import datetime # ⚡ FIX: Agregado para generar_recibo_virtual
 import models   # ⚡ FIX: Agregado para procesar_webhooks_loyverse
+from tenacity import retry, wait_exponential, stop_after_attempt
 
 TOKEN_LOYVERSE = os.getenv("LOYVERSE_TOKEN", "")
 
@@ -141,6 +142,7 @@ async def procesar_webhooks_loyverse(eventos, db, manager):
                                 db.commit()
                                 print(f"🌟 Nuevo modelo descargado desde Loyverse: {sku_padre}")
 
+@retry(wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(5))
 def crear_articulo_loyverse(nombre, sku, precio, nombre_categoria="General", color="Original"):
     try:
         req_cat = urllib.request.Request("https://api.loyverse.com/v1.0/categories")
