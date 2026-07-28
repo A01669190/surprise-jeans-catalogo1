@@ -2061,7 +2061,7 @@
         });
 
         function agregarAlCarrito(id, botonElemento = null) {
-            const pantalon = catalogoCompleto.find(p => p.id === id);
+            const pantalon = catalogoCompleto.find(p => p.id == id);
             if (!pantalon) return;
 
             // ⚡ EL CANDADO: Obliga a elegir talla

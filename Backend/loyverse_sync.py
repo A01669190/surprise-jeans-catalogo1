@@ -85,6 +85,12 @@ async def procesar_webhooks_loyverse(eventos, db, manager):
         tipo = evento.get("type")
         
         if tipo == "receipts.update":
+            # ⚡ FIX: Evitar bucle infinito de doble descuento
+            receipt_number = evento.get("data", {}).get("receipt", {}).get("receipt_number", "")
+            if str(receipt_number).startswith("WEB-"):
+                print(f"🔄 Ignorando recibo {receipt_number} porque ya fue descontado por la web.")
+                continue
+                
             line_items = evento.get("data", {}).get("receipt", {}).get("line_items", [])
             for item in line_items:
                 sku_variante = item.get("sku")

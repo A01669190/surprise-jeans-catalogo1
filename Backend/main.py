@@ -741,7 +741,7 @@ event.listen(models.VarianteTalla, 'after_update', purgar_cache)
 def obtener_categorias(request: Request, db: Session = Depends(get_db)):
     return db.query(models.Categoria).all()
 
-@app.get("/pantalones")
+@app.get("/pantalones", response_model=List[schemas.PantalonRespuesta])
 @limiter.limit("120/minute")
 def obtener_pantalones(
     request: Request, skip: int = 0, limit: int = 1000, 
@@ -1438,10 +1438,8 @@ async def webhook_mercadopago(request: Request, background_tasks: BackgroundTask
                     
                     db.commit()
                     
-                    import asyncio
                     try:
-                        loop = asyncio.get_event_loop()
-                        loop.create_task(manager.broadcast("NUEVO_PEDIDO"))
+                        await manager.broadcast("NUEVO_PEDIDO")
                     except:
                         pass
 
@@ -1488,16 +1486,19 @@ def reembolsar_pedido(
     # 2. Actualizar el estatus
     pedido.estatus = "REEMBOLSADO"
     
-    # 3. Devolver Inventario Físico y Web
+    # 3. Devolver Inventario Físico y Web (Corregido a precisión de talla)
     for detalle in pedido.detalles:
         pantalon = db.query(models.Pantalon).filter(models.Pantalon.id == detalle.pantalon_id).first()
-        if pantalon:
-            # Regresamos el stock web
+        variante = db.query(models.VarianteTalla).filter(models.VarianteTalla.sku == detalle.sku_variante).first()
+        
+        if pantalon and variante:
+            # Regresamos el stock web a la talla exacta y al total del pantalón
+            variante.stock += detalle.cantidad
             pantalon.stock += detalle.cantidad 
             db.commit()
             
-            # ⚡ Regresamos el stock en Loyverse asíncronamente
-            background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, pantalon.codigo, pantalon.stock)
+            # ⚡ Regresamos el stock en Loyverse asíncronamente con el SKU EXACTO
+            background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, variante.sku, variante.stock)
             
     # 4. Quitar puntos ganados al cliente (Protección anti-fraude)
     cliente = db.query(models.Cliente).filter(models.Cliente.correo == pedido.correo_cliente).first()
