@@ -1952,7 +1952,11 @@ async def subir_fotos_magicas(
             db.add(nueva_variante)
             
             if stock_talla > 0:
-                background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, sku_variante, stock_talla)
+                # ⚡ FIX: Le damos 2 segundos a Loyverse para crear las tallas antes de mandarle el stock
+                async def retrasar_stock(sku, stock):
+                    await asyncio.sleep(2.0)
+                    await loyverse_sync.descontar_stock_loyverse(sku, stock)
+                background_tasks.add_task(retrasar_stock, sku_variante, stock_talla)
         
         db.commit()
         
@@ -2099,7 +2103,11 @@ async def subir_excel(
                 db.add(nueva_talla)
                 
                 if stock_talla > 0:
-                    background_tasks.add_task(loyverse_sync.descontar_stock_loyverse, sku_variante, stock_talla)
+                    # ⚡ FIX: Le damos 2 segundos a Loyverse para crear las tallas antes de mandarle el stock
+                    async def retrasar_stock(sku, stock):
+                        await asyncio.sleep(2.0)
+                        await loyverse_sync.descontar_stock_loyverse(sku, stock)
+                    background_tasks.add_task(retrasar_stock, sku_variante, stock_talla)
             
             db.commit()
             
