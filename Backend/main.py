@@ -5,6 +5,7 @@ from google.auth.transport import requests as google_requests
 from pydantic import BaseModel
 import string
 import httpx
+from google import genai
 import random
 import loyverse_sync
 from fastapi.responses import Response
@@ -842,9 +843,54 @@ def recomendaciones_inteligentes(pantalon_id: int, db: Session = Depends(get_db)
     return resultado
 
 # ==========================================
+# 📸 BÚSQUEDA VISUAL CON IA (Encuentra mi estilo)
+# ==========================================
+@app.post("/api/busqueda-visual")
+@limiter.limit("5/minute")
+async def busqueda_visual(request: Request, foto: UploadFile = File(...)):
+    global CACHE_TIENDA
+    from google.genai import types
+    import json
+    
+    contenido = await foto.read()
+    
+    # Preparamos una lista rápida para que Gemini sepa qué hay en stock
+    inventario_texto = "IDs Disponibles:\n"
+    if CACHE_TIENDA["pantalones"]:
+        for p in CACHE_TIENDA["pantalones"][:60]: # Le pasamos los 60 más recientes
+            if p.stock > 0:
+                categoria_nom = p.categoria.nombre if p.categoria else "Jeans"
+                inventario_texto += f"- ID: {p.id} | Modelo: {p.nombre} | Categoría: {categoria_nom}\n"
+
+    prompt = f"""
+    Eres un experto en moda de Surprise Jeans. 
+    Analiza el pantalón en esta imagen (fíjate en el corte: skinny, mom, wide leg, cargo, color y tela).
+    Luego, busca en este inventario los 3 a 5 IDs que más se parezcan al estilo de la foto.
+    Devuelve ÚNICAMENTE un arreglo JSON con los números de ID, ejemplo: [10, 15, 2]. Si no hay parecidos, devuelve []. No escribas NADA MÁS, solo el arreglo.
+    
+    INVENTARIO:
+    {inventario_texto}
+    """
+    
+    try:
+        respuesta = gemini_client.models.generate_content(
+            model='gemini-3-flash-preview',
+            contents=[
+                types.Part.from_bytes(data=contenido, mime_type=foto.content_type),
+                prompt
+            ]
+        )
+        # Limpiamos el texto por si Gemini le pone formato
+        texto_limpio = respuesta.text.replace("```json", "").replace("```", "").strip()
+        ids = json.loads(texto_limpio)
+        return {"ids": ids[:5]}
+    except Exception as e:
+        print(f"🚨 Error en Búsqueda Visual: {str(e)}")
+        return {"ids": []}
+
+# ==========================================
 # 🤖 ASISTENTE VIRTUAL (PERSONAL SHOPPER)
 # ==========================================
-from google import genai
 gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 @app.post("/api/chat")

@@ -75,6 +75,21 @@
 
 <body class="bg-gray-50 text-gray-800 font-sans relative pb-28">
 
+    <!-- 📱 BANNER INSTALACIÓN PWA -->
+    <div id="banner-pwa" class="fixed top-0 left-0 right-0 z-[100] bg-stone-900 text-white p-4 shadow-2xl flex justify-between items-center transform -translate-y-full transition-transform duration-500 ease-out">
+        <div class="flex items-center gap-3">
+            <img src="https://i.ibb.co/wZtDpBYv/Gemini-Generated-Image-myrw5wmyrw5wmyrw-removebg-preview.png" class="w-12 h-12 rounded-xl shadow-sm bg-white p-1">
+            <div>
+                <p class="font-black text-sm tracking-wide">Surprise Jeans App</p>
+                <p class="text-[10px] text-gray-300 font-medium">Instala para comprar más rápido</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <button onclick="cerrarPWA()" class="text-gray-400 hover:text-white text-xs font-bold px-2 py-2">X</button>
+            <button onclick="instalarPWA()" class="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg font-black text-xs shadow-md transition-colors">INSTALAR</button>
+        </div>
+    </div>
+
     <div id="overlay-menu" onclick="cerrarMenuLateral()" class="fixed inset-0 bg-stone-900 bg-opacity-50 z-40 hidden transition-opacity"></div>
     
     <div id="menu-lateral" class="fixed inset-y-0 left-0 w-80 bg-white shadow-2xl transform -translate-x-full transition-transform duration-300 z-50 overflow-y-auto">
@@ -210,12 +225,21 @@
         <div id="overlay-buscador" class="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-40 hidden transition-opacity" onclick="cerrarBuscadorPredictivo()"></div>
 
 
-        <div class="max-w-2xl mx-auto relative shadow-xl rounded-full transform transition-transform hover:scale-[1.02] z-20">
-            <input type="text" id="buscador-tienda" autocomplete="off" name="busqueda" data-lpignore="true" placeholder="¿Qué modelo buscas? (Ej. Skinny, Mom...)" class="w-full border-none bg-white py-4 md:py-5 pr-6 pl-14 md:pl-16 rounded-full focus:outline-none focus:ring-4 focus:ring-rose-200 transition-all text-sm md:text-base text-gray-800 font-medium relative z-20">                   
-            
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-5 md:left-6 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none z-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div class="max-w-2xl mx-auto relative shadow-xl rounded-full transform transition-transform hover:scale-[1.02] z-20 flex items-center bg-white overflow-hidden border border-rose-50">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-5 md:left-6 text-gray-400 pointer-events-none z-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
+            
+            <input type="text" id="buscador-tienda" autocomplete="off" name="busqueda" data-lpignore="true" placeholder="¿Qué modelo buscas? (Ej. Skinny, Mom...)" class="w-full border-none bg-transparent py-4 md:py-5 pr-14 pl-14 md:pl-16 focus:outline-none focus:ring-4 focus:ring-rose-200 transition-all text-sm md:text-base text-gray-800 font-medium relative z-10">                   
+            
+            <!-- ⚡ BOTÓN DE BÚSQUEDA VISUAL IA -->
+            <button onclick="document.getElementById('input-foto-ia').click()" class="absolute right-3 bg-indigo-50 text-indigo-500 hover:bg-indigo-600 hover:text-white transition-colors p-2.5 rounded-full shadow-sm z-30 group" title="Búsqueda con IA">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transform group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+            </button>
+            <input type="file" id="input-foto-ia" class="hidden" accept="image/*" onchange="procesarBusquedaVisual(event)">
 
             <!-- ⚡ VENTANA PREDICTIVA FLOTANTE (Inicia oculta) ⚡ -->
             <div id="resultados-predictivos" class="absolute top-full left-0 right-0 mt-3 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden hidden flex-col max-h-[360px] overflow-y-auto z-30">
@@ -3504,6 +3528,109 @@
                 inputBusq.blur();
             }
         }, { passive: true });
+
+
+        // ==========================================
+        // 📸 LÓGICA DE BÚSQUEDA VISUAL IA
+        // ==========================================
+        async function procesarBusquedaVisual(event) {
+            const archivo = event.target.files[0];
+            if (!archivo) return;
+
+            const inputBuscador = document.getElementById('buscador-tienda');
+            const placeholderOriginal = inputBuscador.placeholder;
+            inputBuscador.value = "";
+            inputBuscador.placeholder = "✨ Analizando estilo con IA...";
+            inputBuscador.disabled = true;
+
+            const ventanaPredictiva = document.getElementById('resultados-predictivos');
+            const overlayBuscador = document.getElementById('overlay-buscador');
+            
+            ventanaPredictiva.classList.remove('hidden');
+            if(overlayBuscador) overlayBuscador.classList.remove('hidden');
+
+            ventanaPredictiva.innerHTML = `
+                <div class="p-8 text-center text-indigo-600">
+                    <div class="animate-spin text-4xl mb-3">✨</div>
+                    <p class="font-black">La IA está buscando tu estilo...</p>
+                    <p class="text-xs text-gray-500 mt-1">Comparando el fit y color con nuestro catálogo</p>
+                </div>
+            `;
+
+            const formData = new FormData();
+            formData.append('foto', archivo);
+
+            try {
+                const res = await fetch(`${API_URL}/api/busqueda-visual`, { method: 'POST', body: formData });
+                const data = await res.json();
+                
+                inputBuscador.disabled = false;
+                inputBuscador.placeholder = placeholderOriginal;
+                
+                if (data.ids && data.ids.length > 0) {
+                    const filtrados = catalogoCompleto.filter(p => data.ids.includes(p.id));
+                    
+                    if (filtrados.length > 0) {
+                        ventanaPredictiva.innerHTML = `<div class="p-3 bg-indigo-50 border-b border-indigo-100 text-[10px] font-black text-indigo-600 uppercase tracking-widest text-center">✨ Opciones similares encontradas</div>`;
+                        
+                        ventanaPredictiva.innerHTML += filtrados.map(p => {
+                            const estaAgotado = p.stock === 0;
+                            const estiloAgotado = estaAgotado ? 'opacity-50 grayscale' : '';
+                            const etiquetaAgotado = estaAgotado ? `<span class="bg-rose-100 text-rose-600 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ml-2">Agotado</span>` : '';
+                            
+                            return `
+                            <div class="flex items-center gap-4 p-4 hover:bg-indigo-50 border-b border-gray-50 cursor-pointer transition-colors group" onclick="cerrarBuscadorPredictivo(); verDetalles(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', '${p.imagen_url}', ${p.precio})">
+                                <div class="w-14 h-16 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0 relative shadow-sm">
+                                    <img src="${p.imagen_url}" class="w-full h-full object-cover ${estiloAgotado} group-hover:scale-110 transition-transform">
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-bold text-gray-800 truncate transition-colors group-hover:text-indigo-700">${p.nombre} ${etiquetaAgotado}</p>
+                                    <p class="text-[10px] text-gray-400 mt-0.5 tracking-wider">Sugerencia IA</p>
+                                </div>
+                                <div class="text-right flex-shrink-0 pr-2">
+                                    <span class="font-black text-indigo-600 text-base">$${p.precio.toFixed(2)}</span>
+                                </div>
+                            </div>`;
+                        }).join('');
+                    } else { throw new Error("Vacío"); }
+                } else { throw new Error("Vacío"); }
+            } catch (e) {
+                inputBuscador.disabled = false;
+                inputBuscador.placeholder = placeholderOriginal;
+                ventanaPredictiva.innerHTML = `
+                    <div class="p-8 text-center text-gray-400">
+                        <span class="text-4xl block mb-3">🥺</span>
+                        <p class="font-bold text-gray-700">No encontramos un estilo idéntico</p>
+                        <p class="text-xs mt-1">Intenta con otra foto o busca por nombre</p>
+                    </div>`;
+            }
+            event.target.value = '';
+        }
+
+        // ==========================================
+        // 📱 PWA: BOTÓN DE INSTALACIÓN NATIVA
+        // ==========================================
+        let promptInstalacion;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault(); // Evita el popup feo de Chrome
+            promptInstalacion = e;
+            const banner = document.getElementById('banner-pwa');
+            if (banner) banner.classList.remove('-translate-y-full'); // Baja el banner
+        });
+
+        function instalarPWA() {
+            const banner = document.getElementById('banner-pwa');
+            if (banner) banner.classList.add('-translate-y-full');
+            
+            if (promptInstalacion) {
+                promptInstalacion.prompt();
+                promptInstalacion.userChoice.then(() => { promptInstalacion = null; });
+            }
+        }
+        function cerrarPWA() {
+            const banner = document.getElementById('banner-pwa');
+            if (banner) banner.classList.add('-translate-y-full');
+        }
 
 
     </script>
