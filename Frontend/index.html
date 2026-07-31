@@ -225,12 +225,15 @@
         <div id="overlay-buscador" class="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-40 hidden transition-opacity" onclick="cerrarBuscadorPredictivo()"></div>
 
 
-        <div class="max-w-2xl mx-auto relative shadow-xl rounded-full transform transition-transform hover:scale-[1.02] z-20 flex items-center bg-white overflow-hidden border border-rose-50">
+        <div class="max-w-2xl mx-auto relative shadow-xl rounded-full transform transition-transform hover:scale-[1.02] z-50 flex items-center bg-white border border-rose-50">
+            
+            <!-- Icono de lupa -->
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-5 md:left-6 text-gray-400 pointer-events-none z-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             
-            <input type="text" id="buscador-tienda" autocomplete="off" name="busqueda" data-lpignore="true" placeholder="¿Qué modelo buscas? (Ej. Skinny, Mom...)" class="w-full border-none bg-transparent py-4 md:py-5 pr-14 pl-14 md:pl-16 focus:outline-none focus:ring-4 focus:ring-rose-200 transition-all text-sm md:text-base text-gray-800 font-medium relative z-10">                   
+            <!-- Input de Búsqueda -->
+            <input type="text" id="buscador-tienda" autocomplete="off" name="busqueda" data-lpignore="true" placeholder="¿Qué modelo buscas? (Ej. Skinny, Mom...)" class="w-full border-none bg-transparent py-4 md:py-5 pr-14 pl-14 md:pl-16 focus:outline-none focus:ring-4 focus:ring-rose-200 transition-all text-sm md:text-base text-gray-800 font-medium relative z-10 rounded-full">                   
             
             <!-- ⚡ BOTÓN DE BÚSQUEDA VISUAL IA -->
             <button onclick="document.getElementById('input-foto-ia').click()" class="absolute right-3 bg-indigo-50 text-indigo-500 hover:bg-indigo-600 hover:text-white transition-colors p-2.5 rounded-full shadow-sm z-30 group" title="Búsqueda con IA">
@@ -241,10 +244,12 @@
             </button>
             <input type="file" id="input-foto-ia" class="hidden" accept="image/*" onchange="procesarBusquedaVisual(event)">
 
-            <!-- ⚡ VENTANA PREDICTIVA FLOTANTE (Inicia oculta) ⚡ -->
-            <div id="resultados-predictivos" class="absolute top-full left-0 right-0 mt-3 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden hidden flex-col max-h-[360px] overflow-y-auto z-30">
+            <!-- ⚡ VENTANA PREDICTIVA FLOTANTE -->
+            <div id="resultados-predictivos" class="absolute top-full left-0 right-0 mt-3 bg-white rounded-2xl shadow-2xl border border-gray-100 hidden flex-col max-h-[360px] overflow-y-auto z-[60]">
                 <!-- JavaScript inyectará las sugerencias aquí mágicamente -->
             </div>
+            
+        </div>
             
         </div>
 
@@ -3608,28 +3613,50 @@
         }
 
         // ==========================================
-        // 📱 PWA: BOTÓN DE INSTALACIÓN NATIVA
+        // 📱 PWA: BOTÓN DE INSTALACIÓN NATIVA (Bypass iOS)
         // ==========================================
         let promptInstalacion;
+        const bannerPwa = document.getElementById('banner-pwa');
+        
+        // ⚡ Detector de Sistema Operativo
+        const esIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const estaEnApp = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+        // 1. Caso Google/Android (Soporte automático)
         window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault(); // Evita el popup feo de Chrome
+            e.preventDefault();
             promptInstalacion = e;
-            const banner = document.getElementById('banner-pwa');
-            if (banner) banner.classList.remove('-translate-y-full'); // Baja el banner
+            if (bannerPwa) bannerPwa.classList.remove('-translate-y-full');
         });
 
+        // 2. Caso Apple/iPhone (Forzamos la aparición del banner después de 3 segundos)
+        if (esIos && !estaEnApp) {
+            setTimeout(() => {
+                if (bannerPwa) bannerPwa.classList.remove('-translate-y-full');
+            }, 3000);
+        }
+
         function instalarPWA() {
-            const banner = document.getElementById('banner-pwa');
-            if (banner) banner.classList.add('-translate-y-full');
+            if (bannerPwa) bannerPwa.classList.add('-translate-y-full');
             
             if (promptInstalacion) {
+                // Instalación a un clic (Android/PC)
                 promptInstalacion.prompt();
                 promptInstalacion.userChoice.then(() => { promptInstalacion = null; });
+            } else if (esIos) {
+                // Tutorial interactivo para iPhone
+                Swal.fire({
+                    title: 'Instalar en iPhone 🍎',
+                    html: `Es muy fácil:<br><br>1. Toca el botón de <b>Compartir</b> <svg class="w-5 h-5 inline text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg> abajo en tu pantalla.<br>2. Desliza hacia abajo y selecciona <b>"Agregar a Inicio"</b> <svg class="w-5 h-5 inline text-gray-700 border rounded" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>.<br>3. ¡Listo! 🛍️`,
+                    icon: 'info',
+                    confirmButtonText: '¡Entendido!',
+                    confirmButtonColor: '#4f46e5'
+                });
             }
         }
+        
         function cerrarPWA() {
-            const banner = document.getElementById('banner-pwa');
-            if (banner) banner.classList.add('-translate-y-full');
+            if (bannerPwa) bannerPwa.classList.add('-translate-y-full');
         }
 
 
