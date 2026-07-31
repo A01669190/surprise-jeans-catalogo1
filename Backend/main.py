@@ -1956,16 +1956,17 @@ async def subir_fotos_magicas(
         
         db.commit()
         
-        # 5. PREPARAMOS EXCEL 
+        # 5. PREPARAMOS EXCEL (CON FORMATO UNIVERSAL)
         datos_excel.append({
-            "Código": sku_padre,
+            "Codigo": sku_padre,
             "Nombre": nombre_limpio,
             "Precio": precio,
-            "Paquetes Físicos": paquetes,
-            "Stock Total (Piezas)": stock_total,
-            "Categoría": categoria.nombre,
-            "Foto Visual": f'=IMAGE("{url_permanente}")',
-            "Link Web": url_permanente
+            "Paquetes": paquetes,
+            "Categoria": categoria.nombre,
+            "Color": color,
+            "Foto_URL": url_permanente,
+            "Stock Visual": stock_total,
+            "Foto Visual": f'=IMAGE("{url_permanente}")'
         })
         exitos += 1
 
@@ -1984,10 +1985,11 @@ async def subir_fotos_magicas(
             df.to_excel(writer, index=False, sheet_name='Nuevos Modelos')
             worksheet = writer.sheets['Nuevos Modelos']
             
-            worksheet.column_dimensions['A'].width = 15  
-            worksheet.column_dimensions['B'].width = 30  
-            worksheet.column_dimensions['G'].width = 25  
-            worksheet.column_dimensions['H'].width = 45  
+            # Ajustamos los anchos de las nuevas columnas
+            worksheet.column_dimensions['A'].width = 15  # Codigo
+            worksheet.column_dimensions['B'].width = 30  # Nombre
+            worksheet.column_dimensions['G'].width = 45  # Foto_URL
+            worksheet.column_dimensions['I'].width = 25  # Foto Visual
             
             for fila in range(2, len(datos_excel) + 2):
                 worksheet.row_dimensions[fila].height = 110  
@@ -2024,6 +2026,16 @@ async def subir_excel(
                 
         df = await run_in_threadpool(procesar_pandas)
         df.columns = df.columns.str.strip()
+        
+        # ⚡ ESCUDO ANTI-BATALLAS: Si tus papás suben un excel viejo, Python lo corrige solito en memoria
+        df = df.rename(columns={
+            'Código': 'Codigo', 
+            'Categoría': 'Categoria', 
+            'Paquetes Físicos': 'Paquetes', 
+            'Link Web': 'Foto_URL'
+        })
+        if 'Color' not in df.columns:
+            df['Color'] = 'Original'
         
         # ⚡ FIX: AHORA EXIGIMOS "Paquetes" y "Color" EN LUGAR DE STOCK
         columnas_esperadas = ["Codigo", "Nombre", "Precio", "Paquetes", "Categoria", "Color"]
