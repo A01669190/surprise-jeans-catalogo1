@@ -192,12 +192,13 @@ if(formExcel) {
             
             const data = await respuesta.json();
             
-            if (respuesta.ok) { 
+            // ⚡ EL FIX: Nos aseguramos de que no haya un error escondido en la respuesta
+            if (respuesta.ok && !data.error) { 
                 alert(`¡Éxito! ${data.mensaje}\n\n⚠️ NOTA: La web se actualizó al instante. Loyverse se está sincronizando en segundo plano, dale un par de minutos para que aparezcan en la tablet.`); 
                 cargarCategoriasEnSelect(); 
                 cargarInventarioAdmin(); 
             } else {
-                alert(`Error en el archivo: ${data.error}`);
+                alert(`Error en el archivo: ${data.error || 'Revisa que tu Excel tenga las columnas correctas.'}`);
             }
         } catch (error) { 
             console.error("Error subiendo Excel:", error);
