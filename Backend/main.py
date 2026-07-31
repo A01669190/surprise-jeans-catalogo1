@@ -1940,6 +1940,12 @@ async def subir_fotos_magicas(
         background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre_limpio, sku_padre, precio, categoria.nombre, color)
 
         distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
+
+        # ⚡ ESCUDO: Función asíncrona AFUERA del ciclo
+        async def retrasar_stock(sku, stock):
+            await asyncio.sleep(8.0)
+            await loyverse_sync.descontar_stock_loyverse(sku, stock)
+
         for talla_str, piezas_por_paquete in distribucion.items():
             stock_talla = paquetes * piezas_por_paquete 
             sku_variante = f"{sku_padre}-{color_sku}-{talla_str}"
@@ -1952,10 +1958,6 @@ async def subir_fotos_magicas(
             db.add(nueva_variante)
             
             if stock_talla > 0:
-                # ⚡ FIX: Le damos 2 segundos a Loyverse para crear las tallas antes de mandarle el stock
-                async def retrasar_stock(sku, stock):
-                    await asyncio.sleep(2.0)
-                    await loyverse_sync.descontar_stock_loyverse(sku, stock)
                 background_tasks.add_task(retrasar_stock, sku_variante, stock_talla)
         
         db.commit()
@@ -2086,8 +2088,16 @@ async def subir_excel(
             
             pantalones_creados += 1
             
-            # 2. CREAMOS LOS HIJOS (Tallas)
+            # ⚡ CREAMOS EN LOYVERSE PRIMERO (¡Movimos esta línea arriba!)
+            background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre, codigo, precio, categoria.nombre, color_excel)
+            
+            # 2. CREAMOS LOS HIJOS (Tallas) Y ENVIAMOS EL STOCK RETRASADO
             distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
+
+            # ⚡ ESCUDO: Definimos la función AFUERA del ciclo para que Python no se confunda con los SKUs
+            async def retrasar_stock(sku, stock):
+                await asyncio.sleep(8.0)
+                await loyverse_sync.descontar_stock_loyverse(sku, stock)
 
             for talla_str, piezas_por_paquete in distribucion.items():
                 stock_talla = paquetes * piezas_por_paquete
@@ -2103,16 +2113,9 @@ async def subir_excel(
                 db.add(nueva_talla)
                 
                 if stock_talla > 0:
-                    # ⚡ FIX: Le damos 2 segundos a Loyverse para crear las tallas antes de mandarle el stock
-                    async def retrasar_stock(sku, stock):
-                        await asyncio.sleep(2.0)
-                        await loyverse_sync.descontar_stock_loyverse(sku, stock)
                     background_tasks.add_task(retrasar_stock, sku_variante, stock_talla)
             
             db.commit()
-            
-            # ⚡ CREAMOS EN LOYVERSE
-            background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre, codigo, precio, categoria.nombre, color_excel)
             
         return {"mensaje": f"Carga masiva exitosa. Se crearon {pantalones_creados} modelos."}
         
