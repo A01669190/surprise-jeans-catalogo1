@@ -75,24 +75,9 @@
 
 <body class="bg-gray-50 text-gray-800 font-sans relative pb-28">
 
-    <!-- 📱 BANNER INSTALACIÓN PWA -->
-    <div id="banner-pwa" class="fixed top-0 left-0 right-0 z-[100] bg-stone-900 text-white p-4 shadow-2xl flex justify-between items-center transform -translate-y-full transition-transform duration-500 ease-out">
-        <div class="flex items-center gap-3">
-            <img src="https://i.ibb.co/wZtDpBYv/Gemini-Generated-Image-myrw5wmyrw5wmyrw-removebg-preview.png" class="w-12 h-12 rounded-xl shadow-sm bg-white p-1">
-            <div>
-                <p class="font-black text-sm tracking-wide">Surprise Jeans App</p>
-                <p class="text-[10px] text-gray-300 font-medium">Instala para comprar más rápido</p>
-            </div>
-        </div>
-        <div class="flex items-center gap-3">
-            <button onclick="cerrarPWA()" class="text-gray-400 hover:text-white text-xs font-bold px-2 py-2">X</button>
-            <button onclick="instalarPWA()" class="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg font-black text-xs shadow-md transition-colors">INSTALAR</button>
-        </div>
-    </div>
-
-    <div id="overlay-menu" onclick="cerrarMenuLateral()" class="fixed inset-0 bg-stone-900 bg-opacity-50 z-40 hidden transition-opacity"></div>
+    <div id="overlay-menu" onclick="cerrarMenuLateral()" class="fixed inset-0 bg-stone-900 bg-opacity-50 z-[60] hidden transition-opacity"></div>
     
-    <div id="menu-lateral" class="fixed inset-y-0 left-0 w-80 bg-white shadow-2xl transform -translate-x-full transition-transform duration-300 z-50 overflow-y-auto">
+    <div id="menu-lateral" class="fixed inset-y-0 left-0 w-80 bg-white shadow-2xl transform -translate-x-full transition-transform duration-300 z-[70] overflow-y-auto">
         <div class="p-6">
             <div class="flex justify-between items-center mb-8">
                 <h2 class="text-2xl font-black text-indigo-500 italic tracking-tighter flex items-baseline gap-1.5">
@@ -3611,54 +3596,6 @@
             }
             event.target.value = '';
         }
-
-        // ==========================================
-        // 📱 PWA: BOTÓN DE INSTALACIÓN NATIVA (Bypass iOS)
-        // ==========================================
-        let promptInstalacion;
-        const bannerPwa = document.getElementById('banner-pwa');
-        
-        // ⚡ Detector de Sistema Operativo
-        const esIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-        const estaEnApp = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-
-        // 1. Caso Google/Android (Soporte automático)
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            promptInstalacion = e;
-            if (bannerPwa) bannerPwa.classList.remove('-translate-y-full');
-        });
-
-        // 2. Caso Apple/iPhone (Forzamos la aparición del banner después de 3 segundos)
-        if (esIos && !estaEnApp) {
-            setTimeout(() => {
-                if (bannerPwa) bannerPwa.classList.remove('-translate-y-full');
-            }, 3000);
-        }
-
-        function instalarPWA() {
-            if (bannerPwa) bannerPwa.classList.add('-translate-y-full');
-            
-            if (promptInstalacion) {
-                // Instalación a un clic (Android/PC)
-                promptInstalacion.prompt();
-                promptInstalacion.userChoice.then(() => { promptInstalacion = null; });
-            } else if (esIos) {
-                // Tutorial interactivo para iPhone
-                Swal.fire({
-                    title: 'Instalar en iPhone 🍎',
-                    html: `Es muy fácil:<br><br>1. Toca el botón de <b>Compartir</b> <svg class="w-5 h-5 inline text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg> abajo en tu pantalla.<br>2. Desliza hacia abajo y selecciona <b>"Agregar a Inicio"</b> <svg class="w-5 h-5 inline text-gray-700 border rounded" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>.<br>3. ¡Listo! 🛍️`,
-                    icon: 'info',
-                    confirmButtonText: '¡Entendido!',
-                    confirmButtonColor: '#4f46e5'
-                });
-            }
-        }
-        
-        function cerrarPWA() {
-            if (bannerPwa) bannerPwa.classList.add('-translate-y-full');
-        }
-
 
     </script>
     
