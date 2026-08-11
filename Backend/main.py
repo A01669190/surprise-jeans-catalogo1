@@ -1,5 +1,6 @@
 import os
 from sqlalchemy import func, text
+import html # Importamos la herramienta de sanitización
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from pydantic import BaseModel
@@ -187,6 +188,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 🛡️ ESCUDO HTTP (Anti-Clickjacking y Anti-Sniffing)
+@app.middleware("http")
+async def escudos_seguridad_http(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
 
 # 🚨 INYECTA TU TOKEN AQUÍ 🚨
 MERCADO_PAGO_TOKEN = os.getenv("MERCADO_PAGO_TOKEN", "")
@@ -676,9 +686,11 @@ def crear_resena(
     if existe:
         raise HTTPException(status_code=400, detail="Ya calificaste este modelo anteriormente.")
         
+    comentario_limpio = html.escape(datos.comentario) if datos.comentario else None
+
     nueva_resena = models.Resena(
         pantalon_id=pantalon_id, cliente_id=cliente.id, 
-        calificacion=datos.calificacion, comentario=datos.comentario
+        calificacion=datos.calificacion, comentario=comentario_limpio
     )
     db.add(nueva_resena)
     db.commit()
@@ -848,6 +860,11 @@ def recomendaciones_inteligentes(pantalon_id: int, db: Session = Depends(get_db)
 @app.post("/api/busqueda-visual")
 @limiter.limit("5/minute")
 async def busqueda_visual(request: Request, foto: UploadFile = File(...)):
+    # 🛡️ VACUNA: Verificamos que sea una imagen real y no un script
+    formatos_permitidos = ["image/jpeg", "image/png", "image/webp", "image/jpg"]
+    if foto.content_type not in formatos_permitidos:
+        raise HTTPException(status_code=400, detail="🛑 Alerta: Solo se permiten subir imágenes.")
+
     global CACHE_TIENDA
     from google.genai import types
     import json
@@ -1714,6 +1731,12 @@ async def crear_pantalon(  # ⚡ FIX: Convertido a asíncrono
     db: Session = Depends(get_db), 
     token: str = Depends(verificar_token)
 ):
+
+    # 🛡️ MATEMÁTICA ESTRICTA: Prohibir negativos
+    if precio <= 0:
+        raise HTTPException(status_code=400, detail="El precio debe ser mayor a 0.")
+    if stock < 0:
+        raise HTTPException(status_code=400, detail="El stock no puede ser negativo.")
 
     # 1. COMPRESIÓN WEBP EN HILO SECUNDARIO (Cero lag)
     contenido_original = await foto.read()
