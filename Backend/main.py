@@ -1957,6 +1957,9 @@ async def subir_fotos_magicas(
     errores = 0
     datos_excel = [] 
     detalles_errores = [] 
+    
+    # ⚡ CREAMOS EL DICCIONARIO MAESTRO AFUERA DEL CICLO
+    skus_totales_magicos = {}
 
     for foto in archivos_fotos:
         print(f"\n📸 Procesando archivo: {foto.filename}")
@@ -2046,13 +2049,10 @@ async def subir_fotos_magicas(
         db.commit()
         db.refresh(nuevo_pantalon)
 
-        # 4. ORDEN OMNICANAL PERFECTO (Primero creamos el artículo en Loyverse, luego descontamos stock)
+        # 4. ORDEN OMNICANAL PERFECTO
         background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre_limpio, sku_padre, precio, categoria.nombre, color)
 
         distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
-
-        # ⚡ OPTIMIZACIÓN: Juntamos todas las tallas en una sola caja
-        skus_a_actualizar = {}
 
         for talla_str, piezas_por_paquete in distribucion.items():
             stock_talla = paquetes * piezas_por_paquete 
@@ -2065,19 +2065,13 @@ async def subir_fotos_magicas(
             )
             db.add(nueva_variante)
             
-            if stock_talla > 0:
-                skus_a_actualizar[sku_variante] = stock_talla
-                
-        # ⚡ Enviamos UN SOLO mensajero a Loyverse con todas las tallas
-        if skus_a_actualizar:
-            async def retrasar_stock_lote(skus_dict):
-                await asyncio.sleep(8.0)
-                await loyverse_sync.descontar_stock_lote_loyverse(skus_dict)
-            background_tasks.add_task(retrasar_stock_lote, skus_a_actualizar)
+            # ⚡ Acumulamos el stock en el Súper Lote en lugar de enviarlo uno por uno
+            if stock_talla >= 0:
+                skus_totales_magicos[sku_variante] = stock_talla
         
         db.commit()
         
-        # 5. PREPARAMOS EXCEL (CON FORMATO UNIVERSAL)
+        # 5. PREPARAMOS EXCEL
         datos_excel.append({
             "Codigo": sku_padre,
             "Nombre": nombre_limpio,
@@ -2090,6 +2084,13 @@ async def subir_fotos_magicas(
             "Foto Visual": f'=IMAGE("{url_permanente}")'
         })
         exitos += 1
+
+    # ⚡ FUERA DEL CICLO: Mandamos 1 solo robot a Loyverse para TODO el lote
+    if skus_totales_magicos:
+        async def retrasar_stock_lote(skus_dict):
+            await asyncio.sleep(12.0) # Esperamos 12s para asegurar que Loyverse creó todo
+            await loyverse_sync.descontar_stock_lote_loyverse(skus_dict)
+        background_tasks.add_task(retrasar_stock_lote, skus_totales_magicos)
 
     print("="*50)
     print(f"🏁 RESULTADO FINAL: {exitos} éxitos | {errores} errores")
@@ -2164,6 +2165,8 @@ async def subir_excel(
             if col not in df.columns: return {"error": f"Falta la columna '{col}' en tu Excel."}
 
         pantalones_creados = 0
+        skus_totales_excel = {} # ⚡ SÚPER LOTE PARA EXCEL
+
         for index, fila in df.iterrows():
             nombre_cat = str(fila.get('Categoria', '')).strip()
             if not nombre_cat or nombre_cat == 'nan': continue
@@ -2183,7 +2186,6 @@ async def subir_excel(
             nombre = str(fila['Nombre']).strip()
             precio = float(fila['Precio'])
             
-            # ⚡ LEEMOS LOS PAQUETES Y CALCULAMOS EL STOCK TOTAL AUTOMÁTICAMENTE
             paquetes = int(fila['Paquetes'])
             stock_total = paquetes * 12
             
@@ -2192,7 +2194,6 @@ async def subir_excel(
                 color_excel = "Original"
             color_sku = color_excel.replace(" ", "").upper()
 
-            # 1. CREAMOS AL PAPÁ PRIMERO (Con el stock ya multiplicado)
             nuevo_pantalon = models.Pantalon(
                 codigo=codigo, nombre=nombre, precio=precio,
                 stock=stock_total, categoria_id=categoria.id, imagen_url=foto_url
@@ -2203,13 +2204,9 @@ async def subir_excel(
             
             pantalones_creados += 1
             
-            # ⚡ CREAMOS EN LOYVERSE PRIMERO (¡Movimos esta línea arriba!)
             background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre, codigo, precio, categoria.nombre, color_excel)
             
-            # 2. CREAMOS LOS HIJOS (Tallas) Y ENVIAMOS EL STOCK RETRASADO EN LOTE
             distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
-
-            skus_a_actualizar = {}
 
             for talla_str, piezas_por_paquete in distribucion.items():
                 stock_talla = paquetes * piezas_por_paquete
@@ -2224,16 +2221,18 @@ async def subir_excel(
                 )
                 db.add(nueva_talla)
                 
-                if stock_talla > 0:
-                    skus_a_actualizar[sku_variante] = stock_talla
-                    
-            if skus_a_actualizar:
-                async def retrasar_stock_lote(skus_dict):
-                    await asyncio.sleep(8.0)
-                    await loyverse_sync.descontar_stock_lote_loyverse(skus_dict)
-                background_tasks.add_task(retrasar_stock_lote, skus_a_actualizar)
+                # ⚡ Acumulamos en el lote
+                if stock_talla >= 0:
+                    skus_totales_excel[sku_variante] = stock_talla
             
             db.commit()
+            
+        # ⚡ FUERA DEL CICLO: Actualización masiva de inventario
+        if skus_totales_excel:
+            async def retrasar_stock_lote_excel(skus_dict):
+                await asyncio.sleep(12.0)
+                await loyverse_sync.descontar_stock_lote_loyverse(skus_dict)
+            background_tasks.add_task(retrasar_stock_lote_excel, skus_totales_excel)
             
         return {"mensaje": f"Carga masiva exitosa. Se crearon {pantalones_creados} modelos."}
         
