@@ -5,8 +5,10 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from pydantic import BaseModel
 import string
+from sqlalchemy import event
 import httpx
 from google import genai
+import time
 import random
 import loyverse_sync
 from fastapi.responses import Response
@@ -722,8 +724,46 @@ def generar_cupon_prueba(db: Session = Depends(get_db)):
         return {"mensaje": "¡Cupón BIENVENIDA10 (10% de descuento) creado y listo para usar!"}
     return {"mensaje": "El cupón ya existía."}
 
-import time
-from sqlalchemy import event
+# ==========================================
+# ❤️ LISTA DE DESEOS (FAVORITOS)
+# ==========================================
+@app.post("/favoritos/{pantalon_id}")
+def agregar_quitar_favorito(pantalon_id: int, correo: str = Depends(verificar_token_cliente), db: Session = Depends(get_db)):
+    cliente = db.query(models.Cliente).filter(models.Cliente.correo == correo).first()
+    if not cliente: raise HTTPException(status_code=404)
+    
+    fav_existente = db.query(models.Favorito).filter(models.Favorito.cliente_id == cliente.id, models.Favorito.pantalon_id == pantalon_id).first()
+    
+    if fav_existente:
+        db.delete(fav_existente)
+        db.commit()
+        return {"estado": "removido", "mensaje": "Eliminado de tus favoritos"}
+    else:
+        nuevo_fav = models.Favorito(cliente_id=cliente.id, pantalon_id=pantalon_id)
+        db.add(nuevo_fav)
+        db.commit()
+        return {"estado": "agregado", "mensaje": "¡Guardado en tu lista de deseos! ❤️"}
+
+@app.get("/favoritos")
+def obtener_favoritos(correo: str = Depends(verificar_token_cliente), db: Session = Depends(get_db)):
+    cliente = db.query(models.Cliente).filter(models.Cliente.correo == correo).first()
+    if not cliente: raise HTTPException(status_code=404)
+    
+    favoritos = db.query(models.Favorito).filter(models.Favorito.cliente_id == cliente.id).order_by(models.Favorito.id.desc()).all()
+    
+    resultado = []
+    for f in favoritos:
+        p = f.pantalon
+        if p:
+            resultado.append({
+                "id": p.id,
+                "nombre": p.nombre,
+                "precio": p.precio,
+                "imagen_url": p.imagen_url,
+                "stock": p.stock
+            })
+    return resultado
+
 
 # ==========================================
 # ⚡ MEJORA 1: MEMORIA RAM (Caché de Ultra Velocidad)
@@ -764,16 +804,35 @@ def obtener_pantalones(
 ):
     global CACHE_TIENDA
     
-    # 1. ⚡ Si la RAM está vacía, hacemos la consulta pesada UNA SOLA VEZ
     if CACHE_TIENDA["pantalones"] is None or (time.time() - CACHE_TIENDA["timestamp"]) > 3600:
-        CACHE_TIENDA["pantalones"] = db.query(models.Pantalon).order_by(models.Pantalon.id.desc()).all()
+        CACHE_TIENDA["pantalones"] = db.query(models.Pantalon).all()
         CACHE_TIENDA["timestamp"] = time.time()
         print("🚀 Catálogo cargado desde PostgreSQL a la RAM (Cero Latencia)")
     
-    # Trabajamos con los datos en la RAM (No gasta CPU)
-    resultados = CACHE_TIENDA["pantalones"]
+    resultados_brutos = CACHE_TIENDA["pantalones"]
+    resultados = []
+    hoy = datetime.utcnow()
+
+    # ⚡ 1. FILTRO FANTASMA (Oculta los de +7 días y empuja los agotados al fondo)
+    for p in resultados_brutos:
+        # Si no tiene stock, revisamos hace cuánto se agotó
+        if p.stock <= 0:
+            if p.fecha_agotado is None:
+                # Se acaba de agotar hoy, le ponemos el reloj
+                p.fecha_agotado = hoy
+                db.commit()
+            elif (hoy - p.fecha_agotado).days > 7:
+                # Ya pasó una semana, NO lo metemos a la lista (Se vuelve invisible)
+                continue
+        else:
+            # Si le volvieron a meter stock, reseteamos el reloj
+            if p.fecha_agotado is not None:
+                p.fecha_agotado = None
+                db.commit()
+                
+        resultados.append(p)
     
-    # 2. Aplicamos los filtros a la velocidad de la luz
+    # 2. Aplicamos los filtros normales
     if categoria_id: 
         resultados = [p for p in resultados if p.categoria_id == categoria_id]
     if busqueda: 
@@ -784,15 +843,16 @@ def obtener_pantalones(
     if precio_max is not None: 
         resultados = [p for p in resultados if p.precio <= precio_max]
         
+    # ⚡ 3. ORDENAMIENTO INTELIGENTE (Los que no tienen stock se van al final SIEMPRE)
     if orden == "precio_asc":
-        resultados.sort(key=lambda x: x.precio)
+        resultados.sort(key=lambda x: (x.stock == 0, x.precio))
     elif orden == "precio_desc":
-        resultados.sort(key=lambda x: x.precio, reverse=True)
+        resultados.sort(key=lambda x: (x.stock == 0, -x.precio))
+    else:
+        # Por defecto, los más nuevos arriba, agotados hasta abajo
+        resultados.sort(key=lambda x: (x.stock == 0, -x.id))
         
-    # 3. ⚡ MEJORA 2: Paginación Real (Corta la lista antes de enviarla)
-    resultados_paginados = resultados[skip : skip + limit]
-    
-    return resultados_paginados
+    return resultados[skip : skip + limit]
 
 @app.get("/generar-cupon-100")
 def generar_cupon_100(db: Session = Depends(get_db)):
@@ -909,6 +969,33 @@ async def busqueda_visual(request: Request, foto: UploadFile = File(...)):
 # 🤖 ASISTENTE VIRTUAL (PERSONAL SHOPPER)
 # ==========================================
 gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+# ==========================================
+# 📏 PROBADOR VIRTUAL CON IA
+# ==========================================
+@app.post("/api/probador-virtual")
+@limiter.limit("5/minute")
+def probador_virtual(request: Request, datos: schemas.RecomendacionTallaRequest):
+    prompt = f"""
+    Eres la diseñadora experta de Surprise Jeans. Tu tarea es encontrar el fit perfecto para esta clienta.
+    Sus datos son:
+    - Peso: {datos.peso_kg} kg
+    - Altura: {datos.altura_cm} cm
+    - Quiere comprar un pantalón corte: {datos.corte_pantalon}
+    - Le gusta usar la ropa: {datos.preferencia_ajuste}
+    
+    Las tallas mexicanas de mezclilla para mujer que manejamos son: 3, 5, 7, 9, 11, 13 y 15.
+    Calcula matemáticamente su talla ideal basándote en la relación peso-altura de la mujer latina.
+    Dame tu recomendación en máximo 3 líneas. Sé amable y usa un par de emojis.
+    """
+    try:
+        respuesta = gemini_client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=prompt
+        )
+        return {"mensaje": respuesta.text}
+    except Exception as e:
+        return {"mensaje": "¡Hola hermosa! ✨ Por tus medidas te sugiero pedir la talla que usas regularmente. Nuestras mezclillas tienen excelente stretch."}
 
 @app.post("/api/chat")
 @limiter.limit("15/minute")
@@ -2678,6 +2765,51 @@ def generar_etiquetas_qr(token: str, db: Session = Depends(get_db)):
     buffer.seek(0)
     
     return Response(content=buffer.getvalue(), media_type="application/pdf")
+
+
+# ==========================================
+# 📊 EXPORTADOR DE CORTE DE CAJA A EXCEL
+# ==========================================
+@app.get("/admin/exportar-ventas")
+@limiter.limit("5/minute")
+def exportar_ventas(request: Request, db: Session = Depends(get_db), token: str = Depends(verificar_token)):
+    # Solo sacamos pedidos que sí significaron dinero en la bolsa
+    pedidos = db.query(models.Pedido).filter(models.Pedido.estatus.in_(["PAGADO", "ENVIADO", "ENTREGADO"])).order_by(models.Pedido.fecha.desc()).all()
+    
+    datos = []
+    for p in pedidos:
+        ropa = ", ".join([f"{d.cantidad}x {d.pantalon.nombre if d.pantalon else 'Modelo'} (Talla {d.talla})" for d in p.detalles])
+        
+        datos.append({
+            "Folio": f"SJ-{p.id:04d}",
+            "Fecha": p.fecha.strftime("%Y-%m-%d %H:%M:%S"),
+            "Cliente": p.nombre_cliente,
+            "Teléfono": p.telefono,
+            "Total MXN": p.total,
+            "Estatus": p.estatus,
+            "Ropa Comprada": ropa,
+            "Guía de Envío": p.guia_rastreo or "Sin guía"
+        })
+        
+    df = pd.DataFrame(datos)
+    buffer = BytesIO()
+    
+    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Corte de Caja')
+        worksheet = writer.sheets['Corte de Caja']
+        
+        # Le damos un formato ancho para que Yessica lo pueda leer bien
+        worksheet.column_dimensions['A'].width = 10
+        worksheet.column_dimensions['B'].width = 20
+        worksheet.column_dimensions['C'].width = 25
+        worksheet.column_dimensions['E'].width = 15
+        worksheet.column_dimensions['G'].width = 60
+        
+    buffer.seek(0)
+    headers = {'Content-Disposition': f'attachment; filename="Corte_Caja_SurpriseJeans_{datetime.now().strftime("%Y%m%d")}.xlsx"'}
+    
+    return Response(content=buffer.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers=headers)
+
 
 # ==========================================
 # 🌟 CARRUSEL DE RESEÑAS EN VIVO (PRUEBA SOCIAL)

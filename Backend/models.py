@@ -20,6 +20,7 @@ class Pantalon(Base):
     descripcion = Column(String, nullable=True)
     precio = Column(Float)
     stock = Column(Integer, default=0)
+    fecha_agotado = Column(DateTime, nullable=True)
     imagen_url = Column(String)
     categoria_id = Column(Integer, ForeignKey("categorias.id"))
     
@@ -124,3 +125,12 @@ class Cupon(Base):
     codigo = Column(String, unique=True, index=True)
     porcentaje = Column(Float)
     activo = Column(Integer, default=1)
+
+class Favorito(Base):
+    __tablename__ = "favoritos"
+    id = Column(Integer, primary_key=True, index=True)
+    cliente_id = Column(Integer, ForeignKey("clientes.id", ondelete="CASCADE"))
+    pantalon_id = Column(Integer, ForeignKey("pantalones.id", ondelete="CASCADE"))
+    fecha_guardado = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    pantalon = relationship("Pantalon")
