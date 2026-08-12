@@ -2051,10 +2051,8 @@ async def subir_fotos_magicas(
 
         distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
 
-        # ⚡ ESCUDO: Función asíncrona AFUERA del ciclo
-        async def retrasar_stock(sku, stock):
-            await asyncio.sleep(8.0)
-            await loyverse_sync.descontar_stock_loyverse(sku, stock)
+        # ⚡ OPTIMIZACIÓN: Juntamos todas las tallas en una sola caja
+        skus_a_actualizar = {}
 
         for talla_str, piezas_por_paquete in distribucion.items():
             stock_talla = paquetes * piezas_por_paquete 
@@ -2068,7 +2066,14 @@ async def subir_fotos_magicas(
             db.add(nueva_variante)
             
             if stock_talla > 0:
-                background_tasks.add_task(retrasar_stock, sku_variante, stock_talla)
+                skus_a_actualizar[sku_variante] = stock_talla
+                
+        # ⚡ Enviamos UN SOLO mensajero a Loyverse con todas las tallas
+        if skus_a_actualizar:
+            async def retrasar_stock_lote(skus_dict):
+                await asyncio.sleep(8.0)
+                await loyverse_sync.descontar_stock_lote_loyverse(skus_dict)
+            background_tasks.add_task(retrasar_stock_lote, skus_a_actualizar)
         
         db.commit()
         
@@ -2201,13 +2206,10 @@ async def subir_excel(
             # ⚡ CREAMOS EN LOYVERSE PRIMERO (¡Movimos esta línea arriba!)
             background_tasks.add_task(loyverse_sync.crear_articulo_loyverse, nombre, codigo, precio, categoria.nombre, color_excel)
             
-            # 2. CREAMOS LOS HIJOS (Tallas) Y ENVIAMOS EL STOCK RETRASADO
+            # 2. CREAMOS LOS HIJOS (Tallas) Y ENVIAMOS EL STOCK RETRASADO EN LOTE
             distribucion = {"3": 1, "5": 1, "7": 3, "9": 3, "11": 2, "13": 1, "15": 1}
 
-            # ⚡ ESCUDO: Definimos la función AFUERA del ciclo para que Python no se confunda con los SKUs
-            async def retrasar_stock(sku, stock):
-                await asyncio.sleep(8.0)
-                await loyverse_sync.descontar_stock_loyverse(sku, stock)
+            skus_a_actualizar = {}
 
             for talla_str, piezas_por_paquete in distribucion.items():
                 stock_talla = paquetes * piezas_por_paquete
@@ -2223,7 +2225,13 @@ async def subir_excel(
                 db.add(nueva_talla)
                 
                 if stock_talla > 0:
-                    background_tasks.add_task(retrasar_stock, sku_variante, stock_talla)
+                    skus_a_actualizar[sku_variante] = stock_talla
+                    
+            if skus_a_actualizar:
+                async def retrasar_stock_lote(skus_dict):
+                    await asyncio.sleep(8.0)
+                    await loyverse_sync.descontar_stock_lote_loyverse(skus_dict)
+                background_tasks.add_task(retrasar_stock_lote, skus_a_actualizar)
             
             db.commit()
             

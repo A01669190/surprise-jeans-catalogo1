@@ -37,47 +37,41 @@ async def obtener_catalogo_completo(token):
                 
     return todos_los_items
 
-async def descontar_stock_loyverse(sku, stock_after):
-    """ Actualiza el inventario absoluto en la tablet de forma asíncrona """
+async def descontar_stock_lote_loyverse(skus_stock_dict):
+    """ Actualiza el inventario de múltiples tallas en un solo viaje a la tablet """
     try:
         headers = {"Authorization": f"Bearer {TOKEN_LOYVERSE}", "Content-Type": "application/json"}
         
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=20.0) as client:
             res_tienda = await client.get("https://api.loyverse.com/v1.0/stores", headers=headers)
             res_tienda.raise_for_status()
             store_id = res_tienda.json()["stores"][0]["id"]
             
-            # ⚡ Motor de paginación infinita asíncrono
+            # Descargamos el catálogo UNA sola vez
             items = await obtener_catalogo_completo(TOKEN_LOYVERSE)
             
-            if not items:
-                print(f"⚠️ El catálogo está vacío en Loyverse.")
-                return
-                
-            variant_id = None
+            if not items: return
+            
+            inventory_levels = []
             for item in items:
                 for variante in item.get("variants", []):
-                    if variante.get("sku") == sku:
-                        variant_id = variante["variant_id"]
-                        break
-                if variant_id:
-                    break
-                    
-            if not variant_id:
-                print(f"⚠️ La talla específica {sku} no se encontró en Loyverse.")
-                return
+                    sku = variante.get("sku")
+                    if sku in skus_stock_dict:
+                        inventory_levels.append({
+                            "store_id": store_id, 
+                            "variant_id": variante["variant_id"], 
+                            "stock_after": skus_stock_dict[sku]
+                        })
             
-            ajuste_payload = {
-                "inventory_levels": [{"store_id": store_id, "variant_id": variant_id, "stock_after": stock_after}]
-            }
-            
-            res_ajuste = await client.post("https://api.loyverse.com/v1.0/inventory", json=ajuste_payload, headers=headers)
-            res_ajuste.raise_for_status()
-            print(f"✅ Loyverse actualizado (Async): Talla {sku} ahora tiene {stock_after} piezas.")
+            if inventory_levels:
+                ajuste_payload = {"inventory_levels": inventory_levels}
+                res_ajuste = await client.post("https://api.loyverse.com/v1.0/inventory", json=ajuste_payload, headers=headers)
+                res_ajuste.raise_for_status()
+                print(f"✅ Loyverse actualizado (LOTE): Se actualizaron {len(inventory_levels)} tallas de un solo golpe.")
             
     except Exception as e:
         error_msg = e.response.text if hasattr(e, 'response') else str(e)
-        print(f"❌ Error de Loyverse al actualizar stock: {error_msg}")
+        print(f"❌ Error de Loyverse al actualizar stock en lote: {error_msg}")
 
 async def procesar_webhooks_loyverse(eventos, db, manager):
     """ Escucha ÚNICAMENTE cuando cobran en caja para restar el stock """
