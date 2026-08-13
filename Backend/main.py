@@ -995,6 +995,7 @@ def probador_virtual(request: Request, datos: schemas.RecomendacionTallaRequest)
         )
         return {"mensaje": respuesta.text}
     except Exception as e:
+        print(f"🚨 ERROR REAL DE GEMINI: {str(e)}")
         return {"mensaje": "¡Hola hermosa! ✨ Por tus medidas te sugiero pedir la talla que usas regularmente. Nuestras mezclillas tienen excelente stretch."}
     
 @app.post("/api/chat")
