@@ -973,6 +973,9 @@ gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 # ==========================================
 # 📏 PROBADOR VIRTUAL CON IA
 # ==========================================
+# ==========================================
+# 📏 PROBADOR VIRTUAL CON IA
+# ==========================================
 @app.post("/api/probador-virtual")
 @limiter.limit("5/minute")
 def probador_virtual(request: Request, datos: schemas.RecomendacionTallaRequest):
@@ -990,14 +993,14 @@ def probador_virtual(request: Request, datos: schemas.RecomendacionTallaRequest)
     """
     try:
         respuesta = gemini_client.models.generate_content(
-            model='gemini-1.5-flash',
+            model='gemini-3-flash-preview', # ⚡ ¡AQUÍ ESTABA EL ERROR! AHORA USA EL MISMO MODELO DEL CHATBOT
             contents=prompt
         )
         return {"mensaje": respuesta.text}
     except Exception as e:
-        print(f"🚨 ERROR REAL DE GEMINI: {str(e)}")
+        print(f"🚨 ERROR REAL DE GEMINI: {str(e)}") 
         return {"mensaje": "¡Hola hermosa! ✨ Por tus medidas te sugiero pedir la talla que usas regularmente. Nuestras mezclillas tienen excelente stretch."}
-    
+       
 @app.post("/api/chat")
 @limiter.limit("15/minute")
 def asistente_virtual(req: ChatRequest, request: Request):
