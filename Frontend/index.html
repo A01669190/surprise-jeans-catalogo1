@@ -1017,11 +1017,12 @@
             window.open(`https://wa.me/?text=${encodeURIComponent(mensaje)}`, '_blank');
         }
 
-        function calcularTalla() {
+        async function calcularTalla() {
             const cintura = parseFloat(document.getElementById('medida-cintura').value);
             const cadera = parseFloat(document.getElementById('medida-cadera').value);
 
             if (!cintura || !cadera) {
+                // Ocultar temporalmente para que la alerta no quede atrás
                 document.getElementById('modal-asistente').classList.add('hidden');
                 Swal.fire('Atención', 'Por favor ingresa ambas medidas.', 'warning').then(() => {
                     document.getElementById('modal-asistente').classList.remove('hidden');
@@ -1029,93 +1030,58 @@
                 return;
             }
 
+            // Ocultamos la ventanita
             document.getElementById('modal-asistente').classList.add('hidden');
 
-            const categoriaLower = window.categoriaParaTalla || '';
-            let corte = 'Skinny'; // Por defecto
-            
-            if (categoriaLower.includes("mom")) corte = "Mom Jeans";
-            else if (categoriaLower.includes("holgado") || categoriaLower.includes("wide")) corte = "Holgado";
-            else if (categoriaLower.includes("barrell") || categoriaLower.includes("barrel")) corte = "Barrell";
-            else if (categoriaLower.includes("cargo")) corte = "Cargo";
-            else if (categoriaLower.includes("recto") || categoriaLower.includes("straight")) corte = "Recto";
-            else if (categoriaLower.includes("short")) corte = "Short";
+            // ⚡ MOTOR DE IA GEMINI PARA TALLAS ⚡
+            Swal.fire({ title: 'Pensando...', text: 'Consultando a la diseñadora virtual ✨', allowOutsideClick: false, showConfirmButton: false });
+            Swal.showLoading();
 
-            // ⚡ Algoritmo Profesional de Fit cruzado (Cintura vs Cadera)
-            let tallaCintura = 0;
-            if (cintura <= 66) tallaCintura = 3;
-            else if (cintura <= 70) tallaCintura = 5;
-            else if (cintura <= 74) tallaCintura = 7;
-            else if (cintura <= 78) tallaCintura = 9;
-            else if (cintura <= 82) tallaCintura = 11;
-            else if (cintura <= 86) tallaCintura = 13;
-            else if (cintura <= 92) tallaCintura = 15;
-            else tallaCintura = 99; 
-            
-            let tallaCadera = 0;
-            if (cadera <= 92) tallaCadera = 3;
-            else if (cadera <= 96) tallaCadera = 5;
-            else if (cadera <= 100) tallaCadera = 7;
-            else if (cadera <= 104) tallaCadera = 9;
-            else if (cadera <= 108) tallaCadera = 11;
-            else if (cadera <= 112) tallaCadera = 13;
-            else if (cadera <= 116) tallaCadera = 15;
-            else tallaCadera = 99;
+            try {
+                // Mandamos los datos a Python
+                const respuesta = await fetch(`${API_URL}/api/probador-virtual`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        cintura_cm: cintura,
+                        cadera_cm: cadera,
+                        corte_pantalon: window.categoriaParaTalla || "Skinny",
+                        preferencia_ajuste: "Normal"
+                    })
+                });
 
-            let tallaFinalNum = Math.max(tallaCintura, tallaCadera);
-            let mensajeFit = "";
+                const data = await respuesta.json();
 
-            // ⚡ Inteligencia por Categoría para minimizar devoluciones
-            if (['Mom Jeans', 'Holgado', 'Barrell', 'Cargo'].includes(corte)) {
-                // Si la cadera dicta una talla mayor, pero este pantalón viene amplio de cadera, nos basamos en la cintura.
-                if (tallaCadera > tallaCintura && tallaCintura !== 99) {
-                    tallaFinalNum = tallaCintura;
-                    mensajeFit = `Como este corte (<b>${corte}</b>) viene amplio de caderas y piernas, nos basamos en tu cintura para darte el fit espectacular que buscas.`;
-                } else {
-                    mensajeFit = `Este corte (<b>${corte}</b>) te quedará perfecto y muy cómodo.`;
+                // Guardamos la memoria si Gemini nos da un número
+                const matchTalla = data.mensaje.match(/talla\s*(\d+)/i);
+                let mensajeMemoria = "";
+                
+                if (matchTalla && matchTalla[1] && ["3", "5", "7", "9", "11", "13", "15"].includes(matchTalla[1])) {
+                    localStorage.setItem('tallaIdealYSK', matchTalla[1]);
+                    mensajeMemoria = `<p class="text-[11px] text-emerald-600 font-black mt-4 border-t border-indigo-100 pt-3 uppercase tracking-widest">✨ Guardamos tu talla para tus futuras compras</p>`;
                 }
-            } else {
-                // Skinny, Recto, Shorts: Vienen al cuerpo, se respeta la medida mayor para que no apriete
-                mensajeFit = `Al ser un estilo (<b>${corte}</b>), nos aseguramos de que te ajuste divino de cadera y cintura sin apretar gracias al stretch.`;
-            }
 
-            let tallaSugerida = "";
-            if (tallaFinalNum === 99 || cintura > 120 || cadera > 130) {
-                tallaSugerida = "Talla Especial";
-                mensajeFit = "Te sugerimos contactarnos por WhatsApp para ofrecerte modelos Plus Size o medirte personalmente.";
-            } else {
-                tallaSugerida = tallaFinalNum.toString();
-            }
+                // Mostramos el resultado de la IA
+                Swal.fire({
+                    title: '¡Tu Fit Perfecto! ✨',
+                    html: `<div class="py-4 text-sm text-gray-600 leading-relaxed bg-indigo-50/50 p-4 rounded-xl border border-indigo-50 text-left">
+                            ${data.mensaje.replace(/\n/g, '<br>')}
+                            ${mensajeMemoria}
+                           </div>`,
+                    confirmButtonText: '¡Entendido!',
+                    confirmButtonColor: '#4f46e5',
+                    customClass: { popup: 'rounded-3xl' }
+                }).then(() => {
+                    Swal.close();
+                });
 
-            // ⚡ LA MAGIA DE LA MEMORIA
-            let mensajeMemoria = "";
-            if (["3", "5", "7", "9", "11", "13", "15"].includes(tallaSugerida)) {
-                localStorage.setItem('tallaIdealYSK', tallaSugerida);
-                mensajeMemoria = `<p class="text-[11px] text-emerald-600 font-black mt-3 uppercase tracking-widest">✨ Guardamos tu talla para tus futuras compras</p>`;
+            } catch (error) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Hubo un problemita',
+                    text: 'La diseñadora virtual está ocupada. Intenta de nuevo en unos segundos.'
+                });
             }
-
-            Swal.fire({
-                title: '¡Tu Fit Perfecto!',
-                html: `<div class="py-4">
-                        <p class="text-sm text-gray-500">Basado en tus medidas, tu talla ideal es:</p>
-                        <p class="text-5xl font-black text-indigo-600 my-4">${tallaSugerida}</p>
-                        <p class="text-xs text-stone-600 font-medium bg-indigo-50 p-3 rounded-lg border border-indigo-100">${mensajeFit}</p>
-                        ${mensajeMemoria}
-                    </div>`,
-                confirmButtonText: '¡Añadir esa talla!',
-                confirmButtonColor: '#4f46e5'
-            }).then(() => {
-                // ⚡ Al cerrarlo, le seleccionamos el botón morado automáticamente
-                if (tallaSugerida !== "Talla Especial" && window.idPantalonAbierto) {
-                    const p = catalogoCompleto.find(x => x.id == window.idPantalonAbierto);
-                    if (p && p.tallas) {
-                        const varStock = p.tallas.find(t => t.talla === tallaSugerida && t.stock > 0);
-                        if (varStock) {
-                            seleccionarTalla(p.id, tallaSugerida, varStock.sku);
-                        }
-                    }
-                }
-            });
         }
         
         // ⚡ COMPARTIR WISHLIST (Fix para pruebas locales)
@@ -1140,69 +1106,6 @@
             const mensaje = `¡Hola! Hice mi wishlist en Surprise Jeans. Aquí te dejo mis modelos favoritos para que no batalles con mi regalo:\n\n${link}`;
             
             window.open(`https://wa.me/?text=${encodeURIComponent(mensaje)}`, '_blank');
-        }
-
-        function calcularTalla() {
-            const cintura = parseFloat(document.getElementById('medida-cintura').value);
-            const cadera = parseFloat(document.getElementById('medida-cadera').value);
-
-            if (!cintura || !cadera) {
-                // Ocultar temporalmente para que la alerta de error no quede por detrás
-                document.getElementById('modal-asistente').classList.add('hidden');
-                Swal.fire('Atención', 'Por favor ingresa ambas medidas.', 'warning').then(() => {
-                    document.getElementById('modal-asistente').classList.remove('hidden');
-                });
-                return;
-            }
-
-            // ⚡ CLAVE: Ocultamos el asistente ANTES de mostrar el resultado
-            document.getElementById('modal-asistente').classList.add('hidden');
-
-            // Nuevo algoritmo más profesional
-            let tallaSugerida = "";
-            
-            if (cintura > 120) {
-                tallaSugerida = "Medida irreal (Revisa tus números)";
-            } else if (cintura <= 65) {
-                tallaSugerida = "3";
-            } else if (cintura <= 68) {
-                tallaSugerida = "5";
-            } else if (cintura <= 72) {
-                tallaSugerida = "7";
-            } else if (cintura <= 76) {
-                tallaSugerida = "9";
-            } else if (cintura <= 80) {
-                tallaSugerida = "11";
-            } else if (cintura <= 84) {
-                tallaSugerida = "13";
-            } else if (cintura <= 92) {
-                tallaSugerida = "15";
-            } else {
-                tallaSugerida = "Talla Especial"; 
-            }
-
-            // ⚡ LA MAGIA DE LA MEMORIA: Solo la guardamos si es una talla válida
-            let mensajeMemoria = "";
-            if (["3", "5", "7", "9", "11", "13", "15"].includes(tallaSugerida)) {
-                localStorage.setItem('tallaIdealYSK', tallaSugerida);
-                mensajeMemoria = `<p class="text-[11px] text-emerald-600 font-black mt-3 uppercase tracking-widest">✨ Guardamos tu talla para tus futuras compras</p>`;
-            }
-
-            Swal.fire({
-                title: '¡Tu Fit Perfecto!',
-                html: `<div class="py-4">
-                        <p class="text-sm">Basado en tus medidas, tu talla ideal es:</p>
-                        <p class="text-4xl font-black text-indigo-600 my-4">${tallaSugerida}</p>
-                        <p class="text-[10px] text-stone-400">Recuerda que nuestra mezclilla estira, esta es una sugerencia basada en nuestro corte estándar.</p>
-                        ${mensajeMemoria}
-                    </div>`,
-                confirmButtonText: '¡Entendido!',
-                confirmButtonColor: '#4f46e5'
-            }).then(() => {
-                // ⚡ Si tenían un pantalón abierto de fondo, cerramos esa ventana
-                // para que al volverlo a abrir, ya aparezca su talla morada seleccionada.
-                Swal.close();
-            });
         }
 
         async function cargarCatalogo() {
@@ -3596,6 +3499,8 @@
             }
             event.target.value = '';
         }
+
+        
 
     </script>
     
