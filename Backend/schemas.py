@@ -89,10 +89,10 @@ class PantalonUpdateRapido(BaseModel):
     stock: Optional[int] = None
 
 class RecomendacionTallaRequest(BaseModel):
-    peso_kg: float
-    altura_cm: float
-    corte_pantalon: Literal["Skinny", "Mom Jeans", "Wide Leg", "Recto"]
-    preferencia_ajuste: Literal["Ajustado", "Normal", "Holgado"] = "Normal"
+    cintura_cm: float
+    cadera_cm: float
+    corte_pantalon: str = "Skinny" # Lo dejamos flexible por si no lo mandan
+    preferencia_ajuste: str = "Normal"
 
 class RefreshTokenReq(BaseModel):
     refresh_token: str

@@ -978,14 +978,14 @@ gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 def probador_virtual(request: Request, datos: schemas.RecomendacionTallaRequest):
     prompt = f"""
     Eres la diseñadora experta de Surprise Jeans. Tu tarea es encontrar el fit perfecto para esta clienta.
-    Sus datos son:
-    - Peso: {datos.peso_kg} kg
-    - Altura: {datos.altura_cm} cm
+    Sus medidas reales son:
+    - Cintura: {datos.cintura_cm} cm
+    - Cadera: {datos.cadera_cm} cm
     - Quiere comprar un pantalón corte: {datos.corte_pantalon}
     - Le gusta usar la ropa: {datos.preferencia_ajuste}
     
     Las tallas mexicanas de mezclilla para mujer que manejamos son: 3, 5, 7, 9, 11, 13 y 15.
-    Calcula matemáticamente su talla ideal basándote en la relación peso-altura de la mujer latina.
+    Calcula matemáticamente su talla ideal basándote en la tabla de medidas estándar cruzando cintura y cadera.
     Dame tu recomendación en máximo 3 líneas. Sé amable y usa un par de emojis.
     """
     try:
@@ -996,7 +996,7 @@ def probador_virtual(request: Request, datos: schemas.RecomendacionTallaRequest)
         return {"mensaje": respuesta.text}
     except Exception as e:
         return {"mensaje": "¡Hola hermosa! ✨ Por tus medidas te sugiero pedir la talla que usas regularmente. Nuestras mezclillas tienen excelente stretch."}
-
+    
 @app.post("/api/chat")
 @limiter.limit("15/minute")
 def asistente_virtual(req: ChatRequest, request: Request):
