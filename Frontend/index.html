@@ -1017,7 +1017,7 @@
             window.open(`https://wa.me/?text=${encodeURIComponent(mensaje)}`, '_blank');
         }
 
-        async function calcularTalla() {
+        function calcularTalla() {
             const cintura = parseFloat(document.getElementById('medida-cintura').value);
             const cadera = parseFloat(document.getElementById('medida-cadera').value);
 
@@ -1029,67 +1029,78 @@
                 return;
             }
 
+            // Ocultamos la ventanita
             document.getElementById('modal-asistente').classList.add('hidden');
 
-            // ⚡ MOTOR DE IA GEMINI PARA TALLAS ⚡
-            Swal.fire({ title: 'Pensando...', text: 'Consultando a la diseñadora virtual ✨', allowOutsideClick: false, showConfirmButton: false });
+            // ⚡ CEREBRO LOCAL: 0 Segundos de conexión externa ⚡
+            Swal.fire({ title: 'Calculando...', allowOutsideClick: false, showConfirmButton: false });
             Swal.showLoading();
 
-            try {
-                const respuesta = await fetch(`${API_URL}/api/probador-virtual`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        cintura_cm: cintura,
-                        cadera_cm: cadera,
-                        corte_pantalon: window.categoriaParaTalla || "Skinny",
-                        preferencia_ajuste: "Normal"
-                    })
-                });
-
-                const data = await respuesta.json();
-
-                // ⚡ ESCÁNER MEJORADO: Busca cualquier número de talla válido en la respuesta
-                const matchTalla = data.mensaje.match(/\b(3|5|7|9|11|13|15)\b/);
-                let mensajeMemoria = "";
+            // Simulamos medio segundo de "pensamiento" para que se sienta súper profesional pero veloz
+            setTimeout(() => {
+                // 1. Matemáticas de Talla
+                let tallaCintura = 0;
+                if (cintura <= 66) tallaCintura = 3;
+                else if (cintura <= 70) tallaCintura = 5;
+                else if (cintura <= 74) tallaCintura = 7;
+                else if (cintura <= 78) tallaCintura = 9;
+                else if (cintura <= 82) tallaCintura = 11;
+                else if (cintura <= 86) tallaCintura = 13;
+                else if (cintura <= 92) tallaCintura = 15;
+                else tallaCintura = 99; 
                 
-                if (matchTalla && matchTalla[0]) {
-                    localStorage.setItem('tallaIdealYSK', matchTalla[0]);
+                let tallaCadera = 0;
+                if (cadera <= 92) tallaCadera = 3;
+                else if (cadera <= 96) tallaCadera = 5;
+                else if (cadera <= 100) tallaCadera = 7;
+                else if (cadera <= 104) tallaCadera = 9;
+                else if (cadera <= 108) tallaCadera = 11;
+                else if (cadera <= 112) tallaCadera = 13;
+                else if (cadera <= 116) tallaCadera = 15;
+                else tallaCadera = 99;
+
+                let tallaFinalNum = Math.max(tallaCintura, tallaCadera);
+                let tallaSugerida = tallaFinalNum === 99 ? "Especial" : tallaFinalNum.toString();
+
+                let mensajeMemoria = "";
+                let mensajeDiseñadora = "";
+
+                // 2. Generador de mensajes tipo IA (Diferentes cada vez)
+                if (tallaSugerida !== "Especial") {
+                    localStorage.setItem('tallaIdealYSK', tallaSugerida);
                     mensajeMemoria = `<p class="text-[11px] text-emerald-600 font-black mt-4 border-t border-indigo-100 pt-3 uppercase tracking-widest">✨ Guardamos tu talla para tus futuras compras</p>`;
+                    
+                    const respuestas = [
+                        `¡Hola hermosa! ✨ Cruzamos tus medidas y tu fit perfecto es la talla <b>${tallaSugerida}</b>. Nuestras mezclillas tienen excelente stretch para adaptarse a tus curvas.`,
+                        `¡Lista! 💖 Para un ajuste increíble con tus medidas, te sugerimos pedir la talla <b>${tallaSugerida}</b>. ¡Te va a quedar divino!`,
+                        `¡Magia pura! 👖 Tomando en cuenta tu cadera y cintura, la talla <b>${tallaSugerida}</b> es la ideal para ti. ¡Amarás cómo te horma!`
+                    ];
+                    mensajeDiseñadora = respuestas[Math.floor(Math.random() * respuestas.length)];
+                } else {
+                    mensajeDiseñadora = "¡Hola hermosa! ✨ Por tus medidas, te sugerimos contactarnos por WhatsApp para mostrarte nuestros modelos Plus Size o asesorarte personalmente.";
                 }
 
+                // 3. Mostramos el resultado al instante
                 Swal.fire({
                     title: '¡Tu Fit Perfecto! ✨',
                     html: `<div class="py-4 text-sm text-gray-600 leading-relaxed bg-indigo-50/50 p-4 rounded-xl border border-indigo-50 text-left">
-                            ${data.mensaje.replace(/\n/g, '<br>')}
+                            ${mensajeDiseñadora}
                             ${mensajeMemoria}
                            </div>`,
                     confirmButtonText: '¡Añadir a mi bolsa!',
                     confirmButtonColor: '#4f46e5',
                     customClass: { popup: 'rounded-3xl' }
                 }).then(() => {
-                    // ⚡ MAGIA VISUAL: Volvemos a abrir el pantalón automáticamente con la nueva talla morada
                     if (window.idPantalonAbierto) {
                         const p = catalogoCompleto.find(x => x.id == window.idPantalonAbierto);
-                        if (p) {
-                            verDetalles(p.id, p.nombre.replace(/'/g, "\\'"), p.imagen_url, p.precio);
-                        }
+                        if (p) verDetalles(p.id, p.nombre.replace(/'/g, "\\'"), p.imagen_url, p.precio);
                     }
                 });
 
-            } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Hubo un problemita',
-                    text: 'La diseñadora virtual está ocupada. Intenta de nuevo en unos segundos.'
-                });
-            }
+            }, 600); // Solo tarda 0.6 segundos en responder
         }
         
-        // ⚡ COMPARTIR WISHLIST (Fix para pruebas locales)
-        // ==========================================
-        // ⚡ GUARDAR EN FAVORITOS (WISHLIST)
-        // ==========================================
+
         function compartirWishlist() {
             if (misFavoritos.length === 0) {
                 Swal.fire({
