@@ -698,3 +698,37 @@ function renderizarPantalones(listaPantalones, esNuevaBusqueda) {
         contenedor.appendChild(tarjeta);
     });
 }
+
+// ==========================================
+        // ⚡ MANTENER SESIÓN AL RECARGAR (F5)
+        // ==========================================
+        async function verificarSesionActiva() {
+            const tokenGuardado = sessionStorage.getItem('token_vip');
+            const tokenRenovacion = localStorage.getItem('refresh_token_vip'); // Si lo tienes implementado
+
+            // Si hay un token guardado, intentamos usarlo para que no pida clave
+            if (tokenGuardado) {
+                try {
+                    // Hacemos una petición silenciosa al servidor para ver si el token aún sirve
+                    const respuesta = await fetch('https://surprise-jeans-api-denz.onrender.com/pedidos-admin', {
+                        headers: { 'Authorization': `Bearer ${tokenGuardado}` }
+                    });
+
+                    // Si el servidor nos dice que todo está bien (OK), ocultamos el cuadro de login
+                    if (respuesta.ok) {
+                        document.getElementById('panel-login').classList.add('hidden');
+                        document.getElementById('nav-admin').classList.remove('hidden');
+                        document.getElementById('vista-catalogo').classList.remove('hidden');
+                        
+                        // Y ya que estamos aquí, cargamos los datos de una vez
+                        verificarEstadoMenu(); 
+                        return; // Todo listo, nos salimos de aquí
+                    }
+                } catch (error) {
+                    console.error("Error validando sesión silenciosa:", error);
+                }
+            }
+
+            // Si llegamos aquí, es porque no hay token, o el token caducó.
+            // Entonces, dejamos que la página cargue normal y muestre el cuadro de login.
+        }
