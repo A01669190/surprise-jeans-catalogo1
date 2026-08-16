@@ -728,7 +728,4 @@ function renderizarPantalones(listaPantalones, esNuevaBusqueda) {
                     console.error("Error validando sesión silenciosa:", error);
                 }
             }
-
-            // Si llegamos aquí, es porque no hay token, o el token caducó.
-            // Entonces, dejamos que la página cargue normal y muestre el cuadro de login.
         }
